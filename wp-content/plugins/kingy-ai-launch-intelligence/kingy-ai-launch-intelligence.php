@@ -38,6 +38,7 @@ require_once KINGY_ALI_PLUGIN_DIR . 'includes/search.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/directories.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/models.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/shortcodes.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/launches-of-week.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/launch-scorecard.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/microsoft-copilot-course.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/ai-launch-academy.php';
@@ -155,6 +156,7 @@ function kingy_ali_maybe_flush_rewrite_rules_deferred() {
 add_action('wp_enqueue_scripts', 'kingy_ali_register_assets');
 add_action('wp_enqueue_scripts', 'kingy_ali_enqueue_public_page_assets', 20);
 add_action('wp_head', 'kingy_ali_output_critical_layout_css', 0);
+add_action('wp_head', 'kingy_ali_output_clients_tools_visual_system_css', PHP_INT_MAX);
 add_action('template_redirect', 'kingy_ali_capture_singular_admin_bar_edit_id', 1);
 add_action('admin_bar_menu', 'kingy_ali_restore_singular_admin_bar_edit_link', PHP_INT_MAX);
 add_action('wp_before_admin_bar_render', 'kingy_ali_restore_singular_admin_bar_edit_link_before_render', PHP_INT_MAX);
@@ -455,6 +457,32 @@ function kingy_ali_enqueue_model_assets() {
     kingy_ali_enqueue_assets();
     wp_enqueue_style('kingy-ali-model-intelligence');
     wp_enqueue_script('kingy-ali-model-intelligence');
+}
+
+function kingy_ali_output_clients_tools_visual_system_css() {
+    if (!is_page(15869) && !is_page('clients')) {
+        return;
+    }
+
+    $css_file = KINGY_ALI_PLUGIN_DIR . 'assets/css/launch-intelligence.css';
+    if (!is_readable($css_file)) {
+        return;
+    }
+
+    $css = file_get_contents($css_file);
+    if (!is_string($css) || $css === '') {
+        return;
+    }
+
+    $marker = '/* Clients page / AI Tools visual system bridge. */';
+    $marker_position = strpos($css, $marker);
+    if ($marker_position === false) {
+        return;
+    }
+
+    echo "\n<style id=\"kingy-ali-clients-tools-visual-system-css\">\n";
+    echo trim(substr($css, $marker_position));
+    echo "\n</style>\n";
 }
 
 function kingy_ali_is_public_launch_intelligence_surface() {

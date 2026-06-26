@@ -1,0 +1,310 @@
+.kingy-ali-model-template,
+.kingy-ali-model-hub,
+.kingy-ali-model-compare,
+.kingy-ali-model-best-list {
+    box-sizing: border-box;
+}
+
+.kingy-ali-model-disclosure {
+    align-items: flex-start;
+    background: #fff8e7;
+    border: 1px solid #ead59a;
+    border-radius: 8px;
+    color: #2f2612;
+    display: grid;
+    gap: 6px;
+    line-height: 1.5;
+    margin: 18px 0 24px;
+    padding: 14px 16px;
+}
+
+.kingy-ali-model-disclosure strong {
+    color: #172026;
+}
+
+.kingy-ali-model-foundation {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 24px 0;
+}
+
+.kingy-ali-model-foundation article,
+.kingy-ali-model-compare-dimensions {
+    background: #fff;
+    border: 1px solid #dbe5de;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    padding: 18px;
+}
+
+.kingy-ali-model-foundation h2,
+.kingy-ali-model-compare-dimensions h2 {
+    font-size: 1.15rem;
+    margin: 0 0 10px;
+}
+
+.kingy-ali-model-foundation ul,
+.kingy-ali-model-compare-dimensions ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.kingy-ali-model-foundation li,
+.kingy-ali-model-compare-dimensions li {
+    line-height: 1.55;
+    margin: 6px 0;
+}
+
+.kingy-ali-model-compare-dimensions {
+    margin: 18px 0;
+}
+
+.kingy-ali-model-compare-dimensions p {
+    color: #44524a;
+    line-height: 1.55;
+    margin: 0 0 12px;
+}
+
+.kingy-ali-model-compare-dimensions ul {
+    columns: 2;
+}
+
+.kingy-ali-model-compare-note,
+.kingy-ali-model-compare-notice {
+    background: #f6f8f5;
+    border: 1px solid #dbe5de;
+    border-radius: 8px;
+    color: #26343b;
+    line-height: 1.55;
+    margin: 18px 0;
+    padding: 16px;
+}
+
+.kingy-ali-model-compare-note strong {
+    color: #172026;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.kingy-ali-model-compare-note p,
+.kingy-ali-model-compare-notice p {
+    margin: 0;
+}
+
+.kingy-ali-model-filter-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.kingy-ali-model-card .kingy-ali-score-list {
+    margin-top: 14px;
+}
+
+.kingy-ali-model-card .kingy-ali-badges {
+    margin-top: 12px;
+}
+
+.kingy-ali-model-compare-form {
+    align-items: end;
+    background: #fbfcfb;
+    border: 1px solid #dbe5de;
+    border-radius: 8px;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(220px, 1fr)) auto auto;
+    margin: 24px 0;
+    padding: 18px;
+}
+
+.kingy-ali-model-compare-form label {
+    display: grid;
+    gap: 6px;
+}
+
+.kingy-ali-model-compare-form span {
+    color: #607068;
+    font-size: .86rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.kingy-ali-model-compare-form select {
+    min-height: 44px;
+    width: 100%;
+}
+
+.kingy-ali-model-compare-form button,
+.kingy-ali-model-compare-form a {
+    align-items: center;
+    border-radius: 6px;
+    display: inline-flex;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    text-decoration: none;
+}
+
+.kingy-ali-model-compare-form button {
+    background: #172026;
+    border: 1px solid #172026;
+    color: #fff;
+}
+
+.kingy-ali-model-compare-form a {
+    background: #fff;
+    border: 1px solid #172026;
+    color: #172026;
+}
+
+.kingy-ali-model-compare-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.kingy-ali-model-compare-table {
+    background: #fff;
+    border: 1px solid #dbe5de;
+    border-collapse: collapse;
+    min-width: 760px;
+    width: 100%;
+}
+
+.kingy-ali-model-compare-table th,
+.kingy-ali-model-compare-table td {
+    border-bottom: 1px solid #edf2ef;
+    line-height: 1.5;
+    padding: 13px 14px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.kingy-ali-model-compare-table thead th {
+    background: #f3f7f4;
+    color: #172026;
+}
+
+.kingy-ali-model-compare-table tbody th {
+    color: #607068;
+    font-weight: 700;
+    width: 190px;
+}
+
+.kingy-ali-model-compare-section th {
+    background: #172026;
+    color: #fff !important;
+    font-size: .86rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.kingy-ali-model-unknown {
+    color: #68746d;
+    font-style: italic;
+}
+
+.kingy-ali-model-readiness,
+.kingy-ali-model-compare-source-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 22px 0;
+}
+
+.kingy-ali-model-readiness__card,
+.kingy-ali-model-compare-source-grid article {
+    background: #fff;
+    border: 1px solid #dbe5de;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.kingy-ali-model-readiness__card.is-ready {
+    border-color: #7fac8d;
+}
+
+.kingy-ali-model-readiness__card.is-caution {
+    border-color: #d8b85e;
+}
+
+.kingy-ali-model-readiness__card h3,
+.kingy-ali-model-compare-source-grid h3 {
+    font-size: 1rem;
+    margin: 0 0 8px;
+}
+
+.kingy-ali-model-readiness__card p,
+.kingy-ali-model-readiness__card ul {
+    margin: 0;
+}
+
+.kingy-ali-model-readiness__card ul {
+    padding-left: 18px;
+}
+
+.kingy-ali-model-source-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.kingy-ali-model-source-list a,
+.kingy-ali-model-source-list span {
+    background: #f6f8f5;
+    border: 1px solid #dbe5de;
+    border-radius: 6px;
+    color: #172026;
+    display: inline-flex;
+    font-size: .9rem;
+    line-height: 1.3;
+    padding: 7px 9px;
+    text-decoration: none;
+}
+
+.kingy-ali-model-compare-sources {
+    margin-top: 28px;
+}
+
+.kingy-ali-model-compare-sources h2 {
+    font-size: 1.35rem;
+    margin-bottom: 14px;
+}
+
+.kingy-ali-model-compare-cta {
+    margin-top: 24px;
+}
+
+.kingy-ali-model-caveat {
+    border-color: #ead59a;
+}
+
+.kingy-ali-model-panels .kingy-ali-text-panel p {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+    .kingy-ali-model-foundation {
+        grid-template-columns: 1fr;
+    }
+
+    .kingy-ali-model-compare-dimensions ul {
+        columns: 1;
+    }
+
+    .kingy-ali-model-compare-form {
+        grid-template-columns: 1fr;
+    }
+
+    .kingy-ali-model-readiness,
+    .kingy-ali-model-compare-source-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .kingy-ali-model-compare-form button,
+    .kingy-ali-model-compare-form a {
+        width: 100%;
+    }
+}
