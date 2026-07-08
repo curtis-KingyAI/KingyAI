@@ -1051,6 +1051,11 @@ function kingy_ali_launch_wpseo_canonical($url) {
         return $launch_action_page_meta['url'];
     }
 
+    $directory_archive_canonical = kingy_ali_directory_archive_canonical_url();
+    if ($directory_archive_canonical) {
+        return $directory_archive_canonical;
+    }
+
     $directory_meta = kingy_ali_current_directory_archive_meta();
     if ($directory_meta && !empty($directory_meta['url'])) {
         return $directory_meta['url'];
@@ -1152,6 +1157,10 @@ function kingy_ali_filter_core_sitemap_taxonomies($taxonomies) {
 }
 
 function kingy_ali_launch_wpseo_rel_link($link) {
+    if (is_post_type_archive('kingy_ai_tool') && function_exists('kingy_ali_directory_has_filters') && !kingy_ali_directory_has_filters(kingy_ali_directory_request_filters())) {
+        return kingy_ali_tool_directory_wpseo_rel_link($link);
+    }
+
     if (!is_string($link) || !is_tax('kingy_launch_category')) {
         return $link;
     }
@@ -1165,6 +1174,79 @@ function kingy_ali_launch_wpseo_rel_link($link) {
     $current_base = home_url('/ai-launch-category/' . $term->slug . '/');
 
     return str_replace($legacy_base, $current_base, $link);
+}
+
+function kingy_ali_tool_directory_wpseo_rel_link($link) {
+    if (!function_exists('kingy_ali_query_tool_directory')) {
+        return $link;
+    }
+
+    $rel = current_filter() === 'wpseo_prev_rel_link' ? 'prev' : 'next';
+    $current_page = function_exists('kingy_ali_directory_current_page') ? kingy_ali_directory_current_page() : max(1, absint(get_query_var('paged')));
+    $total_pages = kingy_ali_tool_directory_total_pages_for_current_request();
+    $target_page = $rel === 'prev' ? $current_page - 1 : $current_page + 1;
+
+    if ($target_page < 1 || $target_page > $total_pages) {
+        return false;
+    }
+
+    $url = kingy_ali_directory_archive_page_url(home_url('/ai-tools/'), $target_page);
+    return '<link rel="' . esc_attr($rel) . '" href="' . esc_url($url) . '" />';
+}
+
+function kingy_ali_tool_directory_total_pages_for_current_request() {
+    static $cache = array();
+
+    if (!function_exists('kingy_ali_query_tool_directory') || !function_exists('kingy_ali_directory_request_filters')) {
+        return 0;
+    }
+
+    $filters = kingy_ali_directory_request_filters();
+    $per_page = function_exists('kingy_ali_tool_directory_per_page') ? kingy_ali_tool_directory_per_page(24) : 24;
+    $current_page = function_exists('kingy_ali_directory_current_page') ? kingy_ali_directory_current_page() : max(1, absint(get_query_var('paged')));
+    $cache_key = md5(wp_json_encode(array($filters, $per_page, $current_page)));
+    if (isset($cache[$cache_key])) {
+        return $cache[$cache_key];
+    }
+
+    $query = kingy_ali_query_tool_directory(
+        array_merge(
+            $filters,
+            array(
+                'limit' => $per_page,
+                'paged' => $current_page,
+                'paginate' => true,
+                'track_search' => false,
+            )
+        )
+    );
+
+    $cache[$cache_key] = isset($query->max_num_pages) ? absint($query->max_num_pages) : 0;
+    return $cache[$cache_key];
+}
+
+function kingy_ali_directory_archive_canonical_url() {
+    $directory_meta = kingy_ali_current_directory_archive_meta();
+    if (!$directory_meta || empty($directory_meta['url'])) {
+        return '';
+    }
+
+    $paged = absint(get_query_var('paged'));
+    if (!$paged) {
+        $paged = absint(get_query_var('page'));
+    }
+
+    return kingy_ali_directory_archive_page_url($directory_meta['url'], max(1, $paged));
+}
+
+function kingy_ali_directory_archive_page_url($base_url, $page) {
+    $base_url = trailingslashit($base_url);
+    $page = max(1, absint($page));
+    if ($page <= 1) {
+        return $base_url;
+    }
+
+    return $base_url . user_trailingslashit('page/' . $page, 'paged');
 }
 
 function kingy_ali_output_launch_meta_description() {

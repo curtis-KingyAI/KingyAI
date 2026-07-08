@@ -10,12 +10,16 @@ add_shortcode('kingy_company_directory', 'kingy_ali_shortcode_company_directory'
 function kingy_ali_shortcode_tool_directory($atts = array()) {
     kingy_ali_enqueue_assets();
     $atts = shortcode_atts(array('limit' => 24, 'heading' => 'yes'), $atts, 'kingy_tool_directory');
+    $per_page = kingy_ali_tool_directory_per_page($atts['limit']);
+    $paged = kingy_ali_directory_current_page();
     $filters = kingy_ali_directory_request_filters();
     $query = kingy_ali_query_tool_directory(
         array_merge(
             $filters,
             array(
-                'limit' => absint($atts['limit']),
+                'limit' => $per_page,
+                'paged' => $paged,
+                'paginate' => true,
                 'track_search' => kingy_ali_directory_has_filters($filters),
             )
         )
@@ -31,6 +35,7 @@ function kingy_ali_shortcode_tool_directory($atts = array()) {
     }
     echo kingy_ali_render_directory_filters($filters, 'tools');
     echo kingy_ali_render_tool_directory_grid($query);
+    echo kingy_ali_render_tool_directory_pagination($query, $paged, $filters);
     echo '</section>';
 
     return ob_get_clean();
@@ -84,9 +89,32 @@ function kingy_ali_directory_has_filters($filters) {
     });
 }
 
+function kingy_ali_tool_directory_per_page($value = 24) {
+    $per_page = absint($value);
+    if (!$per_page) {
+        $per_page = 24;
+    }
+
+    return max(1, (int) apply_filters('kingy_ali_tool_directory_per_page', $per_page));
+}
+
+function kingy_ali_directory_current_page() {
+    $paged = absint(get_query_var('paged'));
+    if (!$paged) {
+        $paged = absint(get_query_var('page'));
+    }
+    if (!$paged) {
+        $paged = absint(kingy_ali_request_get_value('paged'));
+    }
+
+    return max(1, $paged);
+}
+
 function kingy_ali_query_tool_directory($args = array()) {
     $defaults = array(
         'limit' => 24,
+        'paged' => 1,
+        'paginate' => false,
         'q' => '',
         'category' => '',
         'audience' => '',
@@ -99,6 +127,7 @@ function kingy_ali_query_tool_directory($args = array()) {
     );
     $args = wp_parse_args($args, $defaults);
     $limit = absint($args['limit']);
+    $paged = max(1, absint($args['paged']));
 
     $query_args = array(
         'post_type' => 'kingy_ai_tool',
@@ -119,17 +148,20 @@ function kingy_ali_query_tool_directory($args = array()) {
     kingy_ali_apply_directory_meta_filters($query_args, $args, true);
     kingy_ali_apply_public_noindex_meta_constraint($query_args);
 
-    $query = kingy_ali_run_public_filtered_query(
-        $query_args,
-        $limit,
-        function ($post) use ($args) {
-            if (!kingy_ali_public_query_accepts_index_ready_post($post)) {
-                return false;
-            }
-
-            return empty($args['video_demo']) || kingy_ali_public_query_accepts_valid_url_meta($post, array('demo_url'));
+    $predicate = function ($post) use ($args) {
+        if (!kingy_ali_public_query_accepts_index_ready_post($post)) {
+            return false;
         }
-    );
+
+        return empty($args['video_demo']) || kingy_ali_public_query_accepts_valid_url_meta($post, array('demo_url'));
+    };
+
+    if (!empty($args['paginate'])) {
+        $query = kingy_ali_run_public_paginated_filtered_query($query_args, $limit, $paged, $predicate);
+    } else {
+        $query = kingy_ali_run_public_filtered_query($query_args, $limit, $predicate);
+    }
+
     if ($args['track_search']) {
         kingy_ali_track_directory_search('tool_directory', $args, $query);
     }
@@ -354,7 +386,7 @@ function kingy_ali_render_directory_filters($filters, $context = 'tools') {
 
     ob_start();
     ?>
-    <form class="kingy-ali-search" method="get">
+    <form class="kingy-ali-search" method="get" action="<?php echo esc_url($reset_url); ?>">
         <div class="kingy-ali-search__bar">
             <label class="screen-reader-text" for="kingy-ali-directory-q"><?php esc_html_e('Search directory', 'kingy-ai-launch-intelligence'); ?></label>
             <input id="kingy-ali-directory-q" type="search" name="kali_q" value="<?php echo esc_attr($filters['q']); ?>" placeholder="<?php echo esc_attr($context === 'companies' ? __('Search companies, founders, funding, categories, and audiences...', 'kingy-ai-launch-intelligence') : __('Search tools, companies, categories, demos, pricing, and use cases...', 'kingy-ai-launch-intelligence')); ?>">
@@ -400,6 +432,72 @@ function kingy_ali_render_tool_directory_grid($query) {
     }
 
     return ob_get_clean();
+}
+
+function kingy_ali_render_tool_directory_pagination($query, $current_page, $filters) {
+    $total_pages = isset($query->max_num_pages) ? absint($query->max_num_pages) : 0;
+    if ($total_pages <= 1) {
+        return '';
+    }
+
+    $current_page = max(1, absint($current_page));
+    $big = 999999999;
+    $filter_keys = array_values(kingy_ali_directory_filter_query_keys());
+    $base = remove_query_arg(array_merge($filter_keys, array('paged')), get_pagenum_link($big, false));
+    $filter_args = kingy_ali_directory_filter_query_args($filters);
+    $links = paginate_links(
+        array(
+            'base' => str_replace((string) $big, '%#%', $base),
+            'format' => '',
+            'current' => min($current_page, $total_pages),
+            'total' => $total_pages,
+            'prev_text' => __('Previous', 'kingy-ai-launch-intelligence'),
+            'next_text' => __('Next', 'kingy-ai-launch-intelligence'),
+            'type' => 'array',
+            'end_size' => 1,
+            'mid_size' => 1,
+            'add_args' => $filter_args,
+        )
+    );
+
+    if (!$links) {
+        return '';
+    }
+
+    $page_one_paged_url = add_query_arg($filter_args, str_replace((string) $big, '1', $base));
+    $page_one_archive_url = add_query_arg($filter_args, remove_query_arg(array_merge($filter_keys, array('paged')), get_pagenum_link(1, false)));
+    $links = array_map(
+        function ($link) use ($page_one_paged_url, $page_one_archive_url) {
+            return str_replace(esc_url($page_one_paged_url), esc_url($page_one_archive_url), $link);
+        },
+        $links
+    );
+
+    return '<nav class="kingy-ali-pagination" aria-label="' . esc_attr__('AI tools pages', 'kingy-ai-launch-intelligence') . '">' . implode('', array_map('wp_kses_post', $links)) . '</nav>';
+}
+
+function kingy_ali_directory_filter_query_keys() {
+    return array(
+        'q' => 'kali_q',
+        'category' => 'kali_category',
+        'audience' => 'kali_audience',
+        'attribute' => 'kali_attribute',
+        'free_plan' => 'kali_free_plan',
+        'api_available' => 'kali_api_available',
+        'open_source_or_open_weight' => 'kali_open_weight',
+        'video_demo' => 'kali_video_demo',
+    );
+}
+
+function kingy_ali_directory_filter_query_args($filters) {
+    $args = array();
+    foreach (kingy_ali_directory_filter_query_keys() as $filter_key => $query_key) {
+        if (!empty($filters[$filter_key])) {
+            $args[$query_key] = $filters[$filter_key];
+        }
+    }
+
+    return $args;
 }
 
 function kingy_ali_render_company_directory_grid($query) {
