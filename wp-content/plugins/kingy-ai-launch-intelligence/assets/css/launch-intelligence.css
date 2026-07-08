@@ -8620,6 +8620,7 @@ body .kingy-ali-tool-directory .kingy-ali-results-count {
 }
 
 body .kingy-ali-tool-directory .kingy-ali-grid {
+    align-items: stretch;
     display: grid;
     gap: 18px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8634,6 +8635,7 @@ body .kingy-ali-tool-directory .kingy-ali-card {
     color: var(--kai-ink);
     display: flex;
     flex-direction: column;
+    height: 100%;
     min-height: 390px;
     overflow: hidden;
     padding: 20px;
@@ -8653,9 +8655,10 @@ body .kingy-ali-tool-directory .kingy-ali-card__meta {
     color: var(--kai-muted);
     display: flex;
     flex-wrap: wrap;
-    font-size: 0.74rem;
+    font-size: 0.86rem;
     gap: 7px;
     margin: 0 0 12px;
+    min-height: 63px;
 }
 
 body .kingy-ali-tool-directory .kingy-ali-card__meta span {
@@ -8674,7 +8677,7 @@ body .kingy-ali-tool-directory .kingy-ali-card__meta span {
 
 body .kingy-ali-tool-directory .kingy-ali-card h3 {
     color: var(--kai-ink);
-    font-size: clamp(1.13rem, 1.45vw, 1.33rem);
+    font-size: clamp(1.25rem, 1.55vw, 1.46rem);
     font-weight: 800;
     letter-spacing: 0;
     line-height: 1.2;
@@ -8698,7 +8701,7 @@ body .kingy-ali-tool-directory .kingy-ali-card h3 a:focus {
 body .kingy-ali-tool-directory .kingy-ali-card > p {
     color: #2b3732;
     display: -webkit-box;
-    font-size: 0.96rem;
+    font-size: 1.09rem;
     line-height: 1.58;
     margin: 0 0 16px;
     min-height: 4.74em;
@@ -8711,7 +8714,7 @@ body .kingy-ali-tool-directory .kingy-ali-badges {
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
-    margin: auto 0 16px;
+    margin: 0 0 16px;
 }
 
 body .kingy-ali-tool-directory .kingy-ali-badge {
@@ -8721,7 +8724,7 @@ body .kingy-ali-tool-directory .kingy-ali-badge {
     border-radius: 999px;
     color: #78665d;
     display: inline-flex;
-    font-size: 0.78rem;
+    font-size: 0.9rem;
     font-weight: 800;
     gap: 6px;
     line-height: 1.15;
@@ -8787,7 +8790,7 @@ body .kingy-ali-tool-directory .kingy-ali-score-list div:last-child {
 
 body .kingy-ali-tool-directory .kingy-ali-score-list dt {
     color: var(--kai-muted);
-    font-size: 0.78rem;
+    font-size: 0.9rem;
     font-weight: 900;
     letter-spacing: 0;
     line-height: 1.35;
@@ -8796,7 +8799,7 @@ body .kingy-ali-tool-directory .kingy-ali-score-list dt {
 body .kingy-ali-tool-directory .kingy-ali-score-list dd {
     color: #2f3e38;
     display: -webkit-box;
-    font-size: 0.86rem;
+    font-size: 0.98rem;
     line-height: 1.45;
     margin: 0;
     overflow: hidden;
@@ -8816,7 +8819,7 @@ body .kingy-ali-tool-directory .kingy-ali-card__actions a {
     align-items: center;
     border-radius: 8px;
     display: inline-flex;
-    font-size: 0.88rem;
+    font-size: 1rem;
     font-weight: 900;
     justify-content: center;
     line-height: 1.2;
@@ -8850,6 +8853,47 @@ body .kingy-ali-tool-directory .kingy-ali-card__actions a + a:focus {
     background: var(--kai-soft);
     border-color: var(--kai-accent);
     color: var(--kai-ink);
+}
+
+body .kingy-ali-tool-directory .kingy-ali-pagination {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: clamp(24px, 4vw, 36px) 0 0;
+}
+
+body .kingy-ali-tool-directory .kingy-ali-pagination .page-numbers {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--kai-line-strong);
+    border-radius: 8px;
+    color: var(--kai-ink);
+    display: inline-flex;
+    font-size: 1rem;
+    font-weight: 900;
+    justify-content: center;
+    line-height: 1.2;
+    min-height: 42px;
+    min-width: 42px;
+    padding: 10px 13px;
+    text-align: center;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+body .kingy-ali-tool-directory .kingy-ali-pagination a.page-numbers:hover,
+body .kingy-ali-tool-directory .kingy-ali-pagination a.page-numbers:focus {
+    background: var(--kai-soft);
+    border-color: var(--kai-accent);
+    color: var(--kai-ink);
+    transform: translateY(-2px);
+}
+
+body .kingy-ali-tool-directory .kingy-ali-pagination .page-numbers.current {
+    background: var(--kai-ink);
+    border-color: var(--kai-ink);
+    color: #fff;
 }
 
 body a[href$="#back-to-top"],

@@ -405,7 +405,7 @@ function kingy_ali_use_classic_editor_for_agent_use_cases_page($use_block_editor
 }
 
 function kingy_ali_register_assets() {
-    $kingy_ali_launch_asset_version = KINGY_ALI_VERSION . '-funding-style-sync-20260626';
+    $kingy_ali_launch_asset_version = KINGY_ALI_VERSION . '-ai-tools-pagination-card-20260708c';
 
     wp_register_style(
         'kingy-ali-launch-intelligence',

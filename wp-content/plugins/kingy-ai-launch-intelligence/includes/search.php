@@ -204,16 +204,71 @@ function kingy_ali_run_public_filtered_query($query_args, $limit, $predicate) {
     return kingy_ali_replace_query_posts($query, $posts, $limit);
 }
 
-function kingy_ali_replace_query_posts($query, $posts, $limit = 0) {
+function kingy_ali_run_public_paginated_filtered_query($query_args, $per_page, $paged, $predicate) {
+    $per_page = max(1, absint($per_page));
+    $paged = max(1, absint($paged));
+    $batch_size = kingy_ali_public_query_batch_size($per_page);
+    $scan_limit = kingy_ali_public_query_scan_limit($per_page);
+    $offset = 0;
+    $scanned = 0;
+    $accepted_count = 0;
+    $page_start = ($paged - 1) * $per_page;
+    $page_end = $page_start + $per_page;
+    $page_posts = array();
+    $query = null;
+
+    while ($scanned < $scan_limit) {
+        $remaining_scan = $scan_limit - $scanned;
+        $paged_args = $query_args;
+        $paged_args['posts_per_page'] = min($batch_size, $remaining_scan);
+        $paged_args['offset'] = $offset;
+        $paged_args['no_found_rows'] = true;
+        $paged_args['ignore_sticky_posts'] = true;
+
+        $query = new WP_Query($paged_args);
+        $batch_posts = isset($query->posts) ? (array) $query->posts : array();
+        if (!$batch_posts) {
+            break;
+        }
+
+        foreach ($batch_posts as $post) {
+            $scanned++;
+            if (call_user_func($predicate, $post)) {
+                if ($accepted_count >= $page_start && $accepted_count < $page_end) {
+                    $page_posts[] = $post;
+                }
+                $accepted_count++;
+            }
+
+            if ($scanned >= $scan_limit) {
+                break 2;
+            }
+        }
+
+        if (count($batch_posts) < $paged_args['posts_per_page']) {
+            break;
+        }
+
+        $offset += $paged_args['posts_per_page'];
+    }
+
+    if (!$query) {
+        $query = new WP_Query();
+    }
+
+    return kingy_ali_replace_query_posts($query, $page_posts, $per_page, $accepted_count);
+}
+
+function kingy_ali_replace_query_posts($query, $posts, $limit = 0, $found_posts = null) {
     $limit = absint($limit);
     $posts = array_values((array) $posts);
     if ($limit > 0) {
         $posts = array_slice($posts, 0, $limit);
     }
 
-    $total_posts = count($posts);
+    $total_posts = $found_posts === null ? count($posts) : absint($found_posts);
     $query->posts = $posts;
-    $query->post_count = $total_posts;
+    $query->post_count = count($posts);
     $query->found_posts = $total_posts;
     $query->max_num_pages = $limit > 0 && $total_posts > 0 ? (int) ceil($total_posts / $limit) : ($total_posts > 0 ? 1 : 0);
     $query->current_post = -1;
