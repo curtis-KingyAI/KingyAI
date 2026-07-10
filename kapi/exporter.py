@@ -8,8 +8,7 @@ from typing import Any, Mapping
 
 from .calculation import calculate_index
 from .util import (
-PROTOTYPE_CITATION_TEXT,
-    PROTOTYPE_NOTICE,
+    artifact_notice,
     atomic_write,
     canonical_json_bytes,
     csv_bytes,
@@ -58,6 +57,7 @@ def render_release_files(
     """Render every release file except the manifest itself."""
 
     latest = dict(_latest_week(calculation))
+    notice, citation_text = artifact_notice(calculation.get("dataset_kind"))
     release_seed = (
         sha256_bytes(canonical_json_bytes(bundle))
         + sha256_bytes(canonical_json_bytes(methodology))
@@ -72,7 +72,7 @@ def render_release_files(
 
     release = {
         "release_id": release_id,
-        "notice": PROTOTYPE_NOTICE,
+        "notice": notice,
         "not_for_publication": True,
         "deployed": False,
         "published": False,
@@ -91,12 +91,12 @@ def render_release_files(
         "validation": validation_report or {},
         "citation": {
             "permitted": False,
-            "text": PROTOTYPE_CITATION_TEXT,
+            "text": citation_text,
         },
     }
     latest_document = {
         "release_id": release_id,
-        "notice": PROTOTYPE_NOTICE,
+        "notice": notice,
         "not_for_publication": True,
         "latest": latest,
     }
@@ -109,7 +109,7 @@ def render_release_files(
         concentration_status = concentration.get("status")
         history_rows.append(
             {
-                "notice": PROTOTYPE_NOTICE,
+                "notice": notice,
                 "dataset_kind": calculation.get("dataset_kind"),
                 "not_for_publication": True,
                 "citation_permitted": False,
@@ -150,7 +150,7 @@ def render_release_files(
             )
             component_rows.append(
                 {
-                    "notice": PROTOTYPE_NOTICE,
+                    "notice": notice,
                     "dataset_kind": calculation.get("dataset_kind"),
                     "not_for_publication": True,
                     "citation_permitted": False,
@@ -255,6 +255,7 @@ def build_manifest(
     repository_root: str | Path,
 ) -> dict[str, Any]:
     latest = _latest_week(calculation)
+    notice, _ = artifact_notice(calculation.get("dataset_kind"))
     release = load_json_bytes(files["release.json"])
     source_ids = sorted(
         {
@@ -293,7 +294,7 @@ def build_manifest(
     return {
         "manifest_version": "0.1.0",
         "release_id": release["release_id"],
-        "notice": PROTOTYPE_NOTICE,
+        "notice": notice,
         "not_for_publication": True,
         "created_at": latest.get("cutoff_at"),
         "dataset_id": bundle.get("dataset_id"),

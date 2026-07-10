@@ -18,6 +18,18 @@ PROTOTYPE_NOTICE = "SYNTHETIC KAPI PROTOTYPE — NOT AN OFFICIAL OR PUBLISHED IN
 PROTOTYPE_CITATION_TEXT = (
     "Prototype diagnostic only; do not cite as a Kingy AI Price Index release."
 )
+SHADOW_NOTICE = "UNPUBLISHED KAPI SHADOW — NOT AN OFFICIAL OR PUBLIC INDEX"
+SHADOW_CITATION_TEXT = (
+    "Shadow-operation diagnostic only; do not cite as a Kingy AI Price Index release."
+)
+
+
+def artifact_notice(dataset_kind: Any) -> tuple[str, str]:
+    """Return fail-closed notice and citation text for an artifact's data kind."""
+
+    if dataset_kind == "observed":
+        return SHADOW_NOTICE, SHADOW_CITATION_TEXT
+    return PROTOTYPE_NOTICE, PROTOTYPE_CITATION_TEXT
 
 
 def canonical_json_text(value: Any) -> str:
