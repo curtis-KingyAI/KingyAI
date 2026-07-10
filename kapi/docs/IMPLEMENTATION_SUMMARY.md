@@ -2,10 +2,10 @@
 
 ## Workspace
 
-- Source repository: /Users/curtispyke/Documents/Codex/2026-07-09/i-am-looking-to-do-this/work/KingyAI-kapi-prototype
-- Isolated worktree: /Users/curtispyke/Documents/Codex/2026-07-09/goal-implement-a-bounded-zero-spend/work/KingyAI-kapi-v020-remediation
-- Isolated branch: agent/kapi-v020-zero-spend-remediation-20260710
-- Starting commit: 1d59b964a5c895fc9a02a0b9ba58d4200f704419
+- Source worktree: /Users/curtispyke/Documents/Codex/2026-07-09/goal-implement-a-bounded-zero-spend/work/KingyAI-kapi-v021-pr-clean
+- Isolated worktree: /Users/curtispyke/Documents/Codex/2026-07-09/goal-implement-a-bounded-zero-spend/work/KingyAI-kapi-v022-ci-portability-local
+- Isolated branch: agent/kapi-v022-ci-portability-local
+- Starting commit: 6c1568c0659d7c865b238b71047c6f799b1810de
 
 The original dirty worktree was not edited, cleaned, reset, committed, or
 overwritten.
@@ -36,8 +36,12 @@ overwritten.
 | kapi/evidence/official-provider-configuration-evidence-2026-07-10.json | Frozen official-document source ids, URLs, timestamps, hashes, findings, and zero-action limits |
 | kapi/docs/DECISION_RECORD_v0.2.1.md | Human-readable v0.2.1 candidate and evidence decision record |
 | kapi/docs/ENDPOINT_AND_GATE_MATRICES_v0.2.1.md | v0.2.1 documentation, count-evidence, and readiness matrices |
+| kapi/config/methodology-v0.2.2.json | CI-portability amendment separating frozen-manifest reproduction from full source-asset proof |
+| kapi/fixtures/o200k-construction-manifest-v1.json | Canonical 12-entry derived chunk/rank manifest; no complete tokenizer asset |
+| kapi/docs/DECISION_RECORD_v0.2.2.md | Human-readable v0.2.2 portability decision record |
+| kapi/docs/ENDPOINT_AND_GATE_MATRICES_v0.2.2.md | v0.2.2 construction-evidence and readiness matrices |
 | kapi/profiles/* | 36 frozen synthetic input/output payloads across six profiles and 75/100/125 size variants |
-| kapi/fixtures/build_payloads.py | Offline deterministic exact construction-payload generator/checker |
+| kapi/fixtures/build_payloads.py | Portable payload generator/checker plus explicit full source-asset proof mode |
 | kapi/fixtures/build_synthetic.py | Offline deterministic fixture generator/checker |
 | kapi/fixtures/synthetic-hand-example-v1.json | Four-provider, 14-week, 216-token-count, 112-price-observation regression bundle |
 | kapi/schema/001_initial.sql | Normalized source-to-release schema and 29-table append-only triggers |
@@ -48,8 +52,8 @@ overwritten.
 |---|---|
 | kapi/tests/test_calculation.py | 25 calculation, eligibility, price, selection, base, sensitivity, correction-cycle, and concentration regressions |
 | kapi/tests/test_store.py | 12 schema, required-ID/link, source-hash, append-only, rollback, conflict, supersession/correction-cycle, lineage, and round-trip tests |
-| kapi/tests/test_fixtures.py | 12 methodology, version-preservation, official-evidence, payload, hash, grid, offline-generation, and hand-example tests |
-| kapi/tests/test_validation.py | 14 strict source-byte, candidate-evidence, evidence-hash, runtime-gate, cross-record, payload-grid, Decimal, identity, supersession-cycle, and conflict tests |
+| kapi/tests/test_fixtures.py | 16 methodology, portability, version-preservation, official-evidence, payload, hash, grid, offline-generation, and hand-example tests |
+| kapi/tests/test_validation.py | 15 strict source-byte, portability-contract, candidate-evidence, evidence-hash, runtime-gate, cross-record, payload-grid, Decimal, identity, supersession-cycle, and conflict tests |
 | kapi/tests/test_exporter.py | 8 required-artifact, labeling, coverage, manifest/inventory-tamper, weight-reproduction, and deterministic export tests |
 | kapi/tests/test_cli.py | 2 end-to-end CLI, database, export, and reproduction tests |
 | kapi/tests/test_week0_controls.py | 5 truthful-label, base-policy, independent-check, lifecycle, and 10x-unit drill regressions |
@@ -70,9 +74,9 @@ overwritten.
 
 ### Generated synthetic releases
 
-The historical directory `kapi/outputs/sample-release` retains the v0.2.0
-sample vintage. The current-code directory
-`kapi/outputs/sample-release-v0.2.1` contains:
+The historical directories `kapi/outputs/sample-release` and
+`kapi/outputs/sample-release-v0.2.1` retain their prior vintages. The
+current-code directory `kapi/outputs/sample-release-v0.2.2` contains:
 
 - frozen dataset and methodology inputs;
 - calculation.json;

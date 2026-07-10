@@ -14,6 +14,12 @@
 - Their construction counts are exact local reference counts for the JSON
   `content` field under explicitly selected `o200k_base`, using the already
   acquired `tiktoken 0.13.0` package metadata and hashed asset only.
+- Portable reproduction relies on a frozen derived manifest containing only
+  the 12 approved chunk byte strings and ranks. Complete source-asset proof is
+  separate and requires an explicit local path; no source asset is vendored.
+- The derived manifest proves only that those chunks and ranks match the exact
+  hashed retained asset. It does not reproduce or replace the complete
+  tokenizer vocabulary.
 - The construction counts are not model-tokenizer mapping evidence, provider
   request serialization evidence, preflight count evidence, or billing usage
   evidence.
