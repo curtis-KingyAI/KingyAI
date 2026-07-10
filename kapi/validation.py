@@ -310,7 +310,7 @@ def validate_methodology(
         "construction reference must be o200k_base",
     )
     methodology_version = methodology.get("version")
-    if methodology_version in {"0.2.0", "0.2.1"}:
+    if methodology_version in {"0.2.0", "0.2.1", "0.2.2"}:
         collector.check(
             capability.get("configuration_specific_score_allowed") is False,
             "eci_scope",
@@ -336,6 +336,71 @@ def validate_methodology(
             "reference_tokenizer",
             "o200k_base may be verified only as an explicit construction reference",
         )
+        if methodology_version == "0.2.2":
+            manifest = methodology.get("construction_manifest", {})
+            if not isinstance(manifest, Mapping):
+                collector.error(
+                    "construction_manifest",
+                    "construction_manifest",
+                    "v0.2.2 requires a frozen portable construction manifest",
+                )
+                manifest = {}
+            collector.check(
+                manifest.get("entry_count") == 12
+                and manifest.get("status")
+                == "frozen_derived_subset_for_portable_construction_only"
+                and manifest.get("source_asset_vendored") is False,
+                "construction_manifest",
+                "construction_manifest",
+                "v0.2.2 requires exactly 12 derived entries and must not vendor the source asset",
+            )
+            _validate_file_hash(
+                collector,
+                root,
+                manifest.get("path"),
+                manifest.get("sha256"),
+                path_prefix="construction_manifest",
+            )
+            collector.check(
+                reference.get("portable_construction_manifest_path")
+                == manifest.get("path")
+                and reference.get("portable_construction_manifest_sha256")
+                == manifest.get("sha256"),
+                "construction_manifest",
+                "reference_tokenizer",
+                "reference tokenizer must pin the same portable construction manifest",
+            )
+            portable = construction.get("portable_reproduction", {})
+            source_proof = construction.get("source_asset_proof", {})
+            path_configuration = construction.get(
+                "full_source_asset_path_configuration", {}
+            )
+            collector.check(
+                isinstance(portable, Mapping)
+                and portable.get("full_source_asset_required") is False
+                and portable.get("mode") == "frozen_12_chunk_manifest",
+                "construction_portability",
+                "construction_reference.portable_reproduction",
+                "portable reproduction must use the frozen manifest without the full asset",
+            )
+            collector.check(
+                isinstance(source_proof, Mapping)
+                and source_proof.get("full_source_asset_required") is True
+                and source_proof.get("mode") == "explicit_local_asset_path",
+                "construction_source_proof",
+                "construction_reference.source_asset_proof",
+                "full source proof must remain a distinct explicit-asset operation",
+            )
+            collector.check(
+                isinstance(path_configuration, Mapping)
+                and path_configuration.get("cli_option") == "--asset-path"
+                and path_configuration.get("environment_variable")
+                == "KAPI_O200K_ASSET_PATH"
+                and path_configuration.get("repository_default") is None,
+                "construction_source_path",
+                "construction_reference.full_source_asset_path_configuration",
+                "repository code must not contain a default workstation asset path",
+            )
         evidence_classes = methodology.get("evidence_classes", {})
         if not isinstance(evidence_classes, Mapping):
             collector.error(
@@ -438,7 +503,7 @@ def validate_methodology(
                 not in candidates_by_id,
                 "candidate_review_set",
                 "candidate_configurations",
-                "v0.2.1 requires exactly the blocked OpenAI, supported-doc Google, and thinking-omitted Anthropic review candidates",
+                "v0.2.1+ requires exactly the blocked OpenAI, supported-doc Google, and thinking-omitted Anthropic review candidates",
             )
             collector.check(
                 openai.get("model_id") == "gpt-5.4-mini-2026-03-17"
@@ -505,7 +570,7 @@ def validate_methodology(
                 and official_evidence.get("billing_checks_performed") == 0,
                 "official_provider_evidence",
                 "official_provider_evidence",
-                "v0.2.1 official evidence must remain documentation-only with zero provider and billing actions",
+                "v0.2.1+ official evidence must remain documentation-only with zero provider and billing actions",
             )
             if isinstance(official_evidence, Mapping):
                 _validate_file_hash(
@@ -647,7 +712,7 @@ def validate_methodology(
                     entry.get("sha256"),
                     path_prefix=entry_path,
                 )
-                if methodology.get("version") in {"0.2.0", "0.2.1"}:
+                if methodology.get("version") in {"0.2.0", "0.2.1", "0.2.2"}:
                     document = _load_payload_document(
                         collector, root, entry.get("path"), entry_path
                     )
@@ -1165,7 +1230,7 @@ def validate_bundle(
             f"{path}.billing_tokenizer",
             "must match endpoint billing tokenizer",
         )
-        if methodology.get("version") in {"0.2.0", "0.2.1"}:
+        if methodology.get("version") in {"0.2.0", "0.2.1", "0.2.2"}:
             collector.check(
                 token_count.get("construction_count_evidence_class")
                 == "construction_count",

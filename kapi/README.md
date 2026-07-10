@@ -17,36 +17,37 @@ production without separate authorization.
 - Production credentials: none.
 - WordPress or production writes: none.
 - Deployment/publication/shadow operation: none.
-- Runtime dependencies: Python standard library and SQLite only. The payload
-  generator retained from v0.2.0 reads the already acquired local
-  `o200k_base.tiktoken` asset for construction sizing proof; it does not install
-  or vendor package code and does not make network or provider calls.
-- Methodology v0.2.1 adds local official-document evidence statuses only. It
-  does not verify provider runtime behavior, request counts, or billed usage.
+- Runtime dependencies: Python standard library and SQLite only. Portable
+  payload reproduction reads a frozen 12-entry construction manifest. Full
+  `o200k_base` proof is a separate explicit local-asset operation; neither the
+  complete asset nor package code is installed or vendored.
+- Methodology v0.2.2 adds CI-portable construction reproduction without
+  changing the v0.2.1 provider-evidence findings. It does not verify model
+  mapping, provider runtime behavior, request counts, or billed usage.
 
 ## Quick start
 
 Run commands from the repository root:
 
     python3 -m kapi validate-method \
-      --method kapi/config/methodology-v0.2.1.json
+      --method kapi/config/methodology-v0.2.2.json
 
     python3 -m kapi validate \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.2.1.json
+      --method kapi/config/methodology-v0.2.2.json
 
     python3 -m kapi calculate \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.2.1.json \
+      --method kapi/config/methodology-v0.2.2.json \
       --output kapi/outputs/sample/calculation.json
 
     python3 -m kapi export \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.2.1.json \
-      --output-dir kapi/outputs/sample-release-v0.2.1
+      --method kapi/config/methodology-v0.2.2.json \
+      --output-dir kapi/outputs/sample-release-v0.2.2
 
     python3 -m kapi reproduce \
-      --release-dir kapi/outputs/sample-release-v0.2.1
+      --release-dir kapi/outputs/sample-release-v0.2.2
 
 Exercise append-only SQLite storage:
 
@@ -55,7 +56,7 @@ Exercise append-only SQLite storage:
     python3 -m kapi ingest \
       --database kapi/.tmp/kapi.sqlite3 \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.2.1.json
+      --method kapi/config/methodology-v0.2.2.json
 
     python3 -m kapi dump \
       --database kapi/.tmp/kapi.sqlite3 \
@@ -64,6 +65,16 @@ Exercise append-only SQLite storage:
 Run the complete standard-library test suite:
 
     python3 -m unittest discover -s kapi/tests -v
+
+Verify payloads in a fresh checkout without the full tokenizer asset:
+
+    env -u KAPI_O200K_ASSET_PATH \
+      python3 kapi/fixtures/build_payloads.py --check-frozen-manifest
+
+Separately prove the frozen manifest against the retained full asset:
+
+    python3 kapi/fixtures/build_payloads.py --verify-source-asset \
+      --asset-path /explicit/local/path/to/o200k_base.tiktoken
 
 ## Expected synthetic diagnostic
 

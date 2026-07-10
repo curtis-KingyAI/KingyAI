@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BUNDLE = ROOT / "kapi/fixtures/synthetic-hand-example-v1.json"
-METHOD = ROOT / "kapi/config/methodology-v0.2.1.json"
+METHOD = ROOT / "kapi/config/methodology-v0.2.2.json"
 
 
 def run_cli(*arguments: str) -> dict:

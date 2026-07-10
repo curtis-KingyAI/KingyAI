@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from collections import Counter
 from decimal import Decimal
@@ -17,11 +19,15 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO_ROOT / "kapi/config/methodology-v0.2.0.json"
 V021_CONFIG_PATH = REPO_ROOT / "kapi/config/methodology-v0.2.1.json"
+V022_CONFIG_PATH = REPO_ROOT / "kapi/config/methodology-v0.2.2.json"
 OFFICIAL_EVIDENCE_PATH = (
     REPO_ROOT
     / "kapi/evidence/official-provider-configuration-evidence-2026-07-10.json"
 )
 PAYLOAD_GENERATOR_PATH = REPO_ROOT / "kapi/fixtures/build_payloads.py"
+CONSTRUCTION_MANIFEST_PATH = (
+    REPO_ROOT / "kapi/fixtures/o200k-construction-manifest-v1.json"
+)
 GENERATOR_PATH = REPO_ROOT / "kapi/fixtures/build_synthetic.py"
 FIXTURE_PATH = REPO_ROOT / "kapi/fixtures/synthetic-hand-example-v1.json"
 EXPECTED_CONFIG_SHA256 = (
@@ -29,6 +35,12 @@ EXPECTED_CONFIG_SHA256 = (
 )
 EXPECTED_V021_CONFIG_SHA256 = (
     "1cb3cdc12139dad6a6bbaefc31f5023323d1672ba4fba69c531312f5a8a275b0"
+)
+EXPECTED_V022_CONFIG_SHA256 = (
+    "f75219ff27d059b7cc417ba2b2dc3d4e280ccf8e7d2ab0a2b1a38085a99a8ba8"
+)
+EXPECTED_CONSTRUCTION_MANIFEST_SHA256 = (
+    "660cf9990ad347334442622758757023f6f1b9b463273b9cfe5768bd358a918e"
 )
 EXPECTED_OFFICIAL_EVIDENCE_SHA256 = (
     "086d020a9aa40981c95ea2181655d7dcadaf9c1c682449d504641c56c34bdb91"
@@ -94,6 +106,10 @@ class MethodologyFixtureTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config_bytes, cls.config = load_canonical(CONFIG_PATH)
         cls.v021_config_bytes, cls.v021_config = load_canonical(V021_CONFIG_PATH)
+        cls.v022_config_bytes, cls.v022_config = load_canonical(V022_CONFIG_PATH)
+        cls.construction_manifest_bytes, cls.construction_manifest = load_canonical(
+            CONSTRUCTION_MANIFEST_PATH
+        )
         cls.official_evidence_bytes, cls.official_evidence = load_canonical(
             OFFICIAL_EVIDENCE_PATH
         )
@@ -180,6 +196,88 @@ class MethodologyFixtureTests(unittest.TestCase):
         self.assertEqual(
             self.v021_config["readiness_gates"]["technical_go"],
             "failed_no_go",
+        )
+
+    def test_v022_adds_only_the_ci_portability_amendment(self) -> None:
+        self.assertEqual(
+            sha256_bytes(self.v022_config_bytes), EXPECTED_V022_CONFIG_SHA256
+        )
+        self.assertEqual(self.v022_config["version"], "0.2.2")
+        self.assertEqual(
+            self.v022_config["construction_manifest"],
+            {
+                "entry_count": 12,
+                "path": "kapi/fixtures/o200k-construction-manifest-v1.json",
+                "sha256": EXPECTED_CONSTRUCTION_MANIFEST_SHA256,
+                "source_asset_vendored": False,
+                "status": "frozen_derived_subset_for_portable_construction_only",
+            },
+        )
+        self.assertFalse(
+            self.v022_config["construction_reference"]["portable_reproduction"]
+            ["full_source_asset_required"]
+        )
+        self.assertTrue(
+            self.v022_config["construction_reference"]["source_asset_proof"]
+            ["full_source_asset_required"]
+        )
+        path_configuration = self.v022_config["construction_reference"][
+            "full_source_asset_path_configuration"
+        ]
+        self.assertEqual(path_configuration["cli_option"], "--asset-path")
+        self.assertEqual(
+            path_configuration["environment_variable"], "KAPI_O200K_ASSET_PATH"
+        )
+        self.assertIsNone(path_configuration["repository_default"])
+        self.assertEqual(
+            self.v022_config["readiness_gates"], self.v021_config["readiness_gates"]
+        )
+
+        v021_shared = dict(self.v021_config)
+        v022_shared = dict(self.v022_config)
+        for field in (
+            "construction_manifest",
+            "construction_reference",
+            "methodology_amendment",
+            "reference_tokenizer",
+            "version",
+        ):
+            v021_shared.pop(field, None)
+            v022_shared.pop(field, None)
+        self.assertEqual(v022_shared, v021_shared)
+
+    def test_frozen_construction_manifest_is_minimal_and_complete(self) -> None:
+        self.assertEqual(
+            sha256_bytes(self.construction_manifest_bytes),
+            EXPECTED_CONSTRUCTION_MANIFEST_SHA256,
+        )
+        self.assertEqual(len(self.construction_manifest["entries"]), 12)
+        self.assertFalse(
+            self.construction_manifest["derivation"]
+            ["portable_payload_generation_requires_full_source_asset"]
+        )
+        self.assertEqual(
+            self.construction_manifest["derivation"]["source_asset_sha256"],
+            O200K_ASSET_SHA256,
+        )
+        expected = {
+            (profile_id, direction): chunk
+            for profile_id, directions in self.payload_generator.CHUNKS.items()
+            for direction, chunk in directions.items()
+        }
+        actual = {
+            (entry["profile_id"], entry["direction"]): entry["chunk"]
+            for entry in self.construction_manifest["entries"]
+        }
+        self.assertEqual(actual, expected)
+        self.assertEqual(
+            self.construction_manifest["nonclaims"],
+            [
+                "not_verified_model_tokenizer_mapping",
+                "not_provider_preflight_request_count_evidence",
+                "not_billed_usage_count_evidence",
+                "not_billing_equivalence",
+            ],
         )
 
     def test_methodology_encodes_v020_policy(self) -> None:
@@ -328,6 +426,57 @@ class MethodologyFixtureTests(unittest.TestCase):
                 0,
                 msg=f"{script}\nstdout={completed.stdout}\nstderr={completed.stderr}",
             )
+
+    def test_portable_payload_check_does_not_require_source_asset(self) -> None:
+        environment = dict(os.environ)
+        environment.pop("KAPI_O200K_ASSET_PATH", None)
+        completed = subprocess.run(
+            [sys.executable, str(PAYLOAD_GENERATOR_PATH), "--check-frozen-manifest"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=f"stdout={completed.stdout}\nstderr={completed.stderr}",
+        )
+
+    def test_full_source_asset_proof_is_explicit_and_fails_closed(self) -> None:
+        environment = dict(os.environ)
+        environment.pop("KAPI_O200K_ASSET_PATH", None)
+        missing = subprocess.run(
+            [sys.executable, str(PAYLOAD_GENERATOR_PATH), "--verify-source-asset"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("requires --asset-path", missing.stderr)
+
+        with tempfile.TemporaryDirectory() as directory:
+            wrong_asset = Path(directory) / "o200k_base.tiktoken"
+            wrong_asset.write_bytes(b"not the approved asset\n")
+            wrong = subprocess.run(
+                [
+                    sys.executable,
+                    str(PAYLOAD_GENERATOR_PATH),
+                    "--verify-source-asset",
+                    "--asset-path",
+                    str(wrong_asset),
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+        self.assertEqual(wrong.returncode, 2)
+        self.assertIn("unexpected o200k_base asset hash", wrong.stderr)
 
     def test_bundle_identity_and_offline_generation_metadata(self) -> None:
         self.assertEqual(self.fixture["dataset_kind"], "synthetic")
