@@ -10,7 +10,7 @@ from kapi.validation import validate_bundle, validate_methodology
 
 ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = ROOT / "kapi/fixtures/synthetic-hand-example-v1.json"
-METHOD_PATH = ROOT / "kapi/config/methodology-v0.1.0.json"
+METHOD_PATH = ROOT / "kapi/config/methodology-v0.2.1.json"
 
 
 class ValidationTests(unittest.TestCase):
@@ -88,6 +88,65 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("source_grade", report["issue_counts"])
         self.assertIn("token_payload", report["issue_counts"])
         self.assertIn("duplicate_id", report["issue_counts"])
+
+    def test_v021_evidence_classes_and_candidates_fail_closed(self) -> None:
+        method = copy.deepcopy(self.methodology)
+        method["evidence_classes"]["billed_usage_counts"]["status"] = "verified"
+        method["endpoint_specific_billing_counts"]["verified_billing_rows"] = 1
+        method["candidate_configurations"][1]["model_id"] = "gemini-2.5-pro"
+        method["readiness_gates"]["technical_go"] = "passed"
+        report = validate_methodology(method, repository_root=ROOT)
+        self.assertFalse(report["valid"])
+        self.assertIn("evidence_classes", report["issue_counts"])
+        self.assertIn("billing_counts_unverified", report["issue_counts"])
+        self.assertIn("candidate_substitution", report["issue_counts"])
+        self.assertIn("readiness_gates", report["issue_counts"])
+
+    def test_v021_official_documentation_cannot_promote_runtime_evidence(self) -> None:
+        method = copy.deepcopy(self.methodology)
+        candidates = {
+            row["candidate_id"]: row for row in method["candidate_configurations"]
+        }
+        openai = candidates["openai-gpt54mini-reasoning-none"]
+        openai["official_documentation"]["status"] = (
+            "supported_configuration_and_pricing"
+        )
+        openai["eligibility_status"] = "review_candidate_only"
+        anthropic = candidates[
+            "anthropic-claude-sonnet-4-6-thinking-omitted"
+        ]
+        anthropic["priced_configuration"] = {"thinking": "disabled"}
+        candidates["google-gemini25flash-thinking-budget-0"][
+            "provider_preflight_status"
+        ] = "verified"
+        report = validate_methodology(method, repository_root=ROOT)
+        self.assertFalse(report["valid"])
+        self.assertIn("candidate_official_evidence", report["issue_counts"])
+        self.assertIn("candidate_runtime_evidence", report["issue_counts"])
+
+    def test_v021_evidence_record_hash_is_frozen(self) -> None:
+        method = copy.deepcopy(self.methodology)
+        method["official_provider_evidence"]["record_sha256"] = "0" * 64
+        report = validate_methodology(method, repository_root=ROOT)
+        self.assertFalse(report["valid"])
+        self.assertIn("payload_hash", report["issue_counts"])
+
+    def test_v020_payload_and_token_count_evidence_fail_closed(self) -> None:
+        method = copy.deepcopy(self.methodology)
+        method["profiles"][0]["payloads"]["input"][0][
+            "construction_token_count"
+        ] += 1
+        report = validate_methodology(method, repository_root=ROOT)
+        self.assertFalse(report["valid"])
+        self.assertIn("payload_construction_count", report["issue_counts"])
+
+        bundle = copy.deepcopy(self.bundle)
+        bundle["token_counts"][0]["billing_usage_count_status"] = "verified"
+        bundle["token_counts"][0]["construction_count_evidence_class"] = "billing"
+        report = validate_bundle(bundle, self.methodology, repository_root=ROOT)
+        self.assertFalse(report["valid"])
+        self.assertIn("billing_counts_unverified", report["issue_counts"])
+        self.assertIn("evidence_class_separation", report["issue_counts"])
 
     def test_alternate_payloads_and_grid_ids_are_verified(self) -> None:
         method = copy.deepcopy(self.methodology)

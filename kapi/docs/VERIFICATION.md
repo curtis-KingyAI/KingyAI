@@ -1,7 +1,7 @@
 # Verification report
 
-Verification date: 2026-07-09  
-Environment: existing local Python 3.14 standard library and SQLite  
+Verification date: 2026-07-10
+Environment: existing local Python 3.14 standard library and SQLite
 External spend: $0
 
 ## Automated suite
@@ -12,45 +12,20 @@ Command:
 
 Result:
 
-- 73 tests run.
-- 73 passed.
+- 78 tests run.
+- 78 passed.
 - 0 failures.
 - 0 errors.
 
-The suite covers every explicit requested scenario:
-
-- unchanged prices;
-- input-only and output-only price changes;
-- provider/model entry and exit;
-- rolling alias exclusion;
-- missing and conflicting evidence;
-- context-tier selection;
-- provider/creator independence;
-- tied median price setters;
-- concentration warnings and withholding;
-- observation supersession and correction lineage;
-- 13-week base calculation;
-- prospective chain-linking;
-- Grade A versus B/C research evidence;
-- payload hashes and tokenizer-count eligibility;
-- 3x3 payload and editorial/ECI sensitivities;
-- append-only database triggers and transaction rollback;
-- database canonical round-trip;
-- deterministic CSV/JSON export;
-- detached-artifact synthetic/not-for-publication labeling;
-- retained embedded-source content hashing and cross-record evidence gates;
-- non-branching supersession-chain enforcement;
-- price/correction cycle rejection and correction-envelope identity checks;
-- aligned sensitivity schemas and payload-grid min/max reporting;
-- incomplete-week CSV coverage and truthful CLI status reporting;
-- non-default-weight reproduction;
-- file, implementation, and full-manifest metadata tamper detection;
-- rejection of unmanifested release files and unsafe manifest paths;
-- byte-exact reproduction.
+The suite includes focused v0.2.1 checks proving that the exact dated OpenAI
+candidate remains blocked, Google documentation support does not clear runtime
+gates, Anthropic thinking uses omission rather than an explicit disabled value,
+the Sonnet lifecycle statement is active-not-deprecated, and the official
+evidence record hash is frozen.
 
 ## Input validation
 
-The committed methodology and bundle validate with:
+The local-review methodology v0.2.1 and frozen synthetic bundle validate with:
 
 - zero errors;
 - zero warnings;
@@ -64,49 +39,51 @@ The committed methodology and bundle validate with:
 
 Frozen hashes:
 
-- Methodology: 6d2d4b26c1a1c6413a974b361fed9ee700173f0b6f9a923e70b714826df288e8
-- Fixture: f940b7ebc75064f9169e370626f8f655acaf6482923d9c05f4a83483c63d06e3
+- Methodology v0.2.0, preserved byte-for-byte:
+  `8f9442b9cd38acd46602446a9bbcc848a29fd079dfc63fefc0cb24125eaacd59`
+- Methodology v0.2.1:
+  `1cb3cdc12139dad6a6bbaefc31f5023323d1672ba4fba69c531312f5a8a275b0`
+- Official-provider evidence record:
+  `086d020a9aa40981c95ea2181655d7dcadaf9c1c682449d504641c56c34bdb91`
+- Synthetic fixture:
+  `6cba82133f26cf3da4642f60e0006682f8ee190517cac34e2f673be06bb9e8d7`
+- `o200k_base` asset:
+  `446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d`
 
-The offline fixture generator reproduces the committed fixture byte-for-byte.
+The payload generator and fixture generator both reproduce their frozen files
+byte-for-byte. All 36 payloads retain exact construction counts with zero
+tolerance for the JSON `content` field.
 
-## Calculation
+The 11 source metadata rows in the local evidence record match the retained
+official-source manifest exactly for source id, URL, retrieval timestamp, and
+SHA-256. This proves provenance equality only; it is not provider runtime or
+billing evidence.
 
-The required equal-weight hand example reproduces:
+## Synthetic arithmetic
 
-- base representative-profile cost: 0.041266666666666666666666666666666666666666666666667;
-- current representative-profile cost: 0.022216666666666666666666666666666666666666666666667;
-- index: 53.836833602584814216478190630048465266558966074314;
-- 60-profile base/current basket: 2.476 / 1.333;
-- geometric index: 52.591475748249293315951762402309079230320951943563;
-- frontier index: 50.
-- non-headline payload-grid latest range: 52.7551020408163265… to
-  53.8368336025848142… (1.0817315617684877… index points).
+Independent arithmetic remains unchanged:
 
-The approved concentration rule correctly sets release_status to
-withheld_concentration. Numeric values remain diagnostics only.
+- base sum of six profile prices: `0.2476`;
+- current sum of six profile prices: `0.1333`;
+- base/current 60-profile basket: `2.4760` / `1.3330`;
+- synthetic diagnostic index:
+  `53.8368336025848142164781906300484652665589660743134087237480`.
 
-## Append-only store
-
-- Transactional fixture ingestion succeeds.
-- Canonical dump equals the input bundle exactly.
-- All 29 declared domain tables have UPDATE and DELETE blocking triggers.
-- Direct price UPDATE/DELETE attempts fail.
-- Duplicate IDs, duplicate imports, unlinked conflicting prices, and failed
-  imports roll back without changing stored data.
-- Branching supersession graphs with multiple active heads are rejected.
-- Direct store ingestion independently rejects altered embedded source bytes;
-  callers cannot bypass the source-content hash gate by skipping the CLI.
-- Superseding observations and corrections are inserted as new linked rows.
+The required concentration rule keeps the result at `withheld_concentration`.
+Numeric values remain synthetic diagnostics only and are not a KAPI release.
 
 ## Release reproduction
 
+The current-code sample is preserved separately at
+`kapi/outputs/sample-release-v0.2.1`.
+
 Generated release ID:
 
-    kapi-prototype-2fe23c6e61297b26
+    kapi-prototype-1385968fb6caf0e0
 
 Manifest SHA-256:
 
-    275eeceac39a2969311a67efc786b92401ebcf966ec97f38c202be20bd56fc13
+    b55cd3e9bafbed058b67cd6dd9f380404636bf7a6772a00e1b5234238c1f4018
 
 Reproduce result:
 
@@ -114,27 +91,23 @@ Reproduce result:
 - checked release files: 7;
 - mismatches: 0;
 - calculation SHA-256:
-  5e88eca50fc9dc3745c95a291f194179ef7c437fa096bbc4e0d0b47fc90a5429.
+  `a7c04a34bfcfd5fb8816b73aae177be2d9a2d96d7fce83ebef257f565b23af6c`.
 
-Reproduction also regenerates the complete manifest and compares its canonical
-bytes, so changes to release identity, top-level hashes, source lineage,
-implementation inventory, notices, or spending metadata fail verification.
-
-## Static and repository checks
-
-- All KAPI Python modules compile.
-- All JSON files parse.
-- SQLite schema initializes with foreign keys enabled.
-- Git diff whitespace check passes.
-- The isolated branch has no commit and was not pushed.
-- The original dirty worktree remains at its starting commit with its original
-  unrelated changes intact.
+The prior `kapi/outputs/sample-release` vintage is retained unchanged. Its
+manifest pins the earlier validation-code hash, so reproducing it against the
+v0.2.1 working tree correctly reports a code-hash mismatch. Reproduce that
+historical vintage only with its frozen code vintage.
 
 ## Boundary confirmation
 
+- Provider/model/network calls: none.
+- Credential, account, and billing checks: none.
+- Provider preflight request counts verified: 0.
+- Provider billed usage rows verified: 0.
 - Paid API/service activity: none.
-- Network/model activity for prototype generation: none.
 - Production/WordPress writes: none.
 - Deployment/publication: none.
-- Shadow operation: not started.
+- Observed dry run: not performed.
+- Shadow Week 1: not started.
 - Git commit/push/PR: none.
+- Technical status: NO-GO.

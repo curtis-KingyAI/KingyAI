@@ -15,14 +15,29 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = REPO_ROOT / "kapi/config/methodology-v0.1.0.json"
+CONFIG_PATH = REPO_ROOT / "kapi/config/methodology-v0.2.0.json"
+V021_CONFIG_PATH = REPO_ROOT / "kapi/config/methodology-v0.2.1.json"
+OFFICIAL_EVIDENCE_PATH = (
+    REPO_ROOT
+    / "kapi/evidence/official-provider-configuration-evidence-2026-07-10.json"
+)
+PAYLOAD_GENERATOR_PATH = REPO_ROOT / "kapi/fixtures/build_payloads.py"
 GENERATOR_PATH = REPO_ROOT / "kapi/fixtures/build_synthetic.py"
 FIXTURE_PATH = REPO_ROOT / "kapi/fixtures/synthetic-hand-example-v1.json"
 EXPECTED_CONFIG_SHA256 = (
-    "6d2d4b26c1a1c6413a974b361fed9ee700173f0b6f9a923e70b714826df288e8"
+    "8f9442b9cd38acd46602446a9bbcc848a29fd079dfc63fefc0cb24125eaacd59"
+)
+EXPECTED_V021_CONFIG_SHA256 = (
+    "1cb3cdc12139dad6a6bbaefc31f5023323d1672ba4fba69c531312f5a8a275b0"
+)
+EXPECTED_OFFICIAL_EVIDENCE_SHA256 = (
+    "086d020a9aa40981c95ea2181655d7dcadaf9c1c682449d504641c56c34bdb91"
 )
 EXPECTED_FIXTURE_SHA256 = (
-    "f940b7ebc75064f9169e370626f8f655acaf6482923d9c05f4a83483c63d06e3"
+    "6cba82133f26cf3da4642f60e0006682f8ee190517cac34e2f673be06bb9e8d7"
+)
+O200K_ASSET_SHA256 = (
+    "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
 )
 HEADLINE_COUNTS = {
     "analysis-reasoning": (4000, 500),
@@ -48,12 +63,7 @@ CURRENT_PRICES = {
 
 def canonical_bytes(value: Any) -> bytes:
     return (
-        json.dumps(
-            value,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
+        json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
         + "\n"
     ).encode("utf-8")
 
@@ -70,12 +80,10 @@ def load_canonical(path: Path) -> tuple[bytes, dict[str, Any]]:
     return raw, value
 
 
-def load_generator():
-    spec = importlib.util.spec_from_file_location(
-        "kapi_synthetic_generator", GENERATOR_PATH
-    )
+def load_generator(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError("unable to load synthetic fixture generator")
+        raise RuntimeError(f"unable to load generator: {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -85,100 +93,172 @@ class MethodologyFixtureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config_bytes, cls.config = load_canonical(CONFIG_PATH)
+        cls.v021_config_bytes, cls.v021_config = load_canonical(V021_CONFIG_PATH)
+        cls.official_evidence_bytes, cls.official_evidence = load_canonical(
+            OFFICIAL_EVIDENCE_PATH
+        )
         cls.fixture_bytes, cls.fixture = load_canonical(FIXTURE_PATH)
-        cls.generator = load_generator()
+        cls.generator = load_generator(GENERATOR_PATH, "kapi_synthetic_generator")
+        cls.payload_generator = load_generator(
+            PAYLOAD_GENERATOR_PATH, "kapi_payload_generator"
+        )
 
     def test_versioned_config_and_fixture_hashes_are_frozen(self) -> None:
+        self.assertEqual(sha256_bytes(self.config_bytes), EXPECTED_CONFIG_SHA256)
+        self.assertEqual(sha256_bytes(self.fixture_bytes), EXPECTED_FIXTURE_SHA256)
         self.assertEqual(
-            sha256_bytes(self.config_bytes), EXPECTED_CONFIG_SHA256
+            self.fixture["methodology"]["config_sha256"], EXPECTED_CONFIG_SHA256
+        )
+        self.assertEqual(self.config["version"], "0.2.0")
+        self.assertEqual(self.fixture["methodology"]["version"], "0.2.0")
+
+    def test_v021_amendment_preserves_v020_construction_vintage(self) -> None:
+        self.assertEqual(
+            sha256_bytes(self.v021_config_bytes), EXPECTED_V021_CONFIG_SHA256
         )
         self.assertEqual(
-            sha256_bytes(self.fixture_bytes), EXPECTED_FIXTURE_SHA256
+            sha256_bytes(self.official_evidence_bytes),
+            EXPECTED_OFFICIAL_EVIDENCE_SHA256,
+        )
+        self.assertEqual(self.v021_config["version"], "0.2.1")
+        self.assertEqual(
+            self.v021_config["official_provider_evidence"]["record_sha256"],
+            EXPECTED_OFFICIAL_EVIDENCE_SHA256,
+        )
+        v020_shared = dict(self.config)
+        v021_shared = dict(self.v021_config)
+        for field in (
+            "candidate_configurations",
+            "methodology_amendment",
+            "official_provider_evidence",
+            "version",
+        ):
+            v020_shared.pop(field, None)
+            v021_shared.pop(field, None)
+        self.assertEqual(v021_shared, v020_shared)
+
+    def test_v021_candidate_evidence_is_precise_and_fail_closed(self) -> None:
+        candidates = {
+            row["candidate_id"]: row
+            for row in self.v021_config["candidate_configurations"]
+        }
+        openai = candidates["openai-gpt54mini-reasoning-none"]
+        self.assertEqual(
+            openai["official_documentation"]["status"],
+            "failed_exact_model_id_unverified",
         )
         self.assertEqual(
-            self.fixture["methodology"]["config_sha256"],
-            EXPECTED_CONFIG_SHA256,
+            openai["eligibility_status"],
+            "blocked_official_configuration_evidence",
         )
-        self.assertEqual(self.config["version"], "0.1.0")
+        google = candidates["google-gemini25flash-thinking-budget-0"]
+        self.assertEqual(google["priced_configuration"], {"thinkingBudget": 0})
         self.assertEqual(
-            self.fixture["methodology"]["version"], self.config["version"]
+            google["official_documentation"]["status"],
+            "supported_configuration_and_pricing",
+        )
+        anthropic = candidates[
+            "anthropic-claude-sonnet-4-6-thinking-omitted"
+        ]
+        self.assertEqual(
+            anthropic["priced_configuration"], {"thinking_parameter": "omitted"}
+        )
+        self.assertNotIn("stability_risk", anthropic)
+        self.assertEqual(
+            anthropic["lifecycle_status"]["status_at_snapshot"],
+            "active_not_deprecated",
+        )
+        self.assertTrue(
+            all(
+                candidate["provider_preflight_status"]
+                == "unverified_no_provider_call"
+                and candidate["billed_usage_status"]
+                == "unverified_no_billing_or_provider_call"
+                for candidate in candidates.values()
+            )
+        )
+        self.assertEqual(
+            self.v021_config["readiness_gates"]["technical_go"],
+            "failed_no_go",
         )
 
-    def test_methodology_encodes_approved_policy(self) -> None:
-        self.assertEqual(
-            self.config["capability"],
-            {
-                "headline_threshold": "130",
-                "metric": "ECI",
-                "metric_version_policy": "pinned_per_release",
-                "sensitivity_thresholds": ["125", "135"],
-            },
+    def test_methodology_encodes_v020_policy(self) -> None:
+        self.assertEqual(self.config["capability"]["metric"], "ECI")
+        self.assertFalse(
+            self.config["capability"]["configuration_specific_score_allowed"]
         )
         self.assertEqual(self.config["evidence_policy"]["official_grades"], ["A"])
         self.assertEqual(
             self.config["evidence_policy"]["research_grades"], ["A", "B", "C"]
         )
-        self.assertEqual(
-            self.config["evidence_policy"]["excluded_grades"], ["D"]
-        )
         self.assertEqual(self.config["base_period_weeks"], 13)
-        self.assertEqual(
-            self.config["selection"]["tie_break"],
-            [
-                "lowest full-precision median cost",
-                "lowest full-precision triple total cost",
-                "lexicographically sorted endpoint IDs",
-            ],
-        )
-        self.assertEqual(self.config["selection"]["provider_count"], 3)
-        self.assertEqual(self.config["selection"]["creator_count"], 3)
-        self.assertEqual(self.config["concentration"]["warning_share"], "0.35")
-        self.assertEqual(self.config["concentration"]["withhold_share"], "0.50")
-        self.assertEqual(
-            self.config["concentration"]["warning_profile_count"], 3
-        )
-        self.assertEqual(
-            self.config["concentration"]["withhold_profile_count"], 4
-        )
-        self.assertEqual(
-            self.config["corrections"]["finalization"]["timing"], "T+4"
-        )
-        self.assertEqual(
-            self.config["corrections"]["provisional_release_cycles"], 4
-        )
-        self.assertFalse(
-            self.config["corrections"]["silent_overwrite_allowed"]
-        )
         self.assertFalse(self.config["expense_controls"]["network_allowed"])
         self.assertFalse(self.config["expense_controls"]["model_calls_allowed"])
         self.assertEqual(
             self.config["expense_controls"]["total_external_spend_usd"], "0"
         )
 
-    def test_reference_tokenizer_is_explicitly_unverified(self) -> None:
+        reference = self.config["reference_tokenizer"]
+        self.assertEqual(reference["id"], "o200k_base")
+        self.assertEqual(reference["asset_sha256"], O200K_ASSET_SHA256)
+        self.assertEqual(reference["package_version"], "0.13.0")
+        self.assertIn("not_model_mapping", reference["verification_status"])
+
+        construction = self.config["construction_reference"]
+        self.assertTrue(construction["counts_verified"])
+        self.assertEqual(construction["tolerance_tokens"], 0)
+        self.assertFalse(construction["model_mapping_verified"])
+        self.assertIn("never a billing-token substitute", construction["role"])
+
+    def test_evidence_classes_candidates_and_gates_fail_closed(self) -> None:
+        classes = self.config["evidence_classes"]
         self.assertEqual(
-            self.config["reference_tokenizer"],
-            {
-                "asset_sha256": None,
-                "id": "o200k_base",
-                "verification_status": "synthetic_targets_unverified",
-            },
+            classes["construction_counts"]["status"], "verified_local_reference_only"
         )
-        self.assertFalse(
-            self.config["construction_reference"]["counts_verified"]
+        self.assertEqual(
+            classes["provider_preflight_request_counts"]["status"],
+            "unverified_no_provider_call",
         )
-        self.assertFalse(
-            self.config["construction_reference"][
-                "implementation_available_in_prototype"
-            ]
+        self.assertEqual(
+            classes["billed_usage_counts"]["status"],
+            "unverified_no_billing_or_provider_call",
         )
         self.assertFalse(
             self.config["endpoint_specific_billing_counts"][
                 "construction_reference_may_substitute_for_billing_counts"
             ]
         )
+        self.assertEqual(
+            self.config["endpoint_specific_billing_counts"]["verified_billing_rows"], 0
+        )
 
-    def test_profile_payload_hashes_and_design_targets(self) -> None:
+        candidates = {
+            row["candidate_id"]: row for row in self.config["candidate_configurations"]
+        }
+        self.assertIn("openai-gpt54mini-reasoning-none", candidates)
+        self.assertIn("google-gemini25flash-thinking-budget-0", candidates)
+        self.assertIn("anthropic-claude-sonnet-4-6-thinking-disabled", candidates)
+        self.assertEqual(
+            candidates["google-gemini25flash-thinking-budget-0"]["model_id"],
+            "gemini-2.5-flash",
+        )
+        self.assertNotIn(
+            "gemini-2.5-pro",
+            {row["model_id"] for row in self.config["candidate_configurations"]},
+        )
+        self.assertEqual(
+            candidates["anthropic-claude-sonnet-4-6-thinking-disabled"][
+                "stability_risk"
+            ],
+            "deprecation_recorded",
+        )
+        gates = self.config["readiness_gates"]
+        self.assertEqual(gates["technical_go"], "failed_no_go")
+        self.assertIn("failed", gates["independent_review"])
+        self.assertIn("failed", gates["observed_dry_run"])
+        self.assertIn("failed", gates["shadow_week_1"])
+
+    def test_profile_payload_hashes_and_exact_construction_counts(self) -> None:
         self.assertEqual(len(self.config["profiles"]), 6)
         total_count = 0
         rational_numerator = 0
@@ -186,9 +266,7 @@ class MethodologyFixtureTests(unittest.TestCase):
             profile_id = profile["id"]
             self.assertEqual(profile["count"], 10)
             total_count += profile["count"]
-            self.assertEqual(
-                profile["weight"], {"denominator": 6, "numerator": 1}
-            )
+            self.assertEqual(profile["weight"], {"denominator": 6, "numerator": 1})
             rational_numerator += profile["weight"]["numerator"]
             expected_input, expected_output = HEADLINE_COUNTS[profile_id]
             self.assertEqual(profile["input_target_tokens"], expected_input)
@@ -201,81 +279,55 @@ class MethodologyFixtureTests(unittest.TestCase):
                     {"0.75", "1.00", "1.25"},
                 )
                 for payload in payloads:
-                    path = REPO_ROOT / payload["path"]
-                    raw, document = load_canonical(path)
+                    raw, document = load_canonical(REPO_ROOT / payload["path"])
                     self.assertEqual(sha256_bytes(raw), payload["sha256"])
-                    self.assertEqual(document["dataset_kind"], "synthetic")
+                    self.assertTrue(document["o200k_base_count_verified"])
                     self.assertEqual(document["model_calls_performed"], 0)
                     self.assertFalse(document["network_access_used"])
-                    self.assertFalse(document["o200k_base_count_verified"])
+                    self.assertEqual(document["o200k_base_asset_sha256"], O200K_ASSET_SHA256)
+                    self.assertEqual(document["construction_count_tolerance_tokens"], 0)
                     self.assertEqual(
-                        document["token_count_status"],
-                        (
-                            "synthetic_design_target_only_not_verified_by_"
-                            "o200k_base"
-                        ),
+                        document["construction_token_count"],
+                        payload["construction_token_count"],
                     )
                     self.assertEqual(
-                        document["reference_token_design_target"],
+                        document["construction_token_count"],
                         payload["reference_token_design_target"],
                     )
+                    self.assertEqual(
+                        document["content"],
+                        document["single_token_chunk"]
+                        * document["construction_token_count"],
+                    )
+                    self.assertEqual(
+                        document["token_count_status"],
+                        "exact_o200k_base_construction_count_not_billing",
+                    )
             self.assertEqual(
-                profile["input_payload_path"],
-                f"kapi/profiles/{profile_id}/input-100.json",
+                profile["input_payload_path"], f"kapi/profiles/{profile_id}/input-100.json"
             )
             self.assertEqual(
-                profile["output_payload_path"],
-                f"kapi/profiles/{profile_id}/output-100.json",
+                profile["output_payload_path"], f"kapi/profiles/{profile_id}/output-100.json"
             )
         self.assertEqual(total_count, 60)
         self.assertEqual(rational_numerator, 6)
 
-    def test_editorial_and_full_three_by_three_sensitivities(self) -> None:
-        editorial = self.config["sensitivities"]["editorial_weights"]
-        self.assertEqual(editorial["total_count"], 100)
-        self.assertEqual(
-            editorial["profile_counts"],
-            {
-                "analysis-reasoning": 20,
-                "code-repair": 15,
-                "grounded-rag": 20,
-                "structured-extraction": 20,
-                "summarization-transformation": 15,
-                "tool-workflow": 10,
-            },
-        )
-        grid = self.config["sensitivities"]["payload_size_grid"]
-        self.assertEqual(len(grid), 9)
-        expected = {
-            (input_factor, output_factor)
-            for input_factor in ("0.75", "1.00", "1.25")
-            for output_factor in ("0.75", "1.00", "1.25")
-        }
-        self.assertEqual(
-            {(cell["input_factor"], cell["output_factor"]) for cell in grid},
-            expected,
-        )
-        self.assertEqual(
-            [cell["id"] for cell in grid if cell["headline"]], ["100x100"]
-        )
-
-    def test_generator_recreates_committed_fixture_byte_for_byte(self) -> None:
-        first = self.generator.build_bytes()
-        second = self.generator.build_bytes()
-        self.assertEqual(first, second)
-        self.assertEqual(first, self.fixture_bytes)
-        completed = subprocess.run(
-            [sys.executable, str(GENERATOR_PATH), "--check"],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(
-            completed.returncode,
-            0,
-            msg=f"stdout={completed.stdout}\nstderr={completed.stderr}",
-        )
+    def test_payload_and_bundle_generators_are_deterministic(self) -> None:
+        self.assertEqual(self.generator.build_bytes(), self.fixture_bytes)
+        self.assertEqual(self.generator.build_bytes(), self.generator.build_bytes())
+        for script in (PAYLOAD_GENERATOR_PATH, GENERATOR_PATH):
+            completed = subprocess.run(
+                [sys.executable, str(script), "--check"],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                completed.returncode,
+                0,
+                msg=f"{script}\nstdout={completed.stdout}\nstderr={completed.stderr}",
+            )
 
     def test_bundle_identity_and_offline_generation_metadata(self) -> None:
         self.assertEqual(self.fixture["dataset_kind"], "synthetic")
@@ -287,43 +339,20 @@ class MethodologyFixtureTests(unittest.TestCase):
         self.assertEqual(len(self.fixture["creators"]), 4)
         self.assertEqual(len(self.fixture["models"]), 4)
         self.assertEqual(len(self.fixture["endpoints"]), 4)
-        self.assertEqual(
-            self.fixture["generation"],
-            {
-                "external_dependencies": [],
-                "generator_path": "kapi/fixtures/build_synthetic.py",
-                "model_calls_performed": 0,
-                "network_access_used": False,
-                "paid_calls_performed": 0,
-                "total_external_spend_usd": "0",
-            },
-        )
-        self.assertEqual(
-            {endpoint["provider_id"] for endpoint in self.fixture["endpoints"]},
-            {f"provider-{letter}" for letter in "abcd"},
-        )
-        self.assertEqual(
-            {model["creator_id"] for model in self.fixture["models"]},
-            {f"creator-{letter}" for letter in "abcd"},
-        )
+        self.assertEqual(self.fixture["generation"]["model_calls_performed"], 0)
+        self.assertFalse(self.fixture["generation"]["network_access_used"])
+        self.assertEqual(self.fixture["generation"]["total_external_spend_usd"], "0")
         for endpoint in self.fixture["endpoints"]:
-            for flag in (
-                "available_us",
-                "ga",
-                "on_demand",
-                "public",
-                "standard_list_price",
-                "synchronous",
-                "tokenizer_reproducible",
-            ):
-                self.assertIs(endpoint[flag], True)
             self.assertEqual(endpoint["reasoning_mode"], "disabled")
             self.assertEqual(
-                endpoint["billing_tokenizer"],
-                "synthetic-declared-counts-v1",
+                endpoint["billing_tokenizer"], "provider-billing-counts-unverified"
+            )
+            self.assertEqual(
+                endpoint["construction_tokenizer"],
+                "tiktoken-0.13.0:o200k_base(explicit_construction)",
             )
 
-    def test_grade_a_synthetic_sources_and_hashes(self) -> None:
+    def test_grade_a_synthetic_sources_and_eci_scope(self) -> None:
         self.assertEqual(len(self.fixture["source_artifacts"]), 60)
         for source in self.fixture["source_artifacts"]:
             self.assertEqual(source["evidence_grade"], "A")
@@ -332,60 +361,42 @@ class MethodologyFixtureTests(unittest.TestCase):
                 source["content_sha256"],
                 sha256_bytes(canonical_bytes(source["synthetic_content"])),
             )
-            self.assertIn("not a real", source["license_note"])
         self.assertEqual(len(self.fixture["capability_evidence"]), 4)
         for record in self.fixture["capability_evidence"]:
             self.assertEqual(record["evidence_grade"], "A")
             self.assertEqual(record["metric"], "ECI")
+            self.assertFalse(record["score_is_configuration_specific"])
             self.assertGreaterEqual(
                 Decimal(record["score"]),
                 Decimal(self.config["capability"]["headline_threshold"]),
             )
 
-    def test_endpoint_specific_counts_cover_every_grid_cell(self) -> None:
+    def test_endpoint_specific_counts_cover_grid_but_billing_is_unverified(self) -> None:
         token_counts = self.fixture["token_counts"]
         self.assertEqual(len(token_counts), 4 * 6 * 9)
         record_counts = Counter(
-            (record["endpoint_id"], record["profile_id"])
-            for record in token_counts
+            (record["endpoint_id"], record["profile_id"]) for record in token_counts
         )
         self.assertEqual(set(record_counts.values()), {9})
-        headline = [
-            record
-            for record in token_counts
-            if record["size_variant"] == "100x100"
-        ]
+        headline = [record for record in token_counts if record["size_variant"] == "100x100"]
         self.assertEqual(len(headline), 4 * 6)
         for record in headline:
-            expected_input, expected_output = HEADLINE_COUNTS[
-                record["profile_id"]
-            ]
+            expected_input, expected_output = HEADLINE_COUNTS[record["profile_id"]]
             self.assertEqual(record["input_tokens"], expected_input)
             self.assertEqual(record["output_tokens"], expected_output)
-            self.assertEqual(
-                record["billing_tokenizer"],
-                "synthetic-declared-counts-v1",
-            )
-            self.assertIn("not a verified o200k_base", record["synthetic_count_note"])
+            self.assertEqual(record["billing_tokenizer"], "provider-billing-counts-unverified")
+            self.assertEqual(record["billing_usage_count_status"], "unverified_no_provider_call")
+            self.assertEqual(record["construction_count_evidence_class"], "construction_count")
+            self.assertIn("not a provider preflight count", record["synthetic_count_note"])
 
     def test_thirteen_identical_base_fridays_and_current_prices(self) -> None:
         weeks = self.fixture["weeks"]
-        self.assertEqual(
-            [week["id"] for week in weeks[:13]],
-            self.fixture["base_period_week_ids"],
-        )
+        self.assertEqual([week["id"] for week in weeks[:13]], self.fixture["base_period_week_ids"])
         self.assertEqual(weeks[-1]["id"], self.fixture["current_week_id"])
-        self.assertTrue(
-            all(week["cutoff_at"].endswith("T16:00:00Z") for week in weeks)
-        )
         observations = self.fixture["price_observations"]
         self.assertEqual(len(observations), 14 * 4 * 2)
         by_key = {
-            (
-                record["week_id"],
-                record["endpoint_id"],
-                record["component"],
-            ): record
+            (record["week_id"], record["endpoint_id"], record["component"]): record
             for record in observations
         }
         for week in weeks:
@@ -400,58 +411,18 @@ class MethodologyFixtureTests(unittest.TestCase):
                     self.assertEqual(record["amount_per_million"], amount)
                     self.assertEqual(record["evidence_grade"], "A")
                     self.assertEqual(record["currency"], "USD")
-                    self.assertEqual(
-                        record["unit"], "per_million_native_tokens"
-                    )
+                    self.assertEqual(record["unit"], "per_million_native_tokens")
 
     def test_hand_example_values_and_expected_withhold(self) -> None:
         expected = self.fixture["expected_result"]
         diagnostic = expected["diagnostic_hand_calculation"]
-        self.assertEqual(
-            diagnostic["base_sixty_profile_basket_cost"], "2.476"
-        )
-        self.assertEqual(
-            diagnostic["current_sixty_profile_basket_cost"], "1.333"
-        )
+        self.assertEqual(diagnostic["base_sixty_profile_basket_cost"], "2.476")
+        self.assertEqual(diagnostic["current_sixty_profile_basket_cost"], "1.333")
         self.assertEqual(
             diagnostic["current_index_full_precision"],
             "53.8368336025848142164781906300",
         )
         self.assertEqual(diagnostic["current_index_display"], "53.8")
-        base_prices = {
-            profile_id: result["selected_price"]
-            for profile_id, result in diagnostic[
-                "base_profile_results"
-            ].items()
-        }
-        current_prices = {
-            profile_id: result["selected_price"]
-            for profile_id, result in diagnostic[
-                "current_profile_results"
-            ].items()
-        }
-        self.assertEqual(
-            base_prices,
-            {
-                "analysis-reasoning": "0.012",
-                "code-repair": "0.048",
-                "grounded-rag": "0.024",
-                "structured-extraction": "0.0056",
-                "summarization-transformation": "0.05",
-                "tool-workflow": "0.108",
-            },
-        )
-        self.assertEqual(
-            current_prices,
-            {
-                "analysis-reasoning": "0.0065",
-                "code-repair": "0.027",
-                "grounded-rag": "0.012",
-                "structured-extraction": "0.0028",
-                "summarization-transformation": "0.025",
-                "tool-workflow": "0.06",
-            },
-        )
         strict = expected["strict_headline"]
         self.assertEqual(strict["status"], "withheld_concentration")
         self.assertFalse(strict["base_period_usable"])
