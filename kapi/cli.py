@@ -9,6 +9,13 @@ from typing import Any, Sequence
 
 from .calculation import CalculationError, calculate_index
 from .exporter import ExportError, export_release, reproduce_release
+from .independent import IndependentCheckError, check_calculation
+from .lifecycle import (
+    LifecycleError,
+    append_weekly_vintage,
+    record_incident,
+    register_methodology,
+)
 from .store import StoreError, dump_bundle, ingest_bundle, init_database
 from .util import canonical_json_bytes, load_json, write_json
 from .validation import ValidationError, validate_bundle, validate_methodology
@@ -179,6 +186,51 @@ def command_dump(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_independent_check(args: argparse.Namespace) -> int:
+    report = check_calculation(load_json(args.calculation))
+    if args.output:
+        write_json(args.output, report)
+    _emit(report)
+    return 0 if report["status"] == "pass" else 1
+
+
+def command_register_methodology(args: argparse.Namespace) -> int:
+    connection = init_database(args.database)
+    try:
+        register_methodology(
+            connection,
+            load_json(args.method),
+            effective_from=args.effective_from,
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    _emit({"registered": True, "database": str(Path(args.database).resolve())})
+    return 0
+
+
+def command_append_vintage(args: argparse.Namespace) -> int:
+    connection = init_database(args.database)
+    try:
+        summary = append_weekly_vintage(connection, load_json(args.envelope))
+        connection.commit()
+    finally:
+        connection.close()
+    _emit(summary)
+    return 0
+
+
+def command_record_incident(args: argparse.Namespace) -> int:
+    connection = init_database(args.database)
+    try:
+        incident_id = record_incident(connection, load_json(args.incident))
+        connection.commit()
+    finally:
+        connection.close()
+    _emit({"recorded": True, "incident_id": incident_id})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python3 -m kapi",
@@ -260,6 +312,36 @@ def build_parser() -> argparse.ArgumentParser:
     dump.add_argument("--output", required=True)
     dump.set_defaults(handler=command_dump)
 
+    independent = subparsers.add_parser(
+        "independent-check",
+        help="independently recompute frozen selection and index arithmetic",
+    )
+    independent.add_argument("--calculation", required=True)
+    independent.add_argument("--output")
+    independent.set_defaults(handler=command_independent_check)
+
+    register = subparsers.add_parser(
+        "register-methodology", help="append a methodology version to SQLite"
+    )
+    register.add_argument("--database", required=True)
+    register.add_argument("--method", required=True)
+    register.add_argument("--effective-from", required=True)
+    register.set_defaults(handler=command_register_methodology)
+
+    append_vintage = subparsers.add_parser(
+        "append-vintage", help="append an immutable weekly lifecycle envelope"
+    )
+    append_vintage.add_argument("--database", required=True)
+    append_vintage.add_argument("--envelope", required=True)
+    append_vintage.set_defaults(handler=command_append_vintage)
+
+    incident = subparsers.add_parser(
+        "record-incident", help="append an immutable incident state"
+    )
+    incident.add_argument("--database", required=True)
+    incident.add_argument("--incident", required=True)
+    incident.set_defaults(handler=command_record_incident)
+
     return parser
 
 
@@ -268,7 +350,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
-    except (ValidationError, CalculationError, ExportError, StoreError) as error:
+    except (
+        ValidationError,
+        CalculationError,
+        ExportError,
+        StoreError,
+        IndependentCheckError,
+        LifecycleError,
+    ) as error:
         payload: dict[str, Any] = {
             "error": error.__class__.__name__,
             "message": str(error),

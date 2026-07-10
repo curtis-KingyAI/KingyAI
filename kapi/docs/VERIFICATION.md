@@ -12,8 +12,8 @@ Command:
 
 Result:
 
-- 68 tests run.
-- 68 passed.
+- 73 tests run.
+- 73 passed.
 - 0 failures.
 - 0 errors.
 
@@ -102,11 +102,11 @@ withheld_concentration. Numeric values remain diagnostics only.
 
 Generated release ID:
 
-    kapi-prototype-e64032f0e7fc1bd3
+    kapi-prototype-2fe23c6e61297b26
 
 Manifest SHA-256:
 
-    06504d978a92cd4889feb63a41f19a163114ee4e6565b8b4192c6c16aed7755c
+    275eeceac39a2969311a67efc786b92401ebcf966ec97f38c202be20bd56fc13
 
 Reproduce result:
 
@@ -114,7 +114,7 @@ Reproduce result:
 - checked release files: 7;
 - mismatches: 0;
 - calculation SHA-256:
-  39c697a74a61da3864aa495aa581ab28ed4bdbf8aef3df03ecb1609687a35451.
+  5e88eca50fc9dc3745c95a291f194179ef7c437fa096bbc4e0d0b47fc90a5429.
 
 Reproduction also regenerates the complete manifest and compares its canonical
 bytes, so changes to release identity, top-level hashes, source lineage,

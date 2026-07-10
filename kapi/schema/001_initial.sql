@@ -372,7 +372,7 @@ CREATE TABLE IF NOT EXISTS calculations (
         environment_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     calculated_at TEXT NOT NULL CHECK (substr(calculated_at, -1) = 'Z'),
-    status TEXT NOT NULL CHECK (status IN ('complete', 'withheld', 'invalid')),
+    status TEXT NOT NULL CHECK (status IN ('pending_base', 'complete', 'withheld', 'invalid')),
     index_value TEXT CHECK (
         index_value IS NULL OR
         (typeof(index_value) = 'text' AND length(trim(index_value)) > 0)
