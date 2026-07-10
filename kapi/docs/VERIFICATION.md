@@ -12,8 +12,8 @@ Command:
 
 Result:
 
-- 78 tests run.
-- 78 passed.
+- 83 tests run.
+- 83 passed.
 - 0 failures.
 - 0 errors.
 
@@ -21,11 +21,18 @@ The suite includes focused v0.2.1 checks proving that the exact dated OpenAI
 candidate remains blocked, Google documentation support does not clear runtime
 gates, Anthropic thinking uses omission rather than an explicit disabled value,
 the Sonnet lifecycle statement is active-not-deprecated, and the official
-evidence record hash is frozen.
+evidence record hash is frozen. Five v0.2.2 regressions additionally prove the
+frozen 12-entry manifest, no-asset portable operation, explicit full-asset
+failure behavior, prior-version preservation, and fail-closed methodology
+validation.
+
+The same 83-test suite passed from a copied checkout with no `.git` directory,
+`KAPI_O200K_ASSET_PATH` removed, a separate empty home directory, and no
+complete tokenizer asset in the checkout.
 
 ## Input validation
 
-The local-review methodology v0.2.1 and frozen synthetic bundle validate with:
+The local-review methodology v0.2.2 and frozen synthetic bundle validate with:
 
 - zero errors;
 - zero warnings;
@@ -43,6 +50,10 @@ Frozen hashes:
   `8f9442b9cd38acd46602446a9bbcc848a29fd079dfc63fefc0cb24125eaacd59`
 - Methodology v0.2.1:
   `1cb3cdc12139dad6a6bbaefc31f5023323d1672ba4fba69c531312f5a8a275b0`
+- Methodology v0.2.2:
+  `f75219ff27d059b7cc417ba2b2dc3d4e280ccf8e7d2ab0a2b1a38085a99a8ba8`
+- Frozen 12-entry construction manifest:
+  `660cf9990ad347334442622758757023f6f1b9b463273b9cfe5768bd358a918e`
 - Official-provider evidence record:
   `086d020a9aa40981c95ea2181655d7dcadaf9c1c682449d504641c56c34bdb91`
 - Synthetic fixture:
@@ -52,7 +63,9 @@ Frozen hashes:
 
 The payload generator and fixture generator both reproduce their frozen files
 byte-for-byte. All 36 payloads retain exact construction counts with zero
-tolerance for the JSON `content` field.
+tolerance for the JSON `content` field. Portable reproduction passed without
+the full tokenizer asset. A separate explicit full-asset proof derived the
+same frozen manifest from the approved retained asset.
 
 The 11 source metadata rows in the local evidence record match the retained
 official-source manifest exactly for source id, URL, retrieval timestamp, and
@@ -75,15 +88,15 @@ Numeric values remain synthetic diagnostics only and are not a KAPI release.
 ## Release reproduction
 
 The current-code sample is preserved separately at
-`kapi/outputs/sample-release-v0.2.1`.
+`kapi/outputs/sample-release-v0.2.2`.
 
 Generated release ID:
 
-    kapi-prototype-1385968fb6caf0e0
+    kapi-prototype-bacfc3ee6f5344c9
 
 Manifest SHA-256:
 
-    b55cd3e9bafbed058b67cd6dd9f380404636bf7a6772a00e1b5234238c1f4018
+    924a003eda77401b896c34110c0ceee6d6e9608d952ca07134f4694c39e08953
 
 Reproduce result:
 
@@ -91,12 +104,12 @@ Reproduce result:
 - checked release files: 7;
 - mismatches: 0;
 - calculation SHA-256:
-  `a7c04a34bfcfd5fb8816b73aae177be2d9a2d96d7fce83ebef257f565b23af6c`.
+  `a82d92de6987e74bf61d7e35564480678ca2058e3658c0411c6aedbc03f1665f`.
 
-The prior `kapi/outputs/sample-release` vintage is retained unchanged. Its
-manifest pins the earlier validation-code hash, so reproducing it against the
-v0.2.1 working tree correctly reports a code-hash mismatch. Reproduce that
-historical vintage only with its frozen code vintage.
+The prior `kapi/outputs/sample-release` and
+`kapi/outputs/sample-release-v0.2.1` vintages are retained unchanged. Their
+manifests pin earlier validation-code hashes; reproduce those historical
+vintages only with their frozen code vintages.
 
 ## Boundary confirmation
 

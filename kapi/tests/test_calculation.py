@@ -658,7 +658,7 @@ class CalculationTests(unittest.TestCase):
 
         repository = Path(__file__).resolve().parents[2]
         methodology = json.loads(
-            (repository / "kapi/config/methodology-v0.2.1.json").read_text(
+            (repository / "kapi/config/methodology-v0.2.2.json").read_text(
                 encoding="utf-8"
             )
         )

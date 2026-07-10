@@ -14,16 +14,21 @@
 
        python3 kapi/fixtures/build_synthetic.py --check
 
+   Verify portable payload reproduction with no source-asset path:
+
+       env -u KAPI_O200K_ASSET_PATH \
+         python3 kapi/fixtures/build_payloads.py --check-frozen-manifest
+
 2. Validate methodology and payload hashes:
 
        python3 -m kapi validate-method \
-         --method kapi/config/methodology-v0.2.1.json
+         --method kapi/config/methodology-v0.2.2.json
 
 3. Validate the normalized bundle:
 
        python3 -m kapi validate \
          --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-         --method kapi/config/methodology-v0.2.1.json
+         --method kapi/config/methodology-v0.2.2.json
 
 4. Run all tests:
 
@@ -33,13 +38,13 @@
 
        python3 -m kapi export \
          --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-         --method kapi/config/methodology-v0.2.1.json \
-         --output-dir kapi/outputs/sample-release-v0.2.1
+         --method kapi/config/methodology-v0.2.2.json \
+         --output-dir kapi/outputs/sample-release-v0.2.2
 
 6. Reproduce it:
 
        python3 -m kapi reproduce \
-         --release-dir kapi/outputs/sample-release-v0.2.1
+         --release-dir kapi/outputs/sample-release-v0.2.2
 
 7. Confirm the release says not_for_publication and that the hand example is
    withheld for concentration while retaining its diagnostics.
@@ -59,6 +64,8 @@ compare the canonical bundle. Attempted UPDATE or DELETE operations must fail.
 | Incomplete provider triple | Withhold the affected profile and week |
 | Concentration breach | Retain diagnostics; mark release withheld |
 | Reproduction mismatch | Quarantine output and investigate hashes/code/config |
+| Missing full tokenizer asset | Portable checks may continue; full proof must stop until an explicit approved path is supplied |
+| Source asset or derived manifest mismatch | Stop; do not rewrite the frozen manifest or payloads |
 | OpenAI dated id remains unverified | Keep candidate blocked; do not substitute the undated family id |
 | Anthropic thinking cannot be omitted | Stop; do not send an explicit disabled value without official support |
 | Any possible charge | Stop before the action and request separate approval |

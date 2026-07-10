@@ -10,7 +10,7 @@ from kapi.validation import validate_bundle, validate_methodology
 
 ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = ROOT / "kapi/fixtures/synthetic-hand-example-v1.json"
-METHOD_PATH = ROOT / "kapi/config/methodology-v0.2.1.json"
+METHOD_PATH = ROOT / "kapi/config/methodology-v0.2.2.json"
 
 
 class ValidationTests(unittest.TestCase):
@@ -31,6 +31,21 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(60, method_report["stats"]["basket_count"])
         self.assertEqual(14, bundle_report["stats"]["weeks"])
         self.assertEqual(216, bundle_report["stats"]["token_counts"])
+
+    def test_v022_portability_contract_fails_closed(self) -> None:
+        method = copy.deepcopy(self.methodology)
+        method["construction_manifest"]["entry_count"] = 11
+        method["construction_reference"]["portable_reproduction"][
+            "full_source_asset_required"
+        ] = True
+        method["construction_reference"]["full_source_asset_path_configuration"][
+            "repository_default"
+        ] = "/workstation/path"
+        report = validate_methodology(method, repository_root=ROOT)
+        self.assertFalse(report["valid"])
+        self.assertIn("construction_manifest", report["issue_counts"])
+        self.assertIn("construction_portability", report["issue_counts"])
+        self.assertIn("construction_source_path", report["issue_counts"])
 
     def test_changed_payload_bytes_fail_hash_validation(self) -> None:
         method = copy.deepcopy(self.methodology)
