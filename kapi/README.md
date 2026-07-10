@@ -17,31 +17,36 @@ production without separate authorization.
 - Production credentials: none.
 - WordPress or production writes: none.
 - Deployment/publication/shadow operation: none.
-- Runtime dependencies: Python standard library and SQLite only.
+- Runtime dependencies: Python standard library and SQLite only. The payload
+  generator retained from v0.2.0 reads the already acquired local
+  `o200k_base.tiktoken` asset for construction sizing proof; it does not install
+  or vendor package code and does not make network or provider calls.
+- Methodology v0.2.1 adds local official-document evidence statuses only. It
+  does not verify provider runtime behavior, request counts, or billed usage.
 
 ## Quick start
 
 Run commands from the repository root:
 
     python3 -m kapi validate-method \
-      --method kapi/config/methodology-v0.1.0.json
+      --method kapi/config/methodology-v0.2.1.json
 
     python3 -m kapi validate \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.1.0.json
+      --method kapi/config/methodology-v0.2.1.json
 
     python3 -m kapi calculate \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.1.0.json \
+      --method kapi/config/methodology-v0.2.1.json \
       --output kapi/outputs/sample/calculation.json
 
     python3 -m kapi export \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.1.0.json \
-      --output-dir kapi/outputs/sample-release
+      --method kapi/config/methodology-v0.2.1.json \
+      --output-dir kapi/outputs/sample-release-v0.2.1
 
     python3 -m kapi reproduce \
-      --release-dir kapi/outputs/sample-release
+      --release-dir kapi/outputs/sample-release-v0.2.1
 
 Exercise append-only SQLite storage:
 
@@ -50,7 +55,7 @@ Exercise append-only SQLite storage:
     python3 -m kapi ingest \
       --database kapi/.tmp/kapi.sqlite3 \
       --bundle kapi/fixtures/synthetic-hand-example-v1.json \
-      --method kapi/config/methodology-v0.1.0.json
+      --method kapi/config/methodology-v0.2.1.json
 
     python3 -m kapi dump \
       --database kapi/.tmp/kapi.sqlite3 \
@@ -80,7 +85,8 @@ withheld_concentration. This is intentional fail-closed behavior.
 
 - CONTRACT.md — internal prototype contract.
 - config/ — immutable methodology configuration.
-- profiles/ — frozen synthetic payloads and hashes.
+- evidence/ — frozen local official-document metadata and candidate findings.
+- profiles/ — frozen synthetic payloads, exact construction counts, and hashes.
 - fixtures/ — deterministic normalized input data.
 - schema/ — append-only SQLite schema and triggers.
 - calculation.py — pure Decimal calculation engine.

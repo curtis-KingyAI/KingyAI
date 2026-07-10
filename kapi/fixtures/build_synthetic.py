@@ -14,7 +14,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_RELATIVE_PATH = Path("kapi/config/methodology-v0.1.0.json")
+CONFIG_RELATIVE_PATH = Path("kapi/config/methodology-v0.2.0.json")
 OUTPUT_RELATIVE_PATH = Path("kapi/fixtures/synthetic-hand-example-v1.json")
 CONFIG_PATH = REPO_ROOT / CONFIG_RELATIVE_PATH
 OUTPUT_PATH = REPO_ROOT / OUTPUT_RELATIVE_PATH
@@ -47,7 +47,8 @@ ALL_FEATURES = [
     "text_input",
     "text_output",
 ]
-BILLING_TOKENIZER = "synthetic-declared-counts-v1"
+CONSTRUCTION_TOKENIZER = "tiktoken-0.13.0:o200k_base(explicit_construction)"
+BILLING_TOKENIZER = "provider-billing-counts-unverified"
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -132,25 +133,30 @@ def make_source_artifact(
 def verify_methodology_and_payloads(
     methodology: dict[str, Any],
 ) -> tuple[str, dict[tuple[str, str, str], dict[str, Any]]]:
-    if methodology["version"] != "0.1.0":
+    if methodology["version"] != "0.2.0":
         raise ValueError("unexpected methodology version")
-    if methodology["capability"] != {
-        "headline_threshold": "130",
-        "metric": "ECI",
-        "metric_version_policy": "pinned_per_release",
-        "sensitivity_thresholds": ["125", "135"],
-    }:
+    if methodology["capability"].get("metric") != "ECI":
         raise ValueError("capability policy does not match the approved fixture")
+    if methodology["capability"].get("configuration_specific_score_allowed") is not False:
+        raise ValueError("ECI must remain a coarse screen, not a configuration score")
     if methodology["base_period_weeks"] != BASE_WEEK_COUNT:
         raise ValueError("base period must contain thirteen weeks")
-    if methodology["reference_tokenizer"] != {
-        "asset_sha256": None,
-        "id": "o200k_base",
-        "verification_status": "synthetic_targets_unverified",
-    }:
+    if methodology["reference_tokenizer"].get("id") != "o200k_base":
         raise ValueError("reference tokenizer metadata is not explicit")
-    if methodology["construction_reference"]["counts_verified"] is not False:
-        raise ValueError("synthetic construction targets must not claim verified counts")
+    if methodology["construction_reference"]["counts_verified"] is not True:
+        raise ValueError("v0.2.0 requires local construction counts")
+    evidence_classes = methodology.get("evidence_classes", {})
+    if (
+        evidence_classes.get("construction_counts", {}).get("status")
+        != "verified_local_reference_only"
+        or evidence_classes.get("provider_preflight_request_counts", {}).get("status")
+        != "unverified_no_provider_call"
+        or evidence_classes.get("billed_usage_counts", {}).get("status")
+        != "unverified_no_billing_or_provider_call"
+    ):
+        raise ValueError("construction, preflight, and billed counts must stay separate")
+    if methodology["endpoint_specific_billing_counts"]["verified_billing_rows"] != 0:
+        raise ValueError("provider billing-count rows must remain unverified")
 
     grid = methodology["sensitivities"]["payload_size_grid"]
     expected_cells = {
@@ -178,13 +184,25 @@ def verify_methodology_and_payloads(
                 if sha256_path(absolute_path) != payload["sha256"]:
                     raise ValueError(f"payload hash mismatch: {relative_path}")
                 document = load_canonical_json(absolute_path)
-                if document["o200k_base_count_verified"] is not False:
-                    raise ValueError(f"payload falsely asserts o200k count: {relative_path}")
+                if document["o200k_base_count_verified"] is not True:
+                    raise ValueError(f"payload lacks local construction count: {relative_path}")
+                if document["construction_count_tolerance_tokens"] != 0:
+                    raise ValueError(f"payload tolerance must be zero: {relative_path}")
+                if (
+                    document["construction_token_count"]
+                    != payload["construction_token_count"]
+                ):
+                    raise ValueError(f"payload construction count mismatch: {relative_path}")
                 if (
                     document["reference_token_design_target"]
                     != payload["reference_token_design_target"]
                 ):
                     raise ValueError(f"payload target mismatch: {relative_path}")
+                if (
+                    document["content"]
+                    != document["single_token_chunk"] * document["construction_token_count"]
+                ):
+                    raise ValueError(f"payload content is not deterministic: {relative_path}")
                 payload_index[
                     (profile["id"], direction, payload["size_factor"])
                 ] = payload
@@ -247,6 +265,7 @@ def build_identities() -> tuple[
                 "available_until": None,
                 "available_us": True,
                 "billing_tokenizer": BILLING_TOKENIZER,
+                "construction_tokenizer": CONSTRUCTION_TOKENIZER,
                 "configuration_id": configuration_id,
                 "features": list(ALL_FEATURES),
                 "ga": True,
@@ -298,6 +317,7 @@ def build_capability_evidence(
         source_id = f"source-capability-{letter}"
         score = CAPABILITY_SCORES[letter]
         source_content = {
+            "capability_scope": "model_level_or_best_across_settings_coarse_screen",
             "configuration_id": endpoint["configuration_id"],
             "dataset_kind": "synthetic",
             "endpoint_id": endpoint["id"],
@@ -306,6 +326,7 @@ def build_capability_evidence(
             "model_calls_performed": 0,
             "network_access_used": False,
             "score": score,
+            "score_is_configuration_specific": False,
         }
         source_artifacts.append(
             make_source_artifact(
@@ -327,6 +348,7 @@ def build_capability_evidence(
                 "metric_version": "synthetic-eci-v1",
                 "model_id": endpoint["model_id"],
                 "score": score,
+                "score_is_configuration_specific": False,
                 "source_id": source_id,
             }
         )
@@ -413,25 +435,25 @@ def build_token_counts(
                 records.append(
                     {
                         "billing_tokenizer": BILLING_TOKENIZER,
+                        "billing_usage_count_status": "unverified_no_provider_call",
+                        "construction_count_evidence_class": "construction_count",
+                        "construction_tokenizer": CONSTRUCTION_TOKENIZER,
                         "endpoint_id": endpoint["id"],
                         "id": (
                             f"tokens-{endpoint['id']}-{profile_id}-{cell['id']}"
                         ),
                         "input_payload_path": input_payload["path"],
                         "input_payload_sha256": input_payload["sha256"],
-                        "input_tokens": input_payload[
-                            "reference_token_design_target"
-                        ],
+                        "input_tokens": input_payload["construction_token_count"],
                         "output_payload_path": output_payload["path"],
                         "output_payload_sha256": output_payload["sha256"],
-                        "output_tokens": output_payload[
-                            "reference_token_design_target"
-                        ],
+                        "output_tokens": output_payload["construction_token_count"],
                         "profile_id": profile_id,
                         "size_variant": cell["id"],
                         "synthetic_count_note": (
-                            "Exact declared fixture count; not a verified "
-                            "o200k_base count and not obtained from a model call."
+                            "Exact local construction count under explicit o200k_base "
+                            "chunk construction; not a provider preflight count, not "
+                            "billing usage, and not obtained from a model call."
                         ),
                     }
                 )

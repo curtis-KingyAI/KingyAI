@@ -16,7 +16,7 @@ from kapi.validation import validate_or_raise
 
 ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = ROOT / "kapi/fixtures/synthetic-hand-example-v1.json"
-METHOD_PATH = ROOT / "kapi/config/methodology-v0.1.0.json"
+METHOD_PATH = ROOT / "kapi/config/methodology-v0.2.1.json"
 
 
 class ExporterTests(unittest.TestCase):
