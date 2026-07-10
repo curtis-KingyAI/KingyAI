@@ -657,7 +657,11 @@ class CalculationTests(unittest.TestCase):
         from kapi.fixtures.build_synthetic import build_bundle
 
         repository = Path(__file__).resolve().parents[2]
-        methodology = json.loads((repository / "kapi/config/methodology-v0.1.0.json").read_text(encoding="utf-8"))
+        methodology = json.loads(
+            (repository / "kapi/config/methodology-v0.2.1.json").read_text(
+                encoding="utf-8"
+            )
+        )
         result = calculate_index(build_bundle(), methodology)
         current = result["weeks"][-1]
         self.assertEqual(result["status"], "withheld_concentration")

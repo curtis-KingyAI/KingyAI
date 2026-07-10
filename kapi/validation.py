@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
@@ -160,6 +161,36 @@ def _validate_file_hash(
         )
 
 
+def _load_payload_document(
+    collector: _Collector, root: Path, relative: Any, path: str
+) -> Mapping[str, Any] | None:
+    if not isinstance(relative, str) or not relative:
+        return None
+    candidate = (root / relative).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    if not candidate.is_file():
+        return None
+    raw = candidate.read_bytes()
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        collector.error("payload_json", path, f"payload is not JSON: {error}")
+        return None
+    if not isinstance(document, Mapping):
+        collector.error("payload_json", path, "payload must be a JSON object")
+        return None
+    collector.check(
+        raw == canonical_json_bytes(document),
+        "payload_canonical_json",
+        path,
+        "payload must use canonical JSON bytes",
+    )
+    return document
+
+
 def _contains_cycle(edges: Mapping[str, str]) -> bool:
     for start in edges:
         seen: set[str] = set()
@@ -278,6 +309,224 @@ def validate_methodology(
         "reference_tokenizer.id",
         "construction reference must be o200k_base",
     )
+    methodology_version = methodology.get("version")
+    if methodology_version in {"0.2.0", "0.2.1"}:
+        collector.check(
+            capability.get("configuration_specific_score_allowed") is False,
+            "eci_scope",
+            "capability.configuration_specific_score_allowed",
+            "ECI may be used only as a coarse screen, not a configuration score",
+        )
+        construction = methodology.get("construction_reference", {})
+        collector.check(
+            isinstance(construction, Mapping)
+            and construction.get("counts_verified") is True
+            and construction.get("tolerance_tokens") == 0,
+            "construction_count_policy",
+            "construction_reference",
+            "v0.2.x requires exact local construction counts with zero tolerance",
+        )
+        collector.check(
+            isinstance(reference, Mapping)
+            and reference.get("asset_sha256")
+            == "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
+            and reference.get("verification_status")
+            == "explicit_construction_reference_only_not_model_mapping_or_billing_equivalence",
+            "reference_tokenizer",
+            "reference_tokenizer",
+            "o200k_base may be verified only as an explicit construction reference",
+        )
+        evidence_classes = methodology.get("evidence_classes", {})
+        if not isinstance(evidence_classes, Mapping):
+            collector.error(
+                "evidence_classes",
+                "evidence_classes",
+                "v0.2.x requires distinct evidence classes",
+            )
+            evidence_classes = {}
+        collector.check(
+            evidence_classes.get("construction_counts", {}).get("status")
+            == "verified_local_reference_only",
+            "evidence_classes",
+            "evidence_classes.construction_counts.status",
+            "construction counts must be local reference evidence only",
+        )
+        collector.check(
+            evidence_classes.get("provider_preflight_request_counts", {}).get("status")
+            == "unverified_no_provider_call",
+            "evidence_classes",
+            "evidence_classes.provider_preflight_request_counts.status",
+            "provider preflight counts must remain unverified",
+        )
+        collector.check(
+            evidence_classes.get("billed_usage_counts", {}).get("status")
+            == "unverified_no_billing_or_provider_call",
+            "evidence_classes",
+            "evidence_classes.billed_usage_counts.status",
+            "billed usage counts must remain unverified",
+        )
+        billing_counts = methodology.get("endpoint_specific_billing_counts", {})
+        collector.check(
+            isinstance(billing_counts, Mapping)
+            and billing_counts.get("construction_reference_may_substitute_for_billing_counts")
+            is False
+            and billing_counts.get("verified_billing_rows") == 0,
+            "billing_counts_unverified",
+            "endpoint_specific_billing_counts",
+            "construction counts must not substitute for provider billing rows",
+        )
+        candidates = methodology.get("candidate_configurations", [])
+        if not isinstance(candidates, list):
+            collector.error(
+                "candidate_configurations",
+                "candidate_configurations",
+                "candidate configurations must be an array",
+            )
+            candidates = []
+        candidate_ids = {
+            candidate.get("candidate_id")
+            for candidate in candidates
+            if isinstance(candidate, Mapping)
+        }
+        model_ids = {
+            candidate.get("model_id")
+            for candidate in candidates
+            if isinstance(candidate, Mapping)
+        }
+        collector.check(
+            "google-gemini25flash-thinking-budget-0" in candidate_ids
+            and "gemini-2.5-flash" in model_ids
+            and "gemini-2.5-pro" not in model_ids,
+            "candidate_substitution",
+            "candidate_configurations",
+            "Gemini Pro thinking-disabled must be replaced by Gemini Flash thinkingBudget=0",
+        )
+        if methodology_version == "0.2.0":
+            collector.check(
+                "openai-gpt54mini-reasoning-none" in candidate_ids
+                and "anthropic-claude-sonnet-4-6-thinking-disabled" in candidate_ids,
+                "candidate_review_set",
+                "candidate_configurations",
+                "OpenAI and Claude review candidates must remain present",
+            )
+        else:
+            candidates_by_id = {
+                candidate.get("candidate_id"): candidate
+                for candidate in candidates
+                if isinstance(candidate, Mapping)
+                and isinstance(candidate.get("candidate_id"), str)
+            }
+            openai = candidates_by_id.get("openai-gpt54mini-reasoning-none", {})
+            google = candidates_by_id.get(
+                "google-gemini25flash-thinking-budget-0", {}
+            )
+            anthropic = candidates_by_id.get(
+                "anthropic-claude-sonnet-4-6-thinking-omitted", {}
+            )
+            openai_docs = openai.get("official_documentation", {})
+            if not isinstance(openai_docs, Mapping):
+                openai_docs = {}
+            google_docs = google.get("official_documentation", {})
+            if not isinstance(google_docs, Mapping):
+                google_docs = {}
+            anthropic_docs = anthropic.get("official_documentation", {})
+            if not isinstance(anthropic_docs, Mapping):
+                anthropic_docs = {}
+            collector.check(
+                len(candidates_by_id) == 3
+                and "anthropic-claude-sonnet-4-6-thinking-disabled"
+                not in candidates_by_id,
+                "candidate_review_set",
+                "candidate_configurations",
+                "v0.2.1 requires exactly the blocked OpenAI, supported-doc Google, and thinking-omitted Anthropic review candidates",
+            )
+            collector.check(
+                openai.get("model_id") == "gpt-5.4-mini-2026-03-17"
+                and openai.get("priced_configuration") == {"reasoning": "none"}
+                and openai.get("eligibility_status")
+                == "blocked_official_configuration_evidence"
+                and openai_docs.get("status") == "failed_exact_model_id_unverified",
+                "candidate_official_evidence",
+                "candidate_configurations.openai-gpt54mini-reasoning-none",
+                "the exact dated OpenAI candidate must remain blocked and official-source unverified",
+            )
+            collector.check(
+                google.get("model_id") == "gemini-2.5-flash"
+                and google.get("priced_configuration") == {"thinkingBudget": 0}
+                and google.get("eligibility_status") == "review_candidate_only"
+                and google_docs.get("status")
+                == "supported_configuration_and_pricing",
+                "candidate_official_evidence",
+                "candidate_configurations.google-gemini25flash-thinking-budget-0",
+                "Gemini 2.5 Flash thinkingBudget=0 may be marked only as official-document supported",
+            )
+            anthropic_configuration = anthropic.get("priced_configuration", {})
+            collector.check(
+                anthropic.get("model_id") == "claude-sonnet-4-6"
+                and anthropic_configuration == {"thinking_parameter": "omitted"}
+                and "thinking" not in anthropic_configuration
+                and anthropic.get("eligibility_status") == "review_candidate_only"
+                and anthropic_docs.get("status")
+                == "supported_when_parameter_omitted",
+                "candidate_official_evidence",
+                "candidate_configurations.anthropic-claude-sonnet-4-6-thinking-omitted",
+                "Claude Sonnet 4.6 must represent thinking off by parameter omission, not an explicit disabled value",
+            )
+            lifecycle = anthropic.get("lifecycle_status", {})
+            if not isinstance(lifecycle, Mapping):
+                lifecycle = {}
+            collector.check(
+                lifecycle.get("status_at_snapshot") == "active_not_deprecated"
+                and lifecycle.get("tentative_retirement_not_before") == "2027-02-17"
+                and "stability_risk" not in anthropic,
+                "candidate_lifecycle",
+                "candidate_configurations.anthropic-claude-sonnet-4-6-thinking-omitted.lifecycle_status",
+                "Claude Sonnet 4.6 must be recorded as active, not deprecated, at the evidence snapshot",
+            )
+            collector.check(
+                all(
+                    candidate.get("provider_preflight_status")
+                    == "unverified_no_provider_call"
+                    and candidate.get("billed_usage_status")
+                    == "unverified_no_billing_or_provider_call"
+                    for candidate in candidates_by_id.values()
+                ),
+                "candidate_runtime_evidence",
+                "candidate_configurations",
+                "official documentation cannot satisfy provider preflight or billed usage evidence",
+            )
+            official_evidence = methodology.get("official_provider_evidence", {})
+            collector.check(
+                isinstance(official_evidence, Mapping)
+                and official_evidence.get("status")
+                == "documentation_only_no_provider_call"
+                and official_evidence.get("snapshot_date") == "2026-07-10"
+                and official_evidence.get("provider_calls_performed") == 0
+                and official_evidence.get("billing_checks_performed") == 0,
+                "official_provider_evidence",
+                "official_provider_evidence",
+                "v0.2.1 official evidence must remain documentation-only with zero provider and billing actions",
+            )
+            if isinstance(official_evidence, Mapping):
+                _validate_file_hash(
+                    collector,
+                    root,
+                    official_evidence.get("record_path"),
+                    official_evidence.get("record_sha256"),
+                    path_prefix="official_provider_evidence",
+                )
+        gates = methodology.get("readiness_gates", {})
+        collector.check(
+            isinstance(gates, Mapping)
+            and gates.get("technical_go") == "failed_no_go"
+            and gates.get("observed_dry_run") == "failed_not_authorized_not_performed"
+            and gates.get("shadow_week_1") == "failed_not_authorized_not_started"
+            and gates.get("independent_review")
+            == "failed_self_review_is_not_independent",
+            "readiness_gates",
+            "readiness_gates",
+            "technical GO, independent review, observed dry run, and Shadow Week 1 must stay failed",
+        )
 
     concentration = methodology.get("concentration", {})
     if isinstance(concentration, Mapping):
@@ -398,6 +647,43 @@ def validate_methodology(
                     entry.get("sha256"),
                     path_prefix=entry_path,
                 )
+                if methodology.get("version") in {"0.2.0", "0.2.1"}:
+                    document = _load_payload_document(
+                        collector, root, entry.get("path"), entry_path
+                    )
+                    if document is not None:
+                        collector.check(
+                            document.get("o200k_base_count_verified") is True,
+                            "payload_construction_count",
+                            f"{entry_path}.path",
+                            "payload must carry a local o200k_base construction count",
+                        )
+                        collector.check(
+                            document.get("construction_count_tolerance_tokens") == 0,
+                            "payload_construction_count",
+                            f"{entry_path}.path",
+                            "v0.2.x payload count tolerance must be zero",
+                        )
+                        collector.check(
+                            document.get("construction_token_count")
+                            == entry.get("construction_token_count")
+                            == entry.get("reference_token_design_target"),
+                            "payload_construction_count",
+                            f"{entry_path}.reference_token_design_target",
+                            "methodology target must equal payload construction count",
+                        )
+                        content = document.get("content")
+                        chunk = document.get("single_token_chunk")
+                        count = document.get("construction_token_count")
+                        collector.check(
+                            isinstance(content, str)
+                            and isinstance(chunk, str)
+                            and isinstance(count, int)
+                            and content == chunk * count,
+                            "payload_determinism",
+                            f"{entry_path}.path",
+                            "payload content must be deterministic repeated single-token chunks",
+                        )
             collector.check(
                 set(by_factor) == set(PAYLOAD_FACTORS),
                 "payload_factor",
@@ -879,6 +1165,28 @@ def validate_bundle(
             f"{path}.billing_tokenizer",
             "must match endpoint billing tokenizer",
         )
+        if methodology.get("version") in {"0.2.0", "0.2.1"}:
+            collector.check(
+                token_count.get("construction_count_evidence_class")
+                == "construction_count",
+                "evidence_class_separation",
+                f"{path}.construction_count_evidence_class",
+                "token row must identify construction-count evidence",
+            )
+            collector.check(
+                token_count.get("billing_usage_count_status")
+                == "unverified_no_provider_call",
+                "billing_counts_unverified",
+                f"{path}.billing_usage_count_status",
+                "provider billing usage count must remain unverified",
+            )
+            collector.check(
+                token_count.get("construction_tokenizer")
+                == endpoint.get("construction_tokenizer"),
+                "tokenizer_mismatch",
+                f"{path}.construction_tokenizer",
+                "construction tokenizer must match endpoint construction reference",
+            )
         expected_payload = canonical_payloads.get((str(profile_id), str(variant)))
         if expected_payload is None:
             collector.error(

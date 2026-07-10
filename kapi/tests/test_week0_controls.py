@@ -16,7 +16,7 @@ from kapi.store import ingest_bundle, init_database
 
 ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = ROOT / "kapi/outputs/sample-release/inputs/dataset.json"
-METHOD_PATH = ROOT / "kapi/config/methodology-v0.1.0.json"
+METHOD_PATH = ROOT / "kapi/config/methodology-v0.2.1.json"
 CALCULATION_PATH = ROOT / "kapi/outputs/sample-release/calculation.json"
 
 
