@@ -1,0 +1,64 @@
+name: KAPI
+
+"on":
+  pull_request:
+    paths:
+      - "kapi/**"
+      - ".github/workflows/kapi.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "kapi/**"
+      - ".github/workflows/kapi.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "kapi-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14.6"
+
+      - name: Run portable unit suite
+        run: python -m unittest discover -s kapi/tests -v
+
+      - name: Validate methodology
+        run: python -m kapi validate-method --method kapi/config/methodology-v0.2.2.json
+
+      - name: Validate synthetic bundle
+        run: >-
+          python -m kapi validate
+          --bundle kapi/fixtures/synthetic-hand-example-v1.json
+          --method kapi/config/methodology-v0.2.2.json
+
+      - name: Verify portable payload reproduction
+        run: env -u KAPI_O200K_ASSET_PATH python kapi/fixtures/build_payloads.py --check-frozen-manifest
+
+      - name: Verify deterministic fixture
+        run: python kapi/fixtures/build_synthetic.py --check
+
+      - name: Reproduce sample release
+        run: python -m kapi reproduce --release-dir kapi/outputs/sample-release-v0.2.2
+
+      - name: Confirm checks did not mutate tracked files
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1)"
