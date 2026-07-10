@@ -45,6 +45,7 @@ overwritten.
 | kapi/tests/test_validation.py | 10 strict source-byte, cross-record, payload-grid, Decimal, identity, supersession-cycle, and conflict tests |
 | kapi/tests/test_exporter.py | 8 required-artifact, labeling, coverage, manifest/inventory-tamper, weight-reproduction, and deterministic export tests |
 | kapi/tests/test_cli.py | 2 end-to-end CLI, database, export, and reproduction tests |
+| kapi/tests/test_week0_controls.py | 5 truthful-label, base-policy, independent-check, lifecycle, and 10x-unit drill regressions |
 
 ### Documentation
 

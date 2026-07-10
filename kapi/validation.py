@@ -645,6 +645,13 @@ def validate_bundle(
             f"{path}.billing_tokenizer",
             "billing tokenizer ID is required",
         )
+        if "first_party" in endpoint:
+            collector.check(
+                isinstance(endpoint.get("first_party"), bool),
+                "first_party",
+                f"{path}.first_party",
+                "must be boolean when supplied",
+            )
 
     source_ids = indexes["source_artifacts"]
     for index, source in enumerate(arrays["source_artifacts"]):

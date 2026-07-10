@@ -550,6 +550,8 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
             "tokenizer_reproducible",
         ):
             _boolean(record, key, context)
+        if "first_party" in record:
+            _boolean(record, "first_party", context)
         features = record.get("features")
         if not isinstance(features, list):
             raise StoreError(f"{context}.features must be an array")

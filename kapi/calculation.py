@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation, localcontext
 from itertools import combinations, product
 from typing import Any, Iterable, Mapping, Sequence
 
-from .util import PROTOTYPE_CITATION_TEXT, PROTOTYPE_NOTICE
+from .util import artifact_notice
 
 
 class CalculationError(ValueError):
@@ -821,11 +821,36 @@ class _Calculator:
             },
         }, []
 
-    def _profile_calculation(self, week: Mapping[str, Any], profile: Mapping[str, Any], threshold: Decimal, size_variant: str) -> dict[str, Any]:
+    def _profile_calculation(
+        self,
+        week: Mapping[str, Any],
+        profile: Mapping[str, Any],
+        threshold: Decimal,
+        size_variant: str,
+        *,
+        excluded_provider_ids: frozenset[str] = frozenset(),
+        excluded_creator_ids: frozenset[str] = frozenset(),
+        allowed_endpoint_ids: frozenset[str] | None = None,
+        first_party_only: bool = False,
+    ) -> dict[str, Any]:
         candidates = []
         exclusions = []
         for endpoint_id in sorted(self.endpoints):
-            candidate, reasons = self._candidate(self.endpoints[endpoint_id], week, profile, threshold, size_variant)
+            endpoint = self.endpoints[endpoint_id]
+            model = self.models[str(endpoint["model_id"])]
+            policy_reasons = []
+            if endpoint.get("provider_id") in excluded_provider_ids:
+                policy_reasons.append("excluded_provider_sensitivity")
+            if model.get("creator_id") in excluded_creator_ids:
+                policy_reasons.append("excluded_creator_sensitivity")
+            if allowed_endpoint_ids is not None and endpoint_id not in allowed_endpoint_ids:
+                policy_reasons.append("outside_constant_universe")
+            if first_party_only and endpoint.get("first_party") is not True:
+                policy_reasons.append("not_verified_first_party")
+            if policy_reasons:
+                exclusions.append({"endpoint_id": endpoint_id, "reasons": policy_reasons})
+                continue
+            candidate, reasons = self._candidate(endpoint, week, profile, threshold, size_variant)
             if candidate is None:
                 exclusions.append({"endpoint_id": endpoint_id, "reasons": reasons})
             else:
@@ -950,19 +975,48 @@ class _Calculator:
             "creators": creators,
         }
 
-    def _run(self, threshold: Decimal, weights: Mapping[str, Decimal], size_variant: str) -> dict[str, Any]:
+    def _run(
+        self,
+        threshold: Decimal,
+        weights: Mapping[str, Decimal],
+        size_variant: str,
+        *,
+        active_profile_ids: Sequence[str] | None = None,
+        excluded_provider_ids: frozenset[str] = frozenset(),
+        excluded_creator_ids: frozenset[str] = frozenset(),
+        allowed_endpoint_ids: frozenset[str] | None = None,
+        first_party_only: bool = False,
+    ) -> dict[str, Any]:
+        profile_ids = list(active_profile_ids or self.profile_ids)
+        active_profile_count = sum(
+            _integer(
+                self.profile_by_id[profile_id]["count"],
+                f"profile {profile_id}.count",
+                minimum=1,
+            )
+            for profile_id in profile_ids
+        )
         week_results = []
         for week in self.weeks:
             profiles = {
-                profile_id: self._profile_calculation(week, self.profile_by_id[profile_id], threshold, size_variant)
-                for profile_id in self.profile_ids
+                profile_id: self._profile_calculation(
+                    week,
+                    self.profile_by_id[profile_id],
+                    threshold,
+                    size_variant,
+                    excluded_provider_ids=excluded_provider_ids,
+                    excluded_creator_ids=excluded_creator_ids,
+                    allowed_endpoint_ids=allowed_endpoint_ids,
+                    first_party_only=first_party_only,
+                )
+                for profile_id in profile_ids
             }
             declared_complete = week["record"].get("complete", True) is not False
             complete = declared_complete and all(result["status"] == "complete" for result in profiles.values())
             if complete:
-                basket = sum((weights[profile_id] * profiles[profile_id]["price"] for profile_id in self.profile_ids), Decimal(0))
-                frontier_basket = sum((weights[profile_id] * profiles[profile_id]["frontier_price"] for profile_id in self.profile_ids), Decimal(0))
-                mean_three_basket = sum((weights[profile_id] * profiles[profile_id]["mean_three_price"] for profile_id in self.profile_ids), Decimal(0))
+                basket = sum((weights[profile_id] * profiles[profile_id]["price"] for profile_id in profile_ids), Decimal(0))
+                frontier_basket = sum((weights[profile_id] * profiles[profile_id]["frontier_price"] for profile_id in profile_ids), Decimal(0))
+                mean_three_basket = sum((weights[profile_id] * profiles[profile_id]["mean_three_price"] for profile_id in profile_ids), Decimal(0))
                 concentration = self._concentration(profiles, basket, weights)
                 status = "withheld_concentration" if concentration["status"] == "withhold" else "complete"
                 if self.evidence_mode == "research" and status == "complete":
@@ -991,8 +1045,8 @@ class _Calculator:
                     "status": status,
                     "profiles": profiles,
                     "representative_profile_cost": basket,
-                    "basket_profile_count": self.total_profile_count,
-                    "basket_cost": None if basket is None else basket * Decimal(self.total_profile_count),
+                    "basket_profile_count": active_profile_count,
+                    "basket_cost": None if basket is None else basket * Decimal(active_profile_count),
                     "frontier_representative_profile_cost": frontier_basket,
                     "mean_three_representative_profile_cost": mean_three_basket,
                     "concentration": concentration,
@@ -1015,19 +1069,19 @@ class _Calculator:
         base_weeks = [week_results[index] for index in base_indices]
         profile_means = {
             profile_id: sum((week["profiles"][profile_id]["price"] for week in base_weeks), Decimal(0)) / Decimal(self.base_period_weeks)
-            for profile_id in self.profile_ids
+            for profile_id in profile_ids
         }
         frontier_means = {
             profile_id: sum((week["profiles"][profile_id]["frontier_price"] for week in base_weeks), Decimal(0)) / Decimal(self.base_period_weeks)
-            for profile_id in self.profile_ids
+            for profile_id in profile_ids
         }
         mean_three_means = {
             profile_id: sum((week["profiles"][profile_id]["mean_three_price"] for week in base_weeks), Decimal(0)) / Decimal(self.base_period_weeks)
-            for profile_id in self.profile_ids
+            for profile_id in profile_ids
         }
-        base_basket = sum((weights[profile_id] * profile_means[profile_id] for profile_id in self.profile_ids), Decimal(0))
-        frontier_base = sum((weights[profile_id] * frontier_means[profile_id] for profile_id in self.profile_ids), Decimal(0))
-        mean_three_base = sum((weights[profile_id] * mean_three_means[profile_id] for profile_id in self.profile_ids), Decimal(0))
+        base_basket = sum((weights[profile_id] * profile_means[profile_id] for profile_id in profile_ids), Decimal(0))
+        frontier_base = sum((weights[profile_id] * frontier_means[profile_id] for profile_id in profile_ids), Decimal(0))
+        mean_three_base = sum((weights[profile_id] * mean_three_means[profile_id] for profile_id in profile_ids), Decimal(0))
         if base_basket <= 0 or frontier_base <= 0 or mean_three_base <= 0:
             raise CalculationError("base-period basket costs must be positive")
         for week in week_results:
@@ -1037,7 +1091,7 @@ class _Calculator:
             week["index"] = _HUNDRED * basket / base_basket
             log_sum = Decimal(0)
             geometric_valid = True
-            for profile_id in self.profile_ids:
+            for profile_id in profile_ids:
                 price = week["profiles"][profile_id]["price"]
                 if price <= 0 or profile_means[profile_id] <= 0:
                     geometric_valid = False
@@ -1059,7 +1113,7 @@ class _Calculator:
                 "end_cutoff_at": base_weeks[-1]["cutoff_at"],
                 "profile_means": profile_means,
                 "representative_profile_cost": base_basket,
-                "basket_cost": base_basket * Decimal(self.total_profile_count),
+                "basket_cost": base_basket * Decimal(active_profile_count),
                 "frontier_representative_profile_cost": frontier_base,
                 "mean_three_representative_profile_cost": mean_three_base,
             },
@@ -1067,10 +1121,24 @@ class _Calculator:
         }
 
     def _find_base_indices(self, week_results: Sequence[Mapping[str, Any]]) -> list[int] | None:
+        policy = self.methodology.get("base_eligibility", {})
+        if not isinstance(policy, Mapping):
+            raise CalculationError("methodology.base_eligibility must be an object")
+        raw_noncounting = policy.get("noncounting_release_statuses", [])
+        if not isinstance(raw_noncounting, list) or not all(
+            isinstance(item, str) and item for item in raw_noncounting
+        ):
+            raise CalculationError(
+                "base_eligibility.noncounting_release_statuses must be a list of strings"
+            )
+        noncounting = set(raw_noncounting)
         run: list[int] = []
         previous_cutoff: datetime | None = None
         for index, week in enumerate(week_results):
-            if not week["complete"]:
+            # The calculator applies deterministic calculation-state policy.
+            # Human signoff, reproduction and material-correction states are
+            # applied by the append-only lifecycle gate before finalization.
+            if not week["complete"] or week.get("status") in noncounting:
                 run = []
                 previous_cutoff = None
                 continue
@@ -1317,6 +1385,19 @@ class _Calculator:
             "latest": range_weeks[-1],
         }
 
+    def _robustness_record(self, series: Mapping[str, Any]) -> dict[str, Any]:
+        record = self._condense(series)
+        incomplete_week_ids = [
+            str(week["id"])
+            for week in series["weeks"]
+            if not week.get("complete")
+        ]
+        record["structural_fragility"] = bool(incomplete_week_ids) or series.get(
+            "status"
+        ) == "pending_base"
+        record["incomplete_week_ids"] = incomplete_week_ids
+        return record
+
     def calculate(self, capability_threshold: Any, weights_override: Mapping[str, Any] | None) -> dict[str, Any]:
         if capability_threshold is None:
             capability_threshold = self.capability.get("headline_threshold", "130")
@@ -1331,6 +1412,11 @@ class _Calculator:
             "editorial_weights": None,
             "payload_sizes": {},
             "payload_size_range": None,
+            "leave_one_task_out": {},
+            "leave_one_provider_out": {},
+            "leave_one_creator_out": {},
+            "first_party_only": None,
+            "constant_universe": None,
         }
         thresholds = self.capability.get("sensitivity_thresholds", ["125", "130", "135"])
         if not isinstance(thresholds, list):
@@ -1355,6 +1441,73 @@ class _Calculator:
         sensitivity_results["payload_size_range"] = self._payload_size_range(
             payload_series
         )
+
+        for excluded_profile_id in self.profile_ids:
+            active_ids = [
+                profile_id
+                for profile_id in self.profile_ids
+                if profile_id != excluded_profile_id
+            ]
+            active_total = sum(weights[profile_id] for profile_id in active_ids)
+            subset_weights = {
+                profile_id: weights[profile_id] / active_total
+                for profile_id in active_ids
+            }
+            series = self._run(
+                threshold,
+                subset_weights,
+                "100x100",
+                active_profile_ids=active_ids,
+            )
+            sensitivity_results["leave_one_task_out"][excluded_profile_id] = (
+                self._robustness_record(series)
+            )
+
+        for provider_id in sorted(self.providers):
+            series = self._run(
+                threshold,
+                weights,
+                "100x100",
+                excluded_provider_ids=frozenset({provider_id}),
+            )
+            sensitivity_results["leave_one_provider_out"][provider_id] = (
+                self._robustness_record(series)
+            )
+
+        for creator_id in sorted(self.creators):
+            series = self._run(
+                threshold,
+                weights,
+                "100x100",
+                excluded_creator_ids=frozenset({creator_id}),
+            )
+            sensitivity_results["leave_one_creator_out"][creator_id] = (
+                self._robustness_record(series)
+            )
+
+        sensitivity_results["first_party_only"] = self._robustness_record(
+            self._run(threshold, weights, "100x100", first_party_only=True)
+        )
+        first_cutoff = self.weeks[0]["cutoff"]
+        constant_endpoint_ids = frozenset(
+            endpoint_id
+            for endpoint_id, endpoint in self.endpoints.items()
+            if _timestamp(
+                endpoint.get("available_from"),
+                f"endpoint {endpoint_id}.available_from",
+            )
+            <= first_cutoff
+        )
+        constant_universe = self._robustness_record(
+            self._run(
+                threshold,
+                weights,
+                "100x100",
+                allowed_endpoint_ids=constant_endpoint_ids,
+            )
+        )
+        constant_universe["frozen_endpoint_ids"] = sorted(constant_endpoint_ids)
+        sensitivity_results["constant_universe"] = constant_universe
 
         latest = primary["weeks"][-1]
         if primary["status"] == "pending_base":
@@ -1553,6 +1706,7 @@ class _Calculator:
             )
 
         dataset_kind = self.bundle.get("dataset_kind")
+        notice, citation_text = artifact_notice(dataset_kind)
         if dataset_kind == "synthetic":
             series_type = f"synthetic_{self.evidence_mode}_policy_simulation"
         else:
@@ -1562,13 +1716,13 @@ class _Calculator:
                 else "research_reconstruction"
             )
         result = {
-            "notice": PROTOTYPE_NOTICE,
+            "notice": notice,
             "not_for_publication": True,
             "published": False,
             "deployed": False,
             "citation": {
                 "permitted": False,
-                "text": PROTOTYPE_CITATION_TEXT,
+                "text": citation_text,
             },
             "schema_version": self.bundle.get("schema_version"),
             "dataset_id": self.bundle.get("dataset_id"),

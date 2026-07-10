@@ -87,8 +87,13 @@ treatment.
 
 Endpoint feature arrays are normalized into `endpoint_features`. The bundle's
 feature array is reconstructed in sorted order. Token-count identity is
-`(endpoint_id, profile_id, size_variant)`; the optional stable fixture ID is
+`(endpoint_id, profile_id, size_variant)`; the stable fixture ID is required and
 also unique.
+
+First-party ownership is an explicit endpoint field (`first_party: true` or
+`false`) retained in canonical metadata. The robustness calculation never
+infers ownership from provider or creator names; a missing value is treated as
+unverified and excluded from the first-party-only sensitivity.
 
 ## Types and validation
 
