@@ -1,0 +1,36 @@
+name: KAPI ready-for-review guard
+
+"on":
+  pull_request:
+    types: [ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  revert-unauthorized-transition:
+    if: github.actor != 'curtis-KingyAI'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Convert the pull request back to draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+        run: |
+          gh api graphql \
+            -f query='mutation($pullRequestId: ID!) { convertPullRequestToDraft(input: {pullRequestId: $pullRequestId}) { pullRequest { isDraft } } }' \
+            -F pullRequestId="$PR_NODE_ID"
+
+      - name: Record the reverted transition
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          gh api --method POST \
+            "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+            -f body="Unauthorized ready-for-review transition by @${ACTOR} auto-reverted per KAPI governance. Operator authorization required."
+          gh api --method POST \
+            "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
+            -f 'labels[]=unauthorized-transition-reverted'
