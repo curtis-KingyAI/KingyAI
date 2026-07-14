@@ -27,6 +27,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
           sparse-checkout: |
+            .github/CODEOWNERS
             .github/kapi-governance
             .github/scripts
             .github/tests

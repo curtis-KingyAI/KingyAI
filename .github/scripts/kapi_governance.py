@@ -9,6 +9,7 @@ executed. The same decision functions are exercised by local unit tests.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import dataclasses
 import datetime as dt
 import hashlib
@@ -34,9 +35,38 @@ LEGACY_BOOTSTRAP_WORKFLOW = pathlib.PurePosixPath(
 GUARD_WORKFLOW = pathlib.PurePosixPath(
     ".github/workflows/ready-for-review-guard.yml"
 )
+POLICY_PATH = pathlib.PurePosixPath(".github/kapi-governance/policy-v1.json")
+CODEOWNERS_PATH = pathlib.PurePosixPath(".github/CODEOWNERS")
+CHECKOUT_ACTION = (
+    "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
+)
+EXPECTED_WORKFLOWS = frozenset(
+    {REQUIRED_WORKFLOW, LEGACY_BOOTSTRAP_WORKFLOW, GUARD_WORKFLOW}
+)
+EXPECTED_ACTIONS = {
+    REQUIRED_WORKFLOW: Counter({CHECKOUT_ACTION: 2}),
+    LEGACY_BOOTSTRAP_WORKFLOW: Counter({CHECKOUT_ACTION: 2}),
+    GUARD_WORKFLOW: Counter({CHECKOUT_ACTION: 2}),
+}
+EXPECTED_GITHUB_TOKEN_BINDINGS = {
+    REQUIRED_WORKFLOW: 0,
+    LEGACY_BOOTSTRAP_WORKFLOW: 0,
+    GUARD_WORKFLOW: 2,
+}
+EXPECTED_TRUSTED_SPARSE_PATHS = frozenset(
+    {
+        CODEOWNERS_PATH,
+        pathlib.PurePosixPath(".github/kapi-governance"),
+        pathlib.PurePosixPath(".github/scripts"),
+        pathlib.PurePosixPath(".github/tests"),
+        pathlib.PurePosixPath(".github/workflows"),
+    }
+)
 LEGACY_BOOTSTRAP_CHECK_NAME = "verify"
 PR4_BOOTSTRAP_BASE_SHA = "6070f10c9ab5611c0966056a43eb24ae6beda7ce"
 PROTECTED_GOVERNANCE_PATHS = (
+    POLICY_PATH,
+    CODEOWNERS_PATH,
     pathlib.PurePosixPath(".github/scripts/kapi_governance.py"),
     pathlib.PurePosixPath(".github/scripts/kapi_ready_guard.py"),
     pathlib.PurePosixPath(".github/scripts/kapi_ready_reconcile.py"),
@@ -691,6 +721,30 @@ def _top_level_permissions(text: str) -> dict[str, str] | None:
     return permissions
 
 
+def _trusted_sparse_checkout_entries(
+    text: str,
+) -> list[frozenset[pathlib.PurePosixPath]]:
+    lines = text.splitlines()
+    blocks: list[frozenset[pathlib.PurePosixPath]] = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"(\s*)sparse-checkout:\s*\|\s*(?:#.*)?", line)
+        if match is None:
+            continue
+        base_indent = len(match.group(1))
+        entries: set[pathlib.PurePosixPath] = set()
+        for candidate in lines[index + 1 :]:
+            if not candidate.strip():
+                continue
+            indent = len(candidate) - len(candidate.lstrip())
+            if indent <= base_indent:
+                break
+            value = candidate.strip()
+            if not value.startswith("#"):
+                entries.add(pathlib.PurePosixPath(value))
+        blocks.append(frozenset(entries))
+    return blocks
+
+
 def scan_workflows(
     root: pathlib.Path | str,
     trusted_root: pathlib.Path | str | None = None,
@@ -726,13 +780,21 @@ def scan_workflows(
     by_relative = {
         pathlib.PurePosixPath(path.relative_to(root_path).as_posix()): path for path in files
     }
+    actual_workflows = frozenset(by_relative)
+    if actual_workflows != EXPECTED_WORKFLOWS:
+        missing = sorted(str(path) for path in EXPECTED_WORKFLOWS - actual_workflows)
+        unexpected = sorted(str(path) for path in actual_workflows - EXPECTED_WORKFLOWS)
+        errors.append(
+            "workflow inventory must match approved allowlist; "
+            f"missing={missing}; unexpected={unexpected}"
+        )
     if REQUIRED_WORKFLOW not in by_relative:
         errors.append(f"missing always-emitted advisory workflow {REQUIRED_WORKFLOW}")
     if LEGACY_BOOTSTRAP_WORKFLOW not in by_relative:
         errors.append(f"missing legacy bootstrap workflow {LEGACY_BOOTSTRAP_WORKFLOW}")
     if GUARD_WORKFLOW not in by_relative:
         errors.append(f"missing guard workflow {GUARD_WORKFLOW}")
-    policy_file = root_path / ".github" / "kapi-governance" / "policy-v1.json"
+    policy_file = root_path / POLICY_PATH
     candidate_policy: Policy | None = None
     if not policy_file.is_file():
         errors.append("missing .github/kapi-governance/policy-v1.json")
@@ -766,9 +828,61 @@ def scan_workflows(
         r"(?m)^\s*([a-z-]+):\s*(write|write-all)\s*(?:#.*)?$"
     )
     reserved_job_re_template = r"(?m)^\s{{4}}name:\s*[\"']?{}[\"']?\s*(?:#.*)?$"
+    credential_patterns = (
+        (r"\$\{\{\s*secrets\.", "secrets contexts are forbidden"),
+        (
+            r"(?im)^\s*(?:GH_TOKEN|GITHUB_PAT|PERSONAL_ACCESS_TOKEN|PAT_TOKEN|API_TOKEN)\s*:",
+            "alternate credential aliases are forbidden",
+        ),
+        (
+            r"(?i)\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b",
+            "PAT-like literals are forbidden",
+        ),
+        (
+            r"(?im)^\s*secrets\s*:\s*inherit\s*(?:#.*)?$",
+            "inherited secrets are forbidden",
+        ),
+        (
+            r"(?i)actions/create-github-app-token(?:@|\b)",
+            "GitHub App token minting actions are forbidden",
+        ),
+        (
+            r"(?i)/app/installations/(?:\{[^}]+\}|[A-Za-z0-9_.$-]+)/access_tokens",
+            "GitHub App token endpoints are forbidden",
+        ),
+        (
+            r"(?im)^\s*(?:PRIVATE_KEY|APP_PRIVATE_KEY|GITHUB_APP_PRIVATE_KEY)\s*:",
+            "private-key bindings are forbidden",
+        ),
+        (
+            r"\$\{\{\s*(?:vars|env)\.[^}]*?(?:TOKEN|KEY|SECRET)[^}]*\}\}",
+            "credential-like vars/env bindings are forbidden",
+        ),
+    )
 
     for relative, path in by_relative.items():
         text = path.read_text(encoding="utf-8")
+        actions = Counter(
+            match.group(1).strip("\"'")
+            for match in re.finditer(r"(?m)^\s*-?\s*uses:\s*([^\s#]+)", text)
+        )
+        if actions != EXPECTED_ACTIONS.get(relative, Counter()):
+            errors.append(f"{relative}: action inventory must match approved allowlist")
+        token_bindings = len(
+            re.findall(
+                r"(?m)^\s*GITHUB_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}\s*(?:#.*)?$",
+                text,
+            )
+        )
+        expected_token_bindings = EXPECTED_GITHUB_TOKEN_BINDINGS.get(relative, 0)
+        if token_bindings != expected_token_bindings:
+            errors.append(
+                f"{relative}: GITHUB_TOKEN binding count must be exactly "
+                f"{expected_token_bindings}"
+            )
+        for pattern, message in credential_patterns:
+            if re.search(pattern, text):
+                errors.append(f"{relative}: {message}")
         if _top_level_permissions(text) != {"contents": "read"}:
             errors.append(
                 f"{relative}: top-level token permissions must be explicitly contents: read"
@@ -806,14 +920,6 @@ def scan_workflows(
             errors.append(f"{relative}: draft mutation is reserved to the guard")
         if re.search(r"(?m)^\s*pull_request_target:\s*$", text) and relative != GUARD_WORKFLOW:
             errors.append(f"{relative}: pull_request_target is reserved to the guard")
-        for uses in re.finditer(r"(?m)^\s*-?\s*uses:\s*([^\s#]+)", text):
-            action = uses.group(1).strip("\"'")
-            if action.startswith("./"):
-                continue
-            reference = action.rsplit("@", 1)[-1] if "@" in action else ""
-            if not re.fullmatch(r"[0-9a-f]{40}", reference):
-                errors.append(f"{relative}: action must be pinned to a full commit SHA: {action}")
-
     if advisory_name_occurrences != [str(REQUIRED_WORKFLOW)]:
         errors.append(
             "reserved Actions advisory check name must occur exactly once in "
@@ -833,6 +939,13 @@ def scan_workflows(
     legacy_path = by_relative.get(LEGACY_BOOTSTRAP_WORKFLOW)
     if legacy_path:
         legacy_text = legacy_path.read_text(encoding="utf-8")
+        if _trusted_sparse_checkout_entries(legacy_text) != [
+            EXPECTED_TRUSTED_SPARSE_PATHS
+        ]:
+            errors.append(
+                f"{LEGACY_BOOTSTRAP_WORKFLOW}: trusted sparse checkout must match "
+                "approved governance files"
+            )
         if not re.search(r"(?m)^\s{2}pull_request:\s*$", legacy_text):
             errors.append(f"{LEGACY_BOOTSTRAP_WORKFLOW}: pull_request trigger is required")
         if re.search(r"(?m)^\s+(paths|paths-ignore):", legacy_text):
@@ -875,6 +988,13 @@ def scan_workflows(
     required_path = by_relative.get(REQUIRED_WORKFLOW)
     if required_path:
         required_text = required_path.read_text(encoding="utf-8")
+        if _trusted_sparse_checkout_entries(required_text) != [
+            EXPECTED_TRUSTED_SPARSE_PATHS
+        ]:
+            errors.append(
+                f"{REQUIRED_WORKFLOW}: trusted sparse checkout must match "
+                "approved governance files"
+            )
         if not re.search(r"(?m)^\s{2}pull_request:\s*$", required_text):
             errors.append(f"{REQUIRED_WORKFLOW}: pull_request trigger is required")
         if re.search(r"(?m)^\s+(paths|paths-ignore):", required_text):

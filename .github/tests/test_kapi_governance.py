@@ -372,6 +372,9 @@ class WorkflowScannerTests(unittest.TestCase):
         target.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / ".github" / "workflows" / name, target / name)
 
+    def _copy_github(self, root: pathlib.Path) -> None:
+        shutil.copytree(ROOT / ".github", root / ".github")
+
     def test_current_workflows_pass(self) -> None:
         self.assertEqual([], scan_workflows(ROOT))
 
@@ -510,6 +513,160 @@ class WorkflowScannerTests(unittest.TestCase):
             errors = scan_workflows(root)
         self.assertTrue(any("unauthorized pull-requests: write" in error for error in errors))
         self.assertTrue(any("may not mark a PR ready" in error for error in errors))
+
+    def test_unexpected_workflow_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            extra = root / ".github" / "workflows" / "unexpected.yml"
+            extra.write_text(
+                'name: unexpected\n"on":\n  workflow_dispatch:\npermissions:\n'
+                '  contents: read\njobs:\n  inspect:\n    runs-on: ubuntu-latest\n'
+                '    steps:\n      - run: true\n',
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(
+            any("workflow inventory must match approved allowlist" in error for error in errors)
+        )
+
+    def test_local_action_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "kapi.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8")
+                + "\n      - uses: ./.github/actions/unapproved-local-action\n",
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(any("action inventory must match approved allowlist" in error for error in errors))
+
+    def test_unapproved_full_sha_action_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "kapi.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8")
+                + "\n      - uses: step-security/harden-runner@"
+                + ("a" * 40)
+                + "\n",
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(any("action inventory must match approved allowlist" in error for error in errors))
+
+    def test_alternate_credential_paths_are_rejected_without_echoing_values(self) -> None:
+        variants = (
+            ("${{ secrets.KAPI_TOKEN }}", "secrets contexts are forbidden"),
+            ("GH_TOKEN: masked-source", "alternate credential aliases are forbidden"),
+            ("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "PAT-like literals are forbidden"),
+            ("secrets: inherit", "inherited secrets are forbidden"),
+            (
+                "actions/create-github-app-token@" + ("a" * 40),
+                "GitHub App token minting actions are forbidden",
+            ),
+            (
+                "/app/installations/123/access_tokens",
+                "GitHub App token endpoints are forbidden",
+            ),
+            ("PRIVATE_KEY: masked-source", "private-key bindings are forbidden"),
+            ("${{ vars.KAPI_TOKEN }}", "credential-like vars/env bindings are forbidden"),
+        )
+        for injected, expected in variants:
+            with self.subTest(injected=injected):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = pathlib.Path(temporary)
+                    self._copy_github(root)
+                    workflow = (
+                        root
+                        / ".github"
+                        / "workflows"
+                        / "kapi-governance-actions-advisory-v1.yml"
+                    )
+                    workflow.write_text(
+                        workflow.read_text(encoding="utf-8") + "\n" + injected + "\n",
+                        encoding="utf-8",
+                    )
+                    errors = scan_workflows(root)
+                self.assertTrue(any(expected in error for error in errors), errors)
+                self.assertNotIn("masked-source", "\n".join(errors))
+
+    def test_extra_github_token_binding_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "ready-for-review-guard.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8")
+                + "\nGITHUB_TOKEN: ${{ github.token }}\n",
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(
+            any("GITHUB_TOKEN binding count must be exactly 2" in error for error in errors)
+        )
+
+    def test_sparse_checkout_must_include_codeowners(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "kapi.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "            .github/CODEOWNERS\n", "", 1
+                ),
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(any("trusted sparse checkout must match" in error for error in errors))
+
+    def test_trusted_scanner_rejects_candidate_policy_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            trusted = root / "trusted"
+            candidate = root / "candidate"
+            self._copy_github(trusted)
+            self._copy_github(candidate)
+            policy = candidate / ".github" / "kapi-governance" / "policy-v1.json"
+            policy.write_text(
+                policy.read_text(encoding="utf-8").replace(
+                    '"activation_state": "blocked_pending_external_verifier_and_human_authorizer"',
+                    '"activation_state": "active"',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            errors = scan_workflows(candidate, trusted)
+        self.assertTrue(
+            any(
+                "candidate changes protected governance file .github/kapi-governance/policy-v1.json"
+                in error
+                for error in errors
+            )
+        )
+
+    def test_trusted_scanner_rejects_candidate_codeowners_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            trusted = root / "trusted"
+            candidate = root / "candidate"
+            self._copy_github(trusted)
+            self._copy_github(candidate)
+            codeowners = candidate / ".github" / "CODEOWNERS"
+            codeowners.write_text(
+                codeowners.read_text(encoding="utf-8") + "\n# unauthorized candidate change\n",
+                encoding="utf-8",
+            )
+            errors = scan_workflows(candidate, trusted)
+        self.assertTrue(
+            any(
+                "candidate changes protected governance file .github/CODEOWNERS" in error
+                for error in errors
+            )
+        )
 
 
 if __name__ == "__main__":
