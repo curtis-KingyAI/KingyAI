@@ -1,0 +1,101 @@
+name: KAPI governance legacy verify
+
+# This context exists only to satisfy the repository's pre-existing `verify`
+# rule during PR #4 bootstrap. It is not the production governance assurance.
+# No path filter: the job must be emitted for every pull request.
+"on":
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "kapi-legacy-verify-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out trusted base governance code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .kapi-trusted
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .github/kapi-governance
+            .github/scripts
+            .github/tests
+            .github/workflows
+
+      - name: Check out pull request as inert data
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .kapi-candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run trusted verification or the scoped PR 4 bootstrap
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_REPOSITORY_ID: ${{ github.event.pull_request.base.repo.id }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BOOTSTRAP_BASE_SHA: 6070f10c9ab5611c0966056a43eb24ae6beda7ce
+          EVENT_NAME: ${{ github.event_name }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPOSITORY_ID: ${{ github.event.pull_request.head.repo.id || 0 }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+        run: |
+          set -euo pipefail
+
+          actual_base_sha="$(git -C .kapi-trusted rev-parse HEAD)"
+          actual_head_sha="$(git -C .kapi-candidate rev-parse HEAD)"
+          test "$actual_base_sha" = "$BASE_SHA"
+          test "$actual_head_sha" = "$EXPECTED_HEAD_SHA"
+
+          echo "KAPI_VERIFY_EVENT=$EVENT_NAME"
+          echo "KAPI_VERIFY_PR=$PR_NUMBER"
+          echo "KAPI_VERIFY_BASE_SHA=$actual_base_sha"
+          echo "KAPI_VERIFY_HEAD_SHA=$actual_head_sha"
+
+          if test -f .kapi-trusted/.github/scripts/kapi_governance.py; then
+            echo "KAPI_VERIFY_MODE=trusted-base"
+            python3 .kapi-trusted/.github/scripts/kapi_governance.py scan-workflows \
+              --root .kapi-candidate \
+              --trusted-root .kapi-trusted
+            PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+              -s .kapi-trusted/.github/tests -v
+            exit 0
+          fi
+
+          # PR #4 is the sole bootstrap exception because main does not yet
+          # contain the verifier. Actions necessarily executes this candidate
+          # workflow YAML; it only hashes every other candidate file and never
+          # executes a candidate script. Independent hash binding is mandatory.
+          test "$EVENT_NAME" = "pull_request"
+          test "$PR_NUMBER" = "4"
+          test "$REPOSITORY" = "curtis-KingyAI/KingyAI"
+          test "$REPOSITORY_ID" = "1043002851"
+          test "$BASE_REPOSITORY_ID" = "$REPOSITORY_ID"
+          test "$HEAD_REPOSITORY_ID" = "$REPOSITORY_ID"
+          test "$BASE_REF" = "main"
+          test "$BASE_SHA" = "$BOOTSTRAP_BASE_SHA"
+
+          echo "KAPI_VERIFY_MODE=manual-pr4-bootstrap"
+          echo "::warning::One-time PR #4 bootstrap: Actions is executing candidate workflow YAML and has no cryptographic workflow identity. A named reviewer must independently bind the check run, exact head SHA, reviewed workflow hash, manifest, and local test logs before merge."
+          sha256sum .kapi-candidate/.github/workflows/kapi.yml
+          find \
+            .kapi-candidate/.github/CODEOWNERS \
+            .kapi-candidate/.github/kapi-governance \
+            .kapi-candidate/.github/scripts \
+            .kapi-candidate/.github/tests \
+            .kapi-candidate/.github/workflows \
+            -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+          echo "The reviewed candidate workflow YAML defined this job; all other candidate files were only hashed, and no candidate script was executed."

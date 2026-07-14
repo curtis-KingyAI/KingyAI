@@ -1,0 +1,18 @@
+{
+  "actions_advisory_check_name": "kapi-governance-actions-advisory-v1",
+  "activation_state": "blocked_pending_external_verifier_and_human_authorizer",
+  "allowed_ready_actor_ids": [227671038],
+  "audit_actor_id": 41898282,
+  "audit_actor_login": "github-actions[bot]",
+  "automation_actor_ids": [227671038],
+  "authorization_ttl_seconds": 300,
+  "clock_skew_seconds": 5,
+  "credential_separation_attested": false,
+  "dedicated_verifier_attested": false,
+  "dedicated_verifier_integration_id": null,
+  "default_branch": "main",
+  "human_authorizer_actor_ids": [],
+  "repository_id": 1043002851,
+  "production_required_check_name": "kapi-governance-external-v1",
+  "schema": "kapi-governance-policy/v1"
+}

@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""Execute the trusted, metadata-only KAPI ready-for-review guard."""
+
+from __future__ import annotations
+
+import dataclasses
+import datetime as dt
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Any, Sequence
+
+from kapi_governance import (
+    AUDIT_MARKER,
+    Comment,
+    Decision,
+    GovernanceError,
+    Policy,
+    PullRequestEvent,
+    PullRequestSnapshot,
+    UTC,
+    decide_transition,
+    extract_marker_payloads,
+    make_audit_record,
+    parse_audit,
+    parse_time,
+)
+
+
+class ApiError(RuntimeError):
+    """A GitHub API operation failed after bounded retries."""
+
+
+@dataclasses.dataclass(frozen=True)
+class ExecutionResult:
+    status: str
+    reason: str
+    decision: Decision | None
+    errors: tuple[str, ...] = ()
+
+
+class GitHubApi:
+    def __init__(
+        self,
+        token: str,
+        repository: str,
+        pr_number: int,
+        pr_node_id: str,
+        api_url: str = "https://api.github.com",
+        attempts: int = 4,
+    ) -> None:
+        self.token = token
+        self.repository = repository
+        self.pr_number = pr_number
+        self.pr_node_id = pr_node_id
+        self.api_url = api_url.rstrip("/")
+        self.attempts = attempts
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        attempts: int | None = None,
+    ) -> Any:
+        url = path if path.startswith("http") else f"{self.api_url}{path}"
+        data = None if payload is None else json.dumps(payload).encode("utf-8")
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {self.token}",
+            "User-Agent": "kingyai-kapi-ready-guard-v1",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        limit = attempts if attempts is not None else self.attempts
+        last_error: BaseException | None = None
+        for attempt in range(limit):
+            request = urllib.request.Request(
+                url=url, data=data, headers=headers, method=method
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    body = response.read()
+                    return json.loads(body) if body else None
+            except urllib.error.HTTPError as exc:
+                body = exc.read().decode("utf-8", errors="replace")
+                last_error = ApiError(f"{method} {url} returned {exc.code}: {body[:500]}")
+                if exc.code not in {409, 429, 500, 502, 503, 504}:
+                    break
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                last_error = exc
+            if attempt + 1 < limit:
+                time.sleep(min(2**attempt, 4))
+        raise ApiError(str(last_error or f"{method} {url} failed"))
+
+    def get_pull_request(self) -> PullRequestSnapshot:
+        raw = self._request(
+            "GET", f"/repos/{self.repository}/pulls/{self.pr_number}"
+        )
+        return PullRequestSnapshot.from_api(raw)
+
+    def list_open_pull_requests(self) -> list[dict[str, Any]]:
+        pull_requests: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            raw = self._request(
+                "GET",
+                f"/repos/{self.repository}/pulls?state=open&per_page=100&page={page}",
+            )
+            pull_requests.extend(raw)
+            if len(raw) < 100:
+                return pull_requests
+            page += 1
+
+    def list_timeline(self) -> list[dict[str, Any]]:
+        events: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            raw = self._request(
+                "GET",
+                f"/repos/{self.repository}/issues/{self.pr_number}/timeline"
+                f"?per_page=100&page={page}",
+            )
+            events.extend(raw)
+            if len(raw) < 100:
+                return events
+            page += 1
+
+    def list_comments(self) -> list[Comment]:
+        comments: list[Comment] = []
+        page = 1
+        while True:
+            raw = self._request(
+                "GET",
+                f"/repos/{self.repository}/issues/{self.pr_number}/comments"
+                f"?per_page=100&page={page}",
+            )
+            comments.extend(Comment.from_api(item) for item in raw)
+            if len(raw) < 100:
+                return comments
+            page += 1
+
+    def post_comment(self, body: str) -> None:
+        # GitHub issue comments have no idempotency key. Before every retry,
+        # look for the exact marker so an acknowledged-but-disconnected POST
+        # does not create an avoidable duplicate audit record.
+        last_error: BaseException | None = None
+        for attempt in range(self.attempts):
+            try:
+                self._request(
+                    "POST",
+                    f"/repos/{self.repository}/issues/{self.pr_number}/comments",
+                    {"body": body},
+                    attempts=1,
+                )
+                return
+            except ApiError as exc:
+                last_error = exc
+                try:
+                    if any(comment.body == body for comment in self.list_comments()):
+                        return
+                except ApiError:
+                    pass
+                if attempt + 1 < self.attempts:
+                    time.sleep(min(2**attempt, 4))
+        raise ApiError(str(last_error or "failed to append audit comment"))
+
+    def convert_to_draft(self) -> None:
+        query = (
+            "mutation($pullRequestId: ID!) { "
+            "convertPullRequestToDraft(input: {pullRequestId: $pullRequestId}) { "
+            "pullRequest { isDraft } } }"
+        )
+        raw = self._request(
+            "POST",
+            "/graphql",
+            {"query": query, "variables": {"pullRequestId": self.pr_node_id}},
+        )
+        if raw.get("errors"):
+            raise ApiError(f"draft mutation returned errors: {raw['errors']}")
+        is_draft = (
+            raw.get("data", {})
+            .get("convertPullRequestToDraft", {})
+            .get("pullRequest", {})
+            .get("isDraft")
+        )
+        if is_draft is not True:
+            raise ApiError("draft mutation did not confirm isDraft=true")
+
+    def add_reverted_label(self) -> None:
+        self._request(
+            "POST",
+            f"/repos/{self.repository}/issues/{self.pr_number}/labels",
+            {"labels": ["unauthorized-transition-reverted"]},
+        )
+
+
+def _audit_body(action: str, reason: str, marker: str) -> str:
+    if action == "consumed":
+        summary = "KAPI governance consumed a one-use ready authorization."
+    else:
+        summary = f"KAPI governance denied ready-for-review transition: `{reason}`."
+    return f"{summary}\n\n{marker}"
+
+
+def _audit_is_confirmed(
+    comments: Sequence[Comment], policy: Policy, decision: Decision
+) -> bool:
+    for comment in comments:
+        try:
+            record = parse_audit(comment, policy)
+        except GovernanceError:
+            continue
+        if (
+            record is not None
+            and record.action == "consumed"
+            and record.event_fingerprint == decision.event_fingerprint
+            and decision.evidence is not None
+            and record.authorization_comment_id == decision.evidence.comment_id
+            and record.authorization_hash == decision.evidence.payload_hash
+        ):
+            return True
+    return False
+
+
+def _deny_and_revert(
+    api: Any,
+    event: PullRequestEvent,
+    snapshot: PullRequestSnapshot | None,
+    reason: str,
+    now: dt.datetime,
+    decision: Decision | None,
+) -> ExecutionResult:
+    errors: list[str] = []
+    try:
+        if snapshot is None or not snapshot.is_draft:
+            api.convert_to_draft()
+    except Exception as exc:  # operational failure must remain visible
+        errors.append(f"convert_to_draft: {exc}")
+    try:
+        api.add_reverted_label()
+    except Exception as exc:
+        errors.append(f"add_reverted_label: {exc}")
+    try:
+        marker = make_audit_record("denied", event, reason, now)
+        api.post_comment(_audit_body("denied", reason, marker))
+    except Exception as exc:
+        errors.append(f"append_denied_audit: {exc}")
+    if errors:
+        return ExecutionResult(
+            "operational_failure", reason, decision, tuple(errors)
+        )
+    return ExecutionResult("denied", reason, decision)
+
+
+def execute_guard(
+    api: Any,
+    event: PullRequestEvent,
+    policy: Policy,
+    now: dt.datetime | None = None,
+    allow_new_consumption: bool = True,
+) -> ExecutionResult:
+    now = parse_time(now or dt.datetime.now(UTC))
+    snapshot: PullRequestSnapshot | None = None
+    try:
+        snapshot = api.get_pull_request()
+        comments = api.list_comments()
+        decision = decide_transition(event, snapshot, comments, policy, now)
+    except Exception as exc:
+        return _deny_and_revert(
+            api,
+            event,
+            snapshot,
+            "guard_read_failure",
+            now,
+            None,
+        )
+
+    if decision.action == "duplicate":
+        return ExecutionResult("authorized_duplicate", decision.reason, decision)
+
+    if decision.action == "consume" and decision.evidence is not None:
+        if not allow_new_consumption:
+            return _deny_and_revert(
+                api,
+                event,
+                snapshot,
+                "reconciliation_missing_consumed_authorization",
+                now,
+                decision,
+            )
+        try:
+            marker = make_audit_record(
+                "consumed", event, decision.reason, now, decision.evidence
+            )
+            api.post_comment(_audit_body("consumed", decision.reason, marker))
+            if not _audit_is_confirmed(api.list_comments(), policy, decision):
+                raise ApiError("consumed authorization audit was not observable")
+            return ExecutionResult("authorized", decision.reason, decision)
+        except Exception:
+            return _deny_and_revert(
+                api,
+                event,
+                snapshot,
+                "authorization_consumption_failed",
+                now,
+                decision,
+            )
+
+    return _deny_and_revert(
+        api, event, snapshot, decision.reason, now, decision
+    )
+
+
+def _required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise GovernanceError(f"missing required environment variable {name}")
+    return value
+
+
+def event_from_environment() -> PullRequestEvent:
+    head_sha = _required_env("EVENT_HEAD_SHA")
+    return PullRequestEvent(
+        repository_id=int(_required_env("GITHUB_REPOSITORY_ID")),
+        pr_number=int(_required_env("PR_NUMBER")),
+        pr_node_id=_required_env("PR_NODE_ID"),
+        head_sha=head_sha,
+        head_repository_id=int(_required_env("EVENT_HEAD_REPOSITORY_ID")),
+        actor_id=int(_required_env("EVENT_ACTOR_ID")),
+        actor_login=_required_env("EVENT_ACTOR_LOGIN"),
+        event_time=parse_time(_required_env("EVENT_TIME")),
+        run_id=int(_required_env("GITHUB_RUN_ID")),
+        run_attempt=int(_required_env("GITHUB_RUN_ATTEMPT")),
+    )
+
+
+def main() -> int:
+    try:
+        policy = Policy.load(_required_env("KAPI_GOVERNANCE_POLICY"))
+        event = event_from_environment()
+        api = GitHubApi(
+            token=_required_env("GITHUB_TOKEN"),
+            repository=_required_env("GITHUB_REPOSITORY"),
+            pr_number=event.pr_number,
+            pr_node_id=event.pr_node_id,
+            api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
+        )
+        result = execute_guard(api, event, policy)
+    except Exception as exc:
+        print(f"KAPI ready guard bootstrap failure: {exc}", file=sys.stderr)
+        return 2
+
+    print(
+        json.dumps(
+            {
+                "errors": result.errors,
+                "reason": result.reason,
+                "status": result.status,
+            },
+            sort_keys=True,
+        )
+    )
+    if result.status in {"authorized", "authorized_duplicate"}:
+        return 0
+    if result.status == "denied":
+        # A successful fail-closed reversal remains a visible red workflow run.
+        return 1
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
