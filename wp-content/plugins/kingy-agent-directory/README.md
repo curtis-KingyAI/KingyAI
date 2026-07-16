@@ -15,6 +15,8 @@ Server-rendered replacement for the inline Agent Directory application on WordPr
 
 The plugin does not mutate tool records during deployment. Editorial additions or removals are reviewed in the manifest and become visible after the page/object cache is purged.
 
+The page asset also corrects the production newsletter embed's landmark role and dynamically injected iframe title so the directory has no serious accessibility violations while the shared theme component is present.
+
 ## Page content
 
 Page 15708 should contain only:

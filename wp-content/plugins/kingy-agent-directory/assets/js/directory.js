@@ -298,7 +298,29 @@
         });
     }
 
+    function repairNewsletterAccessibility() {
+        var formWrapper = document.querySelector(".kingy-brief-signup__form[aria-label]");
+        if (formWrapper && !formWrapper.hasAttribute("role")) {
+            formWrapper.setAttribute("role", "region");
+        }
+
+        asArray(document.querySelectorAll('iframe[src*="subscribe-forms.beehiiv.com"]')).forEach(function (frame) {
+            if (!frame.hasAttribute("title")) {
+                frame.setAttribute("title", "Subscribe to The Kingy Brief");
+            }
+        });
+    }
+
     initTabs();
     initFilters();
     initScorecard();
+    repairNewsletterAccessibility();
+
+    if (document.body && window.MutationObserver) {
+        var accessibilityObserver = new MutationObserver(repairNewsletterAccessibility);
+        accessibilityObserver.observe(document.body, { childList: true, subtree: true });
+        window.setTimeout(function () {
+            accessibilityObserver.disconnect();
+        }, 15000);
+    }
 }());

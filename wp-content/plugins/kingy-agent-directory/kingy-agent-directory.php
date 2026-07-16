@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kingy AI Agent Directory
  * Description: Server-rendered AI Agent Directory and workflow-readiness scorecard for Kingy AI.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: Kingy AI
  * Text Domain: kingy-agent-directory
  */
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('KAD_VERSION', '1.1.0');
+define('KAD_VERSION', '1.1.1');
 define('KAD_PLUGIN_FILE', __FILE__);
 define('KAD_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAD_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -61,7 +61,12 @@ function kad_output_fallback_meta_description() {
 }
 
 function kad_output_nonpublic_canonical() {
-    if (!kad_is_directory_page() || (int) get_option('blog_public') === 1) {
+    if (!kad_is_directory_page()) {
+        return;
+    }
+
+    $page_noindex = get_post_meta(KAD_PAGE_ID, '_yoast_wpseo_meta-robots-noindex', true) === '1';
+    if ((int) get_option('blog_public') === 1 && !$page_noindex) {
         return;
     }
 
