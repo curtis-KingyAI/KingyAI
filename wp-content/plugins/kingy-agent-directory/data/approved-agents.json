@@ -1,0 +1,90 @@
+[
+  {
+    "id": 916188,
+    "slug": "manus",
+    "title": "Manus",
+    "directory_type": "direct_agent",
+    "availability": "Public product",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 916176,
+    "slug": "lindy",
+    "title": "Lindy",
+    "directory_type": "direct_agent",
+    "availability": "Public product",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913484,
+    "slug": "replit-seo-agent",
+    "title": "Replit SEO Agent",
+    "directory_type": "direct_agent",
+    "availability": "Available in Replit Growth and publishing workflows",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913480,
+    "slug": "microsoft-scout",
+    "title": "Microsoft Scout",
+    "directory_type": "direct_agent_preview",
+    "availability": "Private preview and experimental Frontier release",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913466,
+    "slug": "gemini-spark",
+    "title": "Gemini Spark",
+    "directory_type": "direct_agent_preview",
+    "availability": "Limited to eligible U.S. Google AI Ultra subscribers age 18+ and select business users",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913434,
+    "slug": "cursor-cloud-agents",
+    "title": "Cursor Cloud Agents",
+    "directory_type": "direct_agent",
+    "availability": "Public product",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913428,
+    "slug": "devin",
+    "title": "Devin",
+    "directory_type": "direct_agent",
+    "availability": "Public product",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913382,
+    "slug": "github-copilot-coding-agent",
+    "title": "GitHub Copilot coding agent",
+    "directory_type": "direct_agent",
+    "availability": "Available with eligible GitHub Copilot plans",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913377,
+    "slug": "mistral-vibe",
+    "title": "Mistral Vibe",
+    "directory_type": "direct_agent",
+    "availability": "Free, Pro, Team, and Enterprise plans",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 913223,
+    "slug": "kiro",
+    "title": "Kiro",
+    "directory_type": "direct_agent",
+    "availability": "Public product",
+    "audit_verified": "2026-07-16"
+  },
+  {
+    "id": 912999,
+    "slug": "chatgpt-agent",
+    "title": "ChatGPT agent",
+    "directory_type": "direct_agent",
+    "availability": "Available on eligible paid ChatGPT plans",
+    "audit_verified": "2026-07-16"
+  }
+]
