@@ -9,13 +9,14 @@ name: KAPI ready-for-review guard v1
   workflow_dispatch:
 
 # The default token is read-only. Only the metadata-only guard job receives the
-# pull-request write capability needed to restore draft state and append audit
-# comments. The job checks out and executes the trusted base SHA, never PR code.
+# pull-request write capability needed to append audit comments and apply denial
+# labels. Draft restoration is a manual operator action. The job checks out and
+# executes the trusted base SHA, never PR code.
 permissions:
   contents: read
 
 jobs:
-  authorize-or-revert:
+  authorize-or-deny:
     if: github.event_name == 'pull_request_target'
     name: kapi-ready-guard-v1
     runs-on: ubuntu-latest
@@ -39,7 +40,7 @@ jobs:
           TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: test "$(git rev-parse HEAD)" = "$TRUSTED_BASE_SHA"
 
-      - name: Validate one-use authorization or restore draft state
+      - name: Validate one-use authorization or record denial
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}

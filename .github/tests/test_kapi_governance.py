@@ -113,14 +113,9 @@ class FakeApi:
         )
         self.next_comment_id += 1
 
-    def convert_to_draft(self) -> None:
-        self.calls.append("convert_to_draft")
-        self._maybe_fail("convert_to_draft")
-        self.snapshot = dataclasses.replace(self.snapshot, is_draft=True)
-
-    def add_reverted_label(self) -> None:
-        self.calls.append("add_reverted_label")
-        self._maybe_fail("add_reverted_label")
+    def add_denied_label(self) -> None:
+        self.calls.append("add_denied_label")
+        self._maybe_fail("add_denied_label")
 
 
 class GovernanceFixture(unittest.TestCase):
@@ -258,9 +253,10 @@ class ReadyGuardTests(GovernanceFixture):
         result = execute_guard(api, self.event(), self.live_policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("governance_policy_not_activated", result.reason)
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
 
-    def test_manifest_validation_precedes_denial_audit_and_draft_reversion(self) -> None:
+    def test_manifest_validation_precedes_denial_audit_and_manual_recovery(self) -> None:
         environment = {
             "EVENT_ACTOR_ID": str(OPERATOR_ID),
             "EVENT_ACTOR_LOGIN": "curtis-KingyAI",
@@ -285,18 +281,24 @@ class ReadyGuardTests(GovernanceFixture):
 
         self.assertEqual("denied", result.status)
         self.assertEqual("governance_policy_not_activated", result.reason)
-        self.assertTrue(api.snapshot.is_draft)
-        self.assertIn("convert_to_draft", api.calls)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
+        self.assertIn("add_denied_label", api.calls)
         self.assertIn("post_comment", api.calls)
+        self.assertIn(
+            "A human operator must return this pull request to draft",
+            api.comments[-1].body,
+        )
 
-    def test_unauthorized_actor_is_reverted_and_denied(self) -> None:
+    def test_unauthorized_actor_is_labeled_audited_and_denied(self) -> None:
         event = self.event(actor_id=87654321)
         api = FakeApi(self.snapshot(), [], self.policy, self.now)
         result = execute_guard(api, event, self.policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("event_actor_not_allowed", result.reason)
-        self.assertIn("convert_to_draft", api.calls)
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertIn("add_denied_label", api.calls)
+        self.assertFalse(api.snapshot.is_draft)
         self.assertIn("post_comment", api.calls)
 
     def test_owner_identity_without_authorization_is_not_enough(self) -> None:
@@ -304,7 +306,8 @@ class ReadyGuardTests(GovernanceFixture):
         result = execute_guard(api, self.event(), self.policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("missing_authorization", result.reason)
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
 
     def test_agent_through_owner_cannot_forge_human_authorization(self) -> None:
         created_at = self.now - dt.timedelta(seconds=60)
@@ -337,14 +340,15 @@ class ReadyGuardTests(GovernanceFixture):
         result = execute_guard(api, self.event(), self.policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("authorization_authorizer_not_allowed", result.reason)
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
 
     def test_valid_one_use_human_authorization_is_consumed(self) -> None:
         authorization = self.authorization()
         api = FakeApi(self.snapshot(), [authorization], self.policy, self.now)
         result = execute_guard(api, self.event(), self.policy, self.now)
         self.assertEqual("authorized", result.status)
-        self.assertNotIn("convert_to_draft", api.calls)
+        self.assertEqual("not_required", result.restoration)
         self.assertEqual(2, len(api.comments))
         self.assertIn("kapi-ready-audit-v1", api.comments[-1].body)
         self.assertIn('"action":"consumed"', api.comments[-1].body)
@@ -363,7 +367,8 @@ class ReadyGuardTests(GovernanceFixture):
         self.assertEqual(
             "reconciliation_missing_consumed_authorization", result.reason
         )
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
 
     def test_fork_author_cannot_use_operator_authorization(self) -> None:
         authorization = self.authorization()
@@ -380,7 +385,8 @@ class ReadyGuardTests(GovernanceFixture):
         result = execute_guard(api, event, self.policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("event_actor_not_allowed", result.reason)
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
 
     def test_stale_authorization_head_sha_is_rejected(self) -> None:
         authorization = self.authorization(head_sha=STALE_SHA)
@@ -455,7 +461,8 @@ class ReadyGuardTests(GovernanceFixture):
         result = execute_guard(api, self.event(), self.policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("authorization_replay", result.reason)
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertFalse(api.snapshot.is_draft)
 
     def test_duplicate_delivery_is_idempotently_authorized(self) -> None:
         authorization = self.authorization()
@@ -466,21 +473,45 @@ class ReadyGuardTests(GovernanceFixture):
         )
         result = execute_guard(api, event, self.policy, self.now)
         self.assertEqual("authorized_duplicate", result.status)
-        self.assertNotIn("convert_to_draft", api.calls)
+        self.assertEqual("not_required", result.restoration)
         self.assertEqual(2, len(api.comments))
 
-    def test_api_failure_retries_fail_closed_and_remain_visible(self) -> None:
+    def test_label_failure_keeps_audit_visible_and_fails_operationally(self) -> None:
         api = FakeApi(
             self.snapshot(),
             [],
             self.policy,
             self.now,
-            failures={"list_comments": 1, "convert_to_draft": 1},
+            failures={"add_denied_label": 1},
         )
         result = execute_guard(api, self.event(), self.policy, self.now)
         self.assertEqual("operational_failure", result.status)
-        self.assertIn("convert_to_draft", " ".join(result.errors))
+        self.assertEqual("manual_operator_required", result.restoration)
+        self.assertIn("add_denied_label", " ".join(result.errors))
         self.assertIn("post_comment", api.calls)
+
+    def test_duplicate_denial_delivery_does_not_duplicate_audit(self) -> None:
+        event = self.event(actor_id=87654321)
+        api = FakeApi(self.snapshot(), [], self.policy, self.now)
+
+        first = execute_guard(api, event, self.policy, self.now)
+        second = execute_guard(api, event, self.policy, self.now)
+
+        self.assertEqual("denied", first.status)
+        self.assertEqual("denied", second.status)
+        self.assertEqual(1, len(api.comments))
+        self.assertEqual(1, api.calls.count("post_comment"))
+
+    def test_already_draft_state_does_not_claim_automatic_restoration(self) -> None:
+        api = FakeApi(
+            dataclasses.replace(self.snapshot(), is_draft=True),
+            [],
+            self.policy,
+            self.now,
+        )
+        result = execute_guard(api, self.event(), self.policy, self.now)
+        self.assertEqual("denied", result.status)
+        self.assertEqual("already_draft", result.restoration)
 
     def test_edited_authorization_is_rejected(self) -> None:
         api = FakeApi(
@@ -543,6 +574,14 @@ class GitHubApiSafetyTests(unittest.TestCase):
             with mock.patch.object(api, "list_comments", return_value=[existing]):
                 api.post_comment(body)
         self.assertEqual(1, request.call_count)
+
+    def test_guard_has_no_automatic_draft_mutation_path(self) -> None:
+        source = (
+            ROOT / ".github" / "scripts" / "kapi_ready_guard.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("convertPullRequestToDraft", source)
+        self.assertNotIn('"/graphql"', source)
+        self.assertIn('{"labels": ["invalid"]}', source)
 
 
 class ReadyReconciliationTests(GovernanceFixture):
@@ -632,7 +671,7 @@ class ReadyReconciliationTests(GovernanceFixture):
         self.assertEqual("operational_failure", results[0]["status"])
         self.assertEqual([], api.calls)
 
-    def test_ready_pr_without_prior_consumption_is_reverted(self) -> None:
+    def test_ready_pr_without_prior_consumption_requires_manual_restoration(self) -> None:
         timeline = [
             {
                 "event": "ready_for_review",
@@ -653,7 +692,10 @@ class ReadyReconciliationTests(GovernanceFixture):
         self.assertEqual(
             "reconciliation_missing_consumed_authorization", results[0]["reason"]
         )
-        self.assertTrue(api.snapshot.is_draft)
+        self.assertEqual("manual_operator_required", results[0]["restoration"])
+        self.assertFalse(api.snapshot.is_draft)
+        self.assertIn("add_denied_label", api.calls)
+        self.assertIn("post_comment", api.calls)
 
     def test_duplicate_consumed_event_remains_authorized(self) -> None:
         event = self.event()
@@ -675,7 +717,7 @@ class ReadyReconciliationTests(GovernanceFixture):
         results, exit_code = self.reconcile([self.raw_pull_request()], api)
         self.assertEqual(0, exit_code)
         self.assertEqual("authorized_duplicate", results[0]["status"])
-        self.assertNotIn("convert_to_draft", api.calls)
+        self.assertEqual("not_required", results[0]["restoration"])
 
     def test_timeline_read_failure_is_visible_and_fail_closed(self) -> None:
         api = FakeApi(
@@ -718,6 +760,44 @@ class WorkflowScannerTests(unittest.TestCase):
             self.assertTrue((ROOT / relative).is_file(), str(relative))
         governance_file_bindings(ROOT)
 
+    def test_ready_guard_workflow_cannot_claim_automatic_draft_restoration(self) -> None:
+        variants = (
+            ("authorize-or-deny:", "authorize-or-revert:"),
+            (
+                "Draft restoration is a manual operator action.",
+                "Automatic draft restoration is enforced.",
+            ),
+            (
+                "Validate one-use authorization or record denial",
+                "Validate one-use authorization or restore draft state",
+            ),
+        )
+        for current, stale in variants:
+            with self.subTest(stale=stale):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = pathlib.Path(temporary)
+                    self._copy_github(root)
+                    workflow = (
+                        root
+                        / ".github"
+                        / "workflows"
+                        / "ready-for-review-guard.yml"
+                    )
+                    workflow.write_text(
+                        workflow.read_text(encoding="utf-8").replace(
+                            current, stale, 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    errors = scan_workflows(root)
+                self.assertTrue(
+                    any(
+                        "must not claim automatic draft restoration" in error
+                        for error in errors
+                    ),
+                    errors,
+                )
+
     def test_missing_protected_file_fails_manifest_validation_closed(self) -> None:
         missing = pathlib.PurePosixPath(".github/tests/test_kapi_governance.py")
         with tempfile.TemporaryDirectory() as temporary:
@@ -740,7 +820,35 @@ class WorkflowScannerTests(unittest.TestCase):
             ROOT / ".github" / "kapi-governance" / "policy-v1.json"
         )
         self.assertEqual("Operator-reviewed", policy.review_positioning)
+        self.assertEqual("manual_operator", policy.draft_restoration_mode)
         self.assertFalse(policy.stronger_review_claims_allowed)
+
+    def test_policy_rejects_unattested_automatic_draft_restoration(self) -> None:
+        source = ROOT / ".github" / "kapi-governance" / "policy-v1.json"
+        with tempfile.TemporaryDirectory() as temporary:
+            policy = pathlib.Path(temporary) / "policy.json"
+            policy.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    '"draft_restoration_mode": "manual_operator"',
+                    '"draft_restoration_mode": "automatic"',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                GovernanceError, "draft restoration mode must remain manual_operator"
+            ):
+                Policy.load(policy)
+
+    def test_readme_documents_manual_recovery_and_external_merge_gate(self) -> None:
+        readme = (
+            ROOT / ".github" / "kapi-governance" / "README.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("`draft_restoration_mode` is pinned to `manual_operator`", readme)
+        self.assertIn("A human operator must restore draft state", readme)
+        self.assertIn("external required check", readme)
+        self.assertNotIn("cause draft restoration", readme)
+        self.assertNotIn("returned to draft", readme)
 
     def test_policy_rejects_stronger_review_positioning(self) -> None:
         source = ROOT / ".github" / "kapi-governance" / "policy-v1.json"

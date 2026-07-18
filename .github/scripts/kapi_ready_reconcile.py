@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed reconciliation for ready PRs whose event workflow was missed."""
+"""Fail-closed detection for ready PRs whose event workflow was missed."""
 
 from __future__ import annotations
 
@@ -157,7 +157,12 @@ def reconcile_pull_requests(
                 allow_new_consumption=False,
             )
             results.append(
-                {"pr": pr_number, "reason": result.reason, "status": result.status}
+                {
+                    "pr": pr_number,
+                    "reason": result.reason,
+                    "restoration": result.restoration,
+                    "status": result.status,
+                }
             )
             if result.status == "operational_failure":
                 exit_code = 2
