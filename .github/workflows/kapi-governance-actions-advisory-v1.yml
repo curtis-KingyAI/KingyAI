@@ -1,0 +1,63 @@
+name: KAPI governance Actions advisory v1
+
+# No path filter: the required job must be emitted for every pull request.
+"on":
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "kapi-governance-actions-advisory-v1-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  governance-required:
+    # Always emitted for diagnostics. Production rules must instead require the
+    # policy's external-verifier check and bind it to that verifier's App ID.
+    name: kapi-governance-actions-advisory-v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted base governance code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .kapi-trusted
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .github/CODEOWNERS
+            .github/kapi-governance
+            .github/scripts
+            .github/tests
+            .github/workflows
+
+      - name: Prove trusted governance code exists on the base SHA
+        env:
+          TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          test "$(git -C .kapi-trusted rev-parse HEAD)" = "$TRUSTED_BASE_SHA"
+          if test ! -f .kapi-trusted/.github/scripts/kapi_governance.py; then
+            echo "::error::Trusted governance code is not on the base branch. Follow the documented one-time bootstrap; never execute the PR copy."
+            exit 1
+          fi
+
+      - name: Check out pull request as inert scan data
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .kapi-candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Scan workflow authority and required-check uniqueness
+        run: >-
+          python3 .kapi-trusted/.github/scripts/kapi_governance.py scan-workflows
+          --root .kapi-candidate
+          --trusted-root .kapi-trusted
+
+      - name: Run trusted governance regression tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 -m unittest discover -s .kapi-trusted/.github/tests -v

@@ -1,0 +1,100 @@
+name: KAPI ready-for-review guard v1
+
+"on":
+  pull_request_target:
+    branches: [main]
+    types: [ready_for_review]
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+# The default token is read-only. Only the metadata-only guard job receives the
+# pull-request write capability needed to restore draft state and append audit
+# comments. The job checks out and executes the trusted base SHA, never PR code.
+permissions:
+  contents: read
+
+jobs:
+  authorize-or-revert:
+    if: github.event_name == 'pull_request_target'
+    name: kapi-ready-guard-v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: "kapi-ready-guard-v1-${{ github.repository_id }}-${{ github.event.pull_request.number }}"
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out trusted base policy only
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .github/kapi-governance
+            .github/scripts
+
+      - name: Prove the executable checkout is the trusted base SHA
+        env:
+          TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_BASE_SHA"
+
+      - name: Validate one-use authorization or restore draft state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY_ID: ${{ github.repository_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_ACTOR_ID: ${{ github.event.sender.id }}
+          EVENT_ACTOR_LOGIN: ${{ github.event.sender.login }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_HEAD_REPOSITORY_ID: ${{ github.event.pull_request.head.repo.id || 0 }}
+          EVENT_TIME: ${{ github.event.pull_request.updated_at }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          KAPI_GOVERNANCE_POLICY: .github/kapi-governance/policy-v1.json
+          TRUSTED_GOVERNANCE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 .github/scripts/kapi_ready_guard.py
+
+  reconcile-ready-state:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: kapi-ready-reconcile-v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: "kapi-ready-reconcile-v1-${{ github.repository_id }}"
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out trusted default-branch policy only
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .github/kapi-governance
+            .github/scripts
+
+      - name: Prove reconciliation uses the triggering default-branch SHA
+        env:
+          TRUSTED_GOVERNANCE_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$TRUSTED_GOVERNANCE_SHA"
+
+      - name: Reconcile every open ready PR against consumed authorization
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY_ID: ${{ github.repository_id }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          KAPI_GOVERNANCE_POLICY: .github/kapi-governance/policy-v1.json
+          TRUSTED_GOVERNANCE_SHA: ${{ github.sha }}
+        run: python3 .github/scripts/kapi_ready_reconcile.py
