@@ -21,6 +21,7 @@ from kapi_governance import (  # noqa: E402
     Comment,
     GovernanceError,
     Policy,
+    PROTECTED_GOVERNANCE_PATHS,
     PullRequestEvent,
     PullRequestSnapshot,
     UTC,
@@ -258,6 +259,35 @@ class ReadyGuardTests(GovernanceFixture):
         self.assertEqual("denied", result.status)
         self.assertEqual("governance_policy_not_activated", result.reason)
         self.assertTrue(api.snapshot.is_draft)
+
+    def test_manifest_validation_precedes_denial_audit_and_draft_reversion(self) -> None:
+        environment = {
+            "EVENT_ACTOR_ID": str(OPERATOR_ID),
+            "EVENT_ACTOR_LOGIN": "curtis-KingyAI",
+            "EVENT_BASE_SHA": BASE_SHA,
+            "EVENT_HEAD_REPOSITORY_ID": str(BASE_REPOSITORY_ID),
+            "EVENT_HEAD_SHA": HEAD_SHA,
+            "EVENT_TIME": "2026-07-13T12:00:00Z",
+            "GITHUB_REPOSITORY_ID": str(BASE_REPOSITORY_ID),
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_RUN_ID": "700",
+            "PR_NODE_ID": "PR_kwTEST",
+            "PR_NUMBER": "4",
+            "TRUSTED_GOVERNANCE_SHA": BASE_SHA,
+        }
+        with mock.patch.dict(os.environ, environment, clear=True):
+            event = event_from_environment(
+                str(ROOT / ".github" / "kapi-governance" / "policy-v1.json")
+            )
+
+        api = FakeApi(self.snapshot(), [], self.live_policy, self.now)
+        result = execute_guard(api, event, self.live_policy, self.now)
+
+        self.assertEqual("denied", result.status)
+        self.assertEqual("governance_policy_not_activated", result.reason)
+        self.assertTrue(api.snapshot.is_draft)
+        self.assertIn("convert_to_draft", api.calls)
+        self.assertIn("post_comment", api.calls)
 
     def test_unauthorized_actor_is_reverted_and_denied(self) -> None:
         event = self.event(actor_id=87654321)
@@ -671,6 +701,39 @@ class WorkflowScannerTests(unittest.TestCase):
 
     def test_current_workflows_pass(self) -> None:
         self.assertEqual([], scan_workflows(ROOT))
+
+    def test_ready_guard_uses_complete_trusted_checkouts(self) -> None:
+        workflow = (
+            ROOT / ".github" / "workflows" / "ready-for-review-guard.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(2, workflow.count("uses: actions/checkout@"))
+        self.assertNotIn("sparse-checkout:", workflow)
+        self.assertNotIn("path: .kapi-candidate", workflow)
+        self.assertNotRegex(
+            workflow,
+            r"ref:\s*\$\{\{\s*github\.event\.pull_request\.head",
+        )
+        for relative in PROTECTED_GOVERNANCE_PATHS:
+            self.assertTrue((ROOT / relative).is_file(), str(relative))
+        governance_file_bindings(ROOT)
+
+    def test_missing_protected_file_fails_manifest_validation_closed(self) -> None:
+        missing = pathlib.PurePosixPath(".github/tests/test_kapi_governance.py")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            for relative in PROTECTED_GOVERNANCE_PATHS:
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT / relative, target)
+            (root / missing).unlink()
+
+            with self.assertRaises(GovernanceError) as raised:
+                governance_file_bindings(root)
+
+        self.assertEqual(
+            f"missing protected governance file {missing}", str(raised.exception)
+        )
 
     def test_live_policy_pins_operator_reviewed_positioning(self) -> None:
         policy = Policy.load(

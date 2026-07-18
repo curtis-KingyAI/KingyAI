@@ -27,15 +27,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Check out trusted base policy only
+      - name: Check out complete trusted base governance
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: |
-            .github/kapi-governance
-            .github/scripts
 
       - name: Prove the executable checkout is the trusted base SHA
         env:
@@ -73,15 +70,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Check out trusted default-branch policy only
+      - name: Check out complete trusted default-branch governance
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: |
-            .github/kapi-governance
-            .github/scripts
 
       - name: Prove reconciliation uses the triggering default-branch SHA
         env:
