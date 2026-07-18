@@ -79,7 +79,7 @@ jobs:
           # PR #4 is the sole bootstrap exception because main does not yet
           # contain the verifier. Actions necessarily executes this candidate
           # workflow YAML; it only hashes every other candidate file and never
-          # executes a candidate script. Independent hash binding is mandatory.
+          # executes a candidate script. Operator review must bind the hashes.
           test "$EVENT_NAME" = "pull_request"
           test "$PR_NUMBER" = "4"
           test "$REPOSITORY" = "curtis-KingyAI/KingyAI"
@@ -90,7 +90,7 @@ jobs:
           test "$BASE_SHA" = "$BOOTSTRAP_BASE_SHA"
 
           echo "KAPI_VERIFY_MODE=manual-pr4-bootstrap"
-          echo "::warning::One-time PR #4 bootstrap: Actions is executing candidate workflow YAML and has no cryptographic workflow identity. A named reviewer must independently bind the check run, exact head SHA, reviewed workflow hash, manifest, and local test logs before merge."
+          echo "::warning::One-time PR #4 bootstrap: Actions is executing candidate workflow YAML and has no cryptographic workflow identity. The operator must bind the check run, exact base/head SHAs, reviewed workflow hash, protected-file manifest, and local test logs before merge."
           sha256sum .kapi-candidate/.github/workflows/kapi.yml
           find \
             .kapi-candidate/.github/CODEOWNERS \

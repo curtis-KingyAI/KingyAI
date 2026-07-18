@@ -36,6 +36,9 @@ GUARD_WORKFLOW = pathlib.PurePosixPath(
     ".github/workflows/ready-for-review-guard.yml"
 )
 POLICY_PATH = pathlib.PurePosixPath(".github/kapi-governance/policy-v1.json")
+GOVERNANCE_README_PATH = pathlib.PurePosixPath(
+    ".github/kapi-governance/README.md"
+)
 CODEOWNERS_PATH = pathlib.PurePosixPath(".github/CODEOWNERS")
 CHECKOUT_ACTION = (
     "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
@@ -53,6 +56,11 @@ EXPECTED_GITHUB_TOKEN_BINDINGS = {
     LEGACY_BOOTSTRAP_WORKFLOW: 0,
     GUARD_WORKFLOW: 2,
 }
+EXPECTED_PULL_REQUEST_WRITE_BINDINGS = {
+    REQUIRED_WORKFLOW: 0,
+    LEGACY_BOOTSTRAP_WORKFLOW: 0,
+    GUARD_WORKFLOW: 2,
+}
 EXPECTED_TRUSTED_SPARSE_PATHS = frozenset(
     {
         CODEOWNERS_PATH,
@@ -66,6 +74,7 @@ LEGACY_BOOTSTRAP_CHECK_NAME = "verify"
 PR4_BOOTSTRAP_BASE_SHA = "6070f10c9ab5611c0966056a43eb24ae6beda7ce"
 PROTECTED_GOVERNANCE_PATHS = (
     POLICY_PATH,
+    GOVERNANCE_README_PATH,
     CODEOWNERS_PATH,
     pathlib.PurePosixPath(".github/scripts/kapi_governance.py"),
     pathlib.PurePosixPath(".github/scripts/kapi_ready_guard.py"),
@@ -101,6 +110,8 @@ class Policy:
     clock_skew_seconds: int
     actions_advisory_check_name: str
     production_required_check_name: str
+    review_positioning: str
+    stronger_review_claims_allowed: bool
 
     @classmethod
     def load(cls, path: pathlib.Path | str) -> "Policy":
@@ -121,7 +132,9 @@ class Policy:
             "human_authorizer_actor_ids",
             "repository_id",
             "production_required_check_name",
+            "review_positioning",
             "schema",
+            "stronger_review_claims_allowed",
         }
         if set(raw) != expected:
             raise GovernanceError("policy keys do not match the v1 schema")
@@ -190,6 +203,12 @@ class Policy:
                 raise GovernanceError(f"{label} check name must be unique and versioned")
         if advisory_name == production_name:
             raise GovernanceError("Actions advisory and production check names must differ")
+        review_positioning = raw["review_positioning"]
+        if review_positioning != "Operator-reviewed":
+            raise GovernanceError("KAPI review positioning must be Operator-reviewed")
+        stronger_claims = raw["stronger_review_claims_allowed"]
+        if stronger_claims is not False:
+            raise GovernanceError("stronger KAPI review claims must remain disabled")
         return cls(
             repository_id=int(raw["repository_id"]),
             default_branch=str(raw["default_branch"]),
@@ -206,6 +225,8 @@ class Policy:
             clock_skew_seconds=skew,
             actions_advisory_check_name=advisory_name,
             production_required_check_name=production_name,
+            review_positioning=review_positioning,
+            stronger_review_claims_allowed=stronger_claims,
         )
 
 
@@ -237,6 +258,8 @@ class PullRequestEvent:
     repository_id: int
     pr_number: int
     pr_node_id: str
+    base_sha: str
+    trusted_governance_sha: str
     head_sha: str
     head_repository_id: int
     actor_id: int
@@ -244,6 +267,8 @@ class PullRequestEvent:
     event_time: dt.datetime
     run_id: int
     run_attempt: int
+    policy_sha256: str
+    protected_files_sha256: str
 
     @property
     def fingerprint(self) -> str:
@@ -251,16 +276,21 @@ class PullRequestEvent:
             {
                 "action": "ready_for_review",
                 "actor_id": self.actor_id,
+                "base_sha": self.base_sha,
                 "event_time": format_time(self.event_time),
                 "head_sha": self.head_sha,
+                "policy_sha256": self.policy_sha256,
                 "pr_number": self.pr_number,
+                "protected_files_sha256": self.protected_files_sha256,
                 "repository_id": self.repository_id,
+                "trusted_governance_sha": self.trusted_governance_sha,
             }
         )
 
 
 @dataclasses.dataclass(frozen=True)
 class PullRequestSnapshot:
+    base_sha: str
     head_sha: str
     head_repository_id: int
     base_repository_id: int
@@ -272,6 +302,7 @@ class PullRequestSnapshot:
     def from_api(cls, raw: dict[str, Any]) -> "PullRequestSnapshot":
         head_repo = raw["head"].get("repo") or {}
         return cls(
+            base_sha=str(raw["base"]["sha"]),
             head_sha=str(raw["head"]["sha"]),
             head_repository_id=int(head_repo.get("id") or 0),
             base_repository_id=int(raw["base"]["repo"]["id"]),
@@ -286,11 +317,14 @@ class AuthorizationEvidence:
     comment_id: int
     repository_id: int
     pr_number: int
+    base_sha: str
     head_sha: str
     authorizer_actor_id: int
     ready_actor_id: int
     expires_at: dt.datetime
     nonce: str
+    policy_sha256: str
+    protected_files_sha256: str
     payload_hash: str
 
 
@@ -299,11 +333,14 @@ class AuditRecord:
     action: str
     repository_id: int
     pr_number: int
+    base_sha: str
     head_sha: str
     actor_id: int
     authorization_comment_id: int | None
     authorization_hash: str | None
     nonce: str | None
+    policy_sha256: str
+    protected_files_sha256: str
     event_fingerprint: str
     reason: str
 
@@ -341,6 +378,30 @@ def digest_payload(payload: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
 
 
+def digest_file(path: pathlib.Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def governance_file_bindings(
+    root: pathlib.Path | str,
+) -> tuple[str, str]:
+    """Return policy and protected-file manifest SHA-256 bindings.
+
+    The manifest hashes every approved governance file by both path and content,
+    then hashes the stable newline-delimited manifest. Missing files fail closed.
+    """
+    root_path = pathlib.Path(root)
+    policy_sha256 = digest_file(root_path / POLICY_PATH)
+    entries: list[str] = []
+    for relative in sorted(PROTECTED_GOVERNANCE_PATHS, key=str):
+        path = root_path / relative
+        if not path.is_file():
+            raise GovernanceError(f"missing protected governance file {relative}")
+        entries.append(f"{digest_file(path)}  {relative.as_posix()}")
+    manifest = "\n".join(entries) + "\n"
+    return policy_sha256, hashlib.sha256(manifest.encode("utf-8")).hexdigest()
+
+
 def make_marker(marker: str, payload: dict[str, Any]) -> str:
     return f"<!-- {marker} {canonical_json(payload)} -->"
 
@@ -372,31 +433,46 @@ def parse_authorization(comment: Comment) -> AuthorizationEvidence | None:
     payload = payloads[0]
     expected = {
         "authorizer_actor_id",
+        "base_sha",
         "expires_at",
         "head_sha",
         "nonce",
+        "policy_sha256",
         "pr_number",
+        "protected_files_sha256",
         "ready_actor_id",
         "repository_id",
         "schema",
     }
     if set(payload) != expected or payload.get("schema") != AUTH_SCHEMA:
         raise GovernanceError("authorization keys do not match the v1 schema")
+    base_sha = str(payload["base_sha"])
     head_sha = str(payload["head_sha"])
     nonce = str(payload["nonce"])
+    policy_sha256 = str(payload["policy_sha256"])
+    protected_files_sha256 = str(payload["protected_files_sha256"])
+    if not SHA_RE.fullmatch(base_sha):
+        raise GovernanceError("authorization base SHA must be 40 lowercase hex characters")
     if not SHA_RE.fullmatch(head_sha):
         raise GovernanceError("authorization head SHA must be 40 lowercase hex characters")
     if not NONCE_RE.fullmatch(nonce):
         raise GovernanceError("authorization nonce must be 32 lowercase hex characters")
+    if not re.fullmatch(r"[0-9a-f]{64}", policy_sha256):
+        raise GovernanceError("authorization policy hash must be 64 lowercase hex characters")
+    if not re.fullmatch(r"[0-9a-f]{64}", protected_files_sha256):
+        raise GovernanceError("authorization manifest hash must be 64 lowercase hex characters")
     return AuthorizationEvidence(
         comment_id=comment.id,
         repository_id=int(payload["repository_id"]),
         pr_number=int(payload["pr_number"]),
+        base_sha=base_sha,
         head_sha=head_sha,
         authorizer_actor_id=int(payload["authorizer_actor_id"]),
         ready_actor_id=int(payload["ready_actor_id"]),
         expires_at=parse_time(payload["expires_at"]),
         nonce=nonce,
+        policy_sha256=policy_sha256,
+        protected_files_sha256=protected_files_sha256,
         payload_hash=digest_payload(payload),
     )
 
@@ -420,10 +496,13 @@ def parse_audit(comment: Comment, policy: Policy) -> AuditRecord | None:
         "actor_id",
         "authorization_comment_id",
         "authorization_hash",
+        "base_sha",
         "event_fingerprint",
         "head_sha",
         "nonce",
+        "policy_sha256",
         "pr_number",
+        "protected_files_sha256",
         "reason",
         "recorded_at",
         "repository_id",
@@ -441,6 +520,7 @@ def parse_audit(comment: Comment, policy: Policy) -> AuditRecord | None:
         action=action,
         repository_id=int(payload["repository_id"]),
         pr_number=int(payload["pr_number"]),
+        base_sha=str(payload["base_sha"]),
         head_sha=str(payload["head_sha"]),
         actor_id=int(payload["actor_id"]),
         authorization_comment_id=(
@@ -454,6 +534,8 @@ def parse_audit(comment: Comment, policy: Policy) -> AuditRecord | None:
             else None
         ),
         nonce=str(payload["nonce"]) if payload["nonce"] is not None else None,
+        policy_sha256=str(payload["policy_sha256"]),
+        protected_files_sha256=str(payload["protected_files_sha256"]),
         event_fingerprint=str(payload["event_fingerprint"]),
         reason=str(payload["reason"]),
     )
@@ -482,8 +564,14 @@ def _authorization_error(
         return "authorization_repository_mismatch"
     if evidence.pr_number != event.pr_number:
         return "authorization_pr_mismatch"
+    if evidence.base_sha != event.base_sha:
+        return "authorization_stale_base_sha"
     if evidence.head_sha != event.head_sha:
         return "authorization_stale_head_sha"
+    if evidence.policy_sha256 != event.policy_sha256:
+        return "authorization_policy_hash_mismatch"
+    if evidence.protected_files_sha256 != event.protected_files_sha256:
+        return "authorization_protected_files_hash_mismatch"
     skew = dt.timedelta(seconds=policy.clock_skew_seconds)
     ttl = dt.timedelta(seconds=policy.authorization_ttl_seconds)
     if comment.created_at > event.event_time + skew:
@@ -519,6 +607,10 @@ def decide_transition(
         return Decision("deny", "base_repository_mismatch", fingerprint)
     if snapshot.base_ref != policy.default_branch:
         return Decision("deny", "base_branch_mismatch", fingerprint)
+    if snapshot.base_sha != event.base_sha:
+        return Decision("deny", "current_base_sha_mismatch", fingerprint)
+    if event.trusted_governance_sha != event.base_sha:
+        return Decision("deny", "trusted_governance_sha_mismatch", fingerprint)
     if snapshot.state != "open":
         return Decision("deny", "pull_request_not_open", fingerprint)
     if snapshot.head_sha != event.head_sha:
@@ -545,9 +637,12 @@ def decide_transition(
             audit.action == "consumed"
             and audit.repository_id == event.repository_id
             and audit.pr_number == event.pr_number
+            and audit.base_sha == event.base_sha
             and audit.head_sha == event.head_sha
             and audit.actor_id == event.actor_id
             and audit.event_fingerprint == fingerprint
+            and audit.policy_sha256 == event.policy_sha256
+            and audit.protected_files_sha256 == event.protected_files_sha256
         ):
             return Decision("duplicate", "already_consumed_for_same_event", fingerprint)
 
@@ -588,7 +683,10 @@ def decide_transition(
 
     priority = [
         "authorization_replay",
+        "authorization_stale_base_sha",
         "authorization_stale_head_sha",
+        "authorization_policy_hash_mismatch",
+        "authorization_protected_files_hash_mismatch",
         "authorization_expired",
         "authorization_ready_actor_mismatch",
         "authorization_authorizer_not_allowed",
@@ -637,10 +735,13 @@ def make_audit_record(
         "actor_id": event.actor_id,
         "authorization_comment_id": evidence.comment_id if evidence else None,
         "authorization_hash": evidence.payload_hash if evidence else None,
+        "base_sha": event.base_sha,
         "event_fingerprint": event.fingerprint,
         "head_sha": event.head_sha,
         "nonce": evidence.nonce if evidence else None,
+        "policy_sha256": event.policy_sha256,
         "pr_number": event.pr_number,
+        "protected_files_sha256": event.protected_files_sha256,
         "reason": reason,
         "recorded_at": format_time(recorded_at),
         "repository_id": event.repository_id,
@@ -654,15 +755,24 @@ def make_audit_record(
 def make_authorization_record(
     policy: Policy,
     pr_number: int,
+    base_sha: str,
     head_sha: str,
     authorizer_actor_id: int,
     ready_actor_id: int,
     now: dt.datetime,
+    policy_sha256: str,
+    protected_files_sha256: str,
     nonce: str | None = None,
     expires_in: int | None = None,
 ) -> str:
+    if not SHA_RE.fullmatch(base_sha):
+        raise GovernanceError("base SHA must be 40 lowercase hex characters")
     if not SHA_RE.fullmatch(head_sha):
         raise GovernanceError("head SHA must be 40 lowercase hex characters")
+    if not re.fullmatch(r"[0-9a-f]{64}", policy_sha256):
+        raise GovernanceError("policy hash must be 64 lowercase hex characters")
+    if not re.fullmatch(r"[0-9a-f]{64}", protected_files_sha256):
+        raise GovernanceError("protected-files hash must be 64 lowercase hex characters")
     if (
         policy.activation_state != "active"
         or not policy.credential_separation_attested
@@ -685,10 +795,13 @@ def make_authorization_record(
     now = parse_time(now)
     payload = {
         "authorizer_actor_id": authorizer_actor_id,
+        "base_sha": base_sha,
         "expires_at": format_time(now + dt.timedelta(seconds=lifetime)),
         "head_sha": head_sha,
         "nonce": nonce_value,
+        "policy_sha256": policy_sha256,
         "pr_number": pr_number,
+        "protected_files_sha256": protected_files_sha256,
         "ready_actor_id": ready_actor_id,
         "repository_id": policy.repository_id,
         "schema": AUTH_SCHEMA,
@@ -829,7 +942,7 @@ def scan_workflows(
     )
     reserved_job_re_template = r"(?m)^\s{{4}}name:\s*[\"']?{}[\"']?\s*(?:#.*)?$"
     credential_patterns = (
-        (r"\$\{\{\s*secrets\.", "secrets contexts are forbidden"),
+        (r"\$\{\{\s*secrets(?:\.|\[)", "secrets contexts are forbidden"),
         (
             r"(?im)^\s*(?:GH_TOKEN|GITHUB_PAT|PERSONAL_ACCESS_TOKEN|PAT_TOKEN|API_TOKEN)\s*:",
             "alternate credential aliases are forbidden",
@@ -875,14 +988,72 @@ def scan_workflows(
             )
         )
         expected_token_bindings = EXPECTED_GITHUB_TOKEN_BINDINGS.get(relative, 0)
-        if token_bindings != expected_token_bindings:
+        total_token_keys = len(
+            re.findall(r"(?m)^\s*GITHUB_TOKEN:\s*", text)
+        )
+        if (
+            token_bindings != expected_token_bindings
+            or total_token_keys != expected_token_bindings
+        ):
             errors.append(
                 f"{relative}: GITHUB_TOKEN binding count must be exactly "
                 f"{expected_token_bindings}"
             )
+        checkout_count = EXPECTED_ACTIONS.get(relative, Counter()).get(
+            CHECKOUT_ACTION, 0
+        )
+        persist_false_count = len(
+            re.findall(
+                r"(?m)^\s*persist-credentials:\s*false\s*(?:#.*)?$",
+                text,
+            )
+        )
+        total_persist_keys = len(
+            re.findall(r"(?m)^\s*persist-credentials:\s*", text)
+        )
+        if (
+            persist_false_count != checkout_count
+            or total_persist_keys != checkout_count
+        ):
+            errors.append(
+                f"{relative}: every checkout must set persist-credentials false; "
+                f"expected {checkout_count}, found {persist_false_count}"
+            )
+        pull_request_write_count = len(
+            re.findall(
+                r"(?m)^\s*pull-requests:\s*write\s*(?:#.*)?$",
+                text,
+            )
+        )
+        expected_pull_request_writes = EXPECTED_PULL_REQUEST_WRITE_BINDINGS.get(
+            relative, 0
+        )
+        if pull_request_write_count != expected_pull_request_writes:
+            errors.append(
+                f"{relative}: pull-requests write binding count must be exactly "
+                f"{expected_pull_request_writes}"
+            )
         for pattern, message in credential_patterns:
             if re.search(pattern, text):
                 errors.append(f"{relative}: {message}")
+        credential_key_re = re.compile(
+            r"(?im)^\s*([A-Z0-9_-]*(?:TOKEN|SECRET|PRIVATE[-_]KEY|"
+            r"CREDENTIAL|PASSWORD|API[-_]KEY)[A-Z0-9_-]*)\s*:"
+        )
+        for match in credential_key_re.finditer(text):
+            if match.group(1).upper() not in {
+                "GITHUB_TOKEN",
+                "PERSIST-CREDENTIALS",
+            }:
+                errors.append(
+                    f"{relative}: credential-like YAML key is forbidden"
+                )
+        if re.search(
+            r"(?im)\b(?:export\s+)?[A-Z0-9_]*(?:TOKEN|SECRET|PRIVATE_KEY|"
+            r"CREDENTIAL|PASSWORD|API_KEY)[A-Z0-9_]*\s*=",
+            text,
+        ):
+            errors.append(f"{relative}: credential-like shell assignment is forbidden")
         if _top_level_permissions(text) != {"contents": "read"}:
             errors.append(
                 f"{relative}: top-level token permissions must be explicitly contents: read"
@@ -1035,6 +1206,11 @@ def scan_workflows(
             "workflow_dispatch:": "guard reconciliation must support manual execution",
             "pull-requests: write": "guard needs job-scoped metadata write",
             "ref: ${{ github.event.pull_request.base.sha }}": "guard must checkout base SHA",
+            "EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}": "guard event must bind base SHA",
+            "TRUSTED_GOVERNANCE_SHA: ${{ github.event.pull_request.base.sha }}": "guard must bind executable governance SHA",
+            "ref: ${{ github.sha }}": "reconciliation must checkout its triggering default-branch SHA",
+            "TRUSTED_GOVERNANCE_SHA: ${{ github.sha }}": "reconciliation must bind its executable governance SHA",
+            "Prove reconciliation uses the triggering default-branch SHA": "reconciliation checkout must be verified",
             "persist-credentials: false": "checkout credentials must not persist",
             "cancel-in-progress: false": "per-PR authorization events must serialize",
             "timeout-minutes:": "guard must have a timeout",
@@ -1066,13 +1242,17 @@ def _command_scan(args: argparse.Namespace) -> int:
 
 def _command_authorize(args: argparse.Namespace) -> int:
     policy = Policy.load(args.policy)
+    policy_sha256, protected_files_sha256 = governance_file_bindings(args.root)
     marker = make_authorization_record(
         policy=policy,
         pr_number=args.pr_number,
+        base_sha=args.base_sha,
         head_sha=args.head_sha,
         authorizer_actor_id=args.authorizer_actor_id,
         ready_actor_id=args.ready_actor_id,
         now=dt.datetime.now(UTC),
+        policy_sha256=policy_sha256,
+        protected_files_sha256=protected_files_sha256,
         nonce=args.nonce,
         expires_in=args.expires_in,
     )
@@ -1092,7 +1272,9 @@ def build_parser() -> argparse.ArgumentParser:
     authorize.add_argument(
         "--policy", default=".github/kapi-governance/policy-v1.json"
     )
+    authorize.add_argument("--root", default=".")
     authorize.add_argument("--pr-number", type=int, required=True)
+    authorize.add_argument("--base-sha", required=True)
     authorize.add_argument("--head-sha", required=True)
     authorize.add_argument("--authorizer-actor-id", type=int, required=True)
     authorize.add_argument("--ready-actor-id", type=int, required=True)

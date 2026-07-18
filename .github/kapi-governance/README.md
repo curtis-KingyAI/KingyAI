@@ -2,6 +2,12 @@
 
 ## Current status: fail closed, not activated
 
+KAPI's review positioning is exactly **Operator-reviewed**. This repository does
+not claim a stronger review boundary, autonomous review, or verified separation
+from the personal-repository owner. The owner retains administrative and
+recovery authority. Automation that can use the owner's credentials is inside
+the same authority boundary and cannot prove human/automation separation.
+
 `policy-v1.json` intentionally uses
 `blocked_pending_external_verifier_and_human_authorizer`. Until both prerequisites
 below are satisfied, every observed ready-for-review transition is denied and
@@ -27,6 +33,29 @@ Before activation:
    `automation_actor_ids`.
 5. Set `credential_separation_attested` to `true` only after that separation has
    been checked outside this repository.
+
+This separation is a fail-closed authorization control. It does not change
+KAPI's **Operator-reviewed** positioning or eliminate the owner's administrative
+recovery power.
+
+## Sanitized owner credential boundary
+
+The detailed owner credential inventory is intentionally local and ignored by
+Git. No secret values, authentication challenges, cookies, private keys, token
+fingerprints, or recovery material belong in this repository.
+
+| Access class | Repository-safe conclusion |
+| --- | --- |
+| Owner browser and recovery access | Owner-controlled and recovery-capable; session and recovery material are not inventoried here. |
+| GitHub CLI and HTTPS Git access | Owner-bound interactive access; not evidence of separation from automation. |
+| OAuth grants and GitHub Apps | Installation or authorization state must be verified outside the repository; no App credential is accepted by these workflows. |
+| GitHub Actions token | Ephemeral per run and limited by explicit workflow/job permissions. Only the guard receives `pull-requests: write`. |
+| PATs, deploy keys, SSH keys, and repository/environment secrets | Not required by KAPI governance and prohibited from all approved workflows. Their account-level presence is not asserted here. |
+| Automation identities | Any tool using the owner identity is classified as owner-bound automation, not a distinct reviewer. |
+
+Unknown or stale account-level state must remain unknown. A local inventory may
+record metadata such as class, purpose, custody boundary, status, and AI
+accessibility, but must never contain credential material.
 
 The ready transition may still be performed by an ID in
 `allowed_ready_actor_ids`; that actor cannot authorize itself. A valid comment
@@ -69,13 +98,15 @@ main checkout:
 ```sh
 python3 .github/scripts/kapi_governance.py authorize-ready \
   --pr-number 4 \
+  --base-sha EXACT_40_HEX_BASE_SHA \
   --head-sha EXACT_40_HEX_HEAD_SHA \
   --authorizer-actor-id HUMAN_NUMERIC_ID \
   --ready-actor-id READY_ACTOR_NUMERIC_ID
 ```
 
 The human posts that exact marker as a PR comment from the segregated account.
-The evidence contains repository ID, PR number, exact head SHA, separate
+The evidence contains repository ID, PR number, exact base and head SHAs, the
+trusted policy hash, the complete protected-file manifest hash, separate
 authorizer ID, ready actor ID, 32-byte-hex nonce, and an expiry no more than five
 minutes after the GitHub comment timestamp. Edited comments are invalid.
 
@@ -83,12 +114,13 @@ The specified ready actor then marks the same unchanged PR ready before expiry.
 The metadata guard serializes events per PR and:
 
 1. reads the current PR and all comments from GitHub;
-2. verifies the exact current/event/evidence head SHA;
-3. verifies stable actor IDs and the human/automation separation;
-4. rejects stale, expired, edited, ambiguous, or previously consumed evidence;
-5. appends a consumed audit comment before allowing ready state;
-6. confirms the consumed record is observable;
-7. returns the PR to draft and appends a denied record on any failure.
+2. verifies the exact current/event/evidence base and head SHAs;
+3. verifies the trusted policy and protected-file manifest hashes;
+4. verifies stable actor IDs and the human/automation separation;
+5. rejects stale, expired, edited, ambiguous, or previously consumed evidence;
+6. appends a consumed audit comment before allowing ready state;
+7. confirms the consumed record is observable;
+8. returns the PR to draft and appends a denied record on any failure.
 
 The event fingerprint makes a duplicate delivery idempotent. Reusing the same
 comment, nonce, or evidence hash for a later ready event is a replay and is
@@ -118,9 +150,10 @@ and through `workflow_dispatch`.
 
 Reconciliation inspects every open non-draft PR and its stage timeline. It only
 accepts a transition that already has a consumed audit record for the exact
-event fingerprint and current head. It never consumes a fresh authorization on
-behalf of a missed event. Missing evidence, changed heads, suppressed events,
-or inactive policy cause draft restoration and a visible failed run.
+event fingerprint, current base/head pair, policy hash, and protected-file
+manifest. It never consumes a fresh authorization on behalf of a missed event.
+Missing evidence, changed bases or heads, suppressed events, hash mismatches, or
+inactive policy cause draft restoration and a visible failed run.
 
 ## Append-only record limitation
 
@@ -161,8 +194,8 @@ Use this PR #4-only sequence:
    head into a clean local checkout. Record the 40-character head SHA, the
    SHA-256 of `.github/workflows/kapi.yml`, and a SHA-256 manifest of every
    changed governance file.
-2. A named human reviewer independently inspects the complete diff and confirms
-   the PR #4 head is based directly on pinned main SHA
+2. A named operator reviews the complete diff and confirms the PR #4 head is
+   based directly on pinned main SHA
    `6070f10c9ab5611c0966056a43eb24ae6beda7ce`. Any rebase or head change voids
    the bootstrap review and requires a fresh full review.
 3. From that exact fetched head, run both commands under "Local verification"
@@ -178,9 +211,10 @@ Use this PR #4-only sequence:
    collision, unexpected rerun, different head SHA, different manifest, skipped
    step, or unavailable log as a hard failure. Record the run URL/ID, attempt,
    GitHub Actions App ID, head SHA, workflow hash, manifest hash, local test-log
-   hash, reviewer identity, and review time in the change record.
+   hash, operator identity, and review time in the change record. This is
+   operator review, not a claim of a stronger review boundary.
 6. Merge PR #4 only through the existing no-bypass ruleset after that named
-   reviewer signs the one-time record. The candidate workflow YAML is manually
+   operator signs the one-time record. The candidate workflow YAML is manually
    trusted for this one merge because App ID `15368` cannot cryptographically
    distinguish the workflow file.
 7. On a subsequent harmless PR, confirm both Actions jobs execute scanner/tests

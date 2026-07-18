@@ -14,5 +14,7 @@
   "human_authorizer_actor_ids": [],
   "repository_id": 1043002851,
   "production_required_check_name": "kapi-governance-external-v1",
+  "review_positioning": "Operator-reviewed",
+  "stronger_review_claims_allowed": false,
   "schema": "kapi-governance-policy/v1"
 }

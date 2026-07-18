@@ -6,10 +6,19 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import pathlib
 import sys
 from typing import Any
 
-from kapi_governance import GovernanceError, Policy, PullRequestEvent, UTC, parse_time
+from kapi_governance import (
+    GovernanceError,
+    Policy,
+    PullRequestEvent,
+    SHA_RE,
+    UTC,
+    governance_file_bindings,
+    parse_time,
+)
 from kapi_ready_guard import GitHubApi, execute_guard
 
 
@@ -34,7 +43,15 @@ def _latest_stage_event(timeline: list[dict[str, Any]]) -> dict[str, Any] | None
 
 def main() -> int:
     try:
-        policy = Policy.load(_required_env("KAPI_GOVERNANCE_POLICY"))
+        policy_path = _required_env("KAPI_GOVERNANCE_POLICY")
+        policy = Policy.load(policy_path)
+        root = pathlib.Path(policy_path).resolve().parents[2]
+        policy_sha256, protected_files_sha256 = governance_file_bindings(root)
+        trusted_governance_sha = _required_env("TRUSTED_GOVERNANCE_SHA")
+        if not SHA_RE.fullmatch(trusted_governance_sha):
+            raise GovernanceError(
+                "trusted governance SHA must be 40 lowercase hex characters"
+            )
         repository = _required_env("GITHUB_REPOSITORY")
         repository_id = int(_required_env("GITHUB_REPOSITORY_ID"))
         token = _required_env("GITHUB_TOKEN")
@@ -82,6 +99,8 @@ def main() -> int:
                 repository_id=repository_id,
                 pr_number=pr_number,
                 pr_node_id=str(raw["node_id"]),
+                base_sha=str(raw["base"]["sha"]),
+                trusted_governance_sha=trusted_governance_sha,
                 head_sha=str(raw["head"]["sha"]),
                 head_repository_id=int((raw["head"].get("repo") or {}).get("id") or 0),
                 actor_id=actor_id,
@@ -89,6 +108,8 @@ def main() -> int:
                 event_time=event_time,
                 run_id=run_id,
                 run_attempt=run_attempt,
+                policy_sha256=policy_sha256,
+                protected_files_sha256=protected_files_sha256,
             )
             result = execute_guard(
                 pr_api,

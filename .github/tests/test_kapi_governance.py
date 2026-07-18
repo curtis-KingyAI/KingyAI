@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import os
 import pathlib
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -17,11 +19,13 @@ from kapi_governance import (  # noqa: E402
     AUTH_MARKER,
     AUTH_SCHEMA,
     Comment,
+    GovernanceError,
     Policy,
     PullRequestEvent,
     PullRequestSnapshot,
     UTC,
     format_time,
+    governance_file_bindings,
     make_audit_record,
     make_authorization_record,
     make_marker,
@@ -29,11 +33,17 @@ from kapi_governance import (  # noqa: E402
     scan_workflows,
     validate_production_check_source,
 )
-from kapi_ready_guard import ApiError, execute_guard  # noqa: E402
+from kapi_ready_guard import (  # noqa: E402
+    ApiError,
+    event_from_environment,
+    execute_guard,
+)
 
 
 HEAD_SHA = "a" * 40
 STALE_SHA = "b" * 40
+BASE_SHA = "c" * 40
+STALE_BASE_SHA = "d" * 40
 BASE_REPOSITORY_ID = 1043002851
 FORK_REPOSITORY_ID = 999000111
 OPERATOR_ID = 227671038
@@ -114,20 +124,29 @@ class GovernanceFixture(unittest.TestCase):
             dedicated_verifier_integration_id=987654321,
         )
         self.now = dt.datetime(2026, 7, 13, 12, 0, 0, tzinfo=UTC)
+        self.policy_sha256, self.protected_files_sha256 = governance_file_bindings(
+            ROOT
+        )
 
     def event(
         self,
         *,
         actor_id: int = OPERATOR_ID,
         event_time: dt.datetime | None = None,
+        base_sha: str = BASE_SHA,
+        trusted_governance_sha: str | None = None,
         head_sha: str = HEAD_SHA,
         head_repository_id: int = BASE_REPOSITORY_ID,
         run_id: int = 700,
+        policy_sha256: str | None = None,
+        protected_files_sha256: str | None = None,
     ) -> PullRequestEvent:
         return PullRequestEvent(
             repository_id=BASE_REPOSITORY_ID,
             pr_number=4,
             pr_node_id="PR_kwTEST",
+            base_sha=base_sha,
+            trusted_governance_sha=trusted_governance_sha or base_sha,
             head_sha=head_sha,
             head_repository_id=head_repository_id,
             actor_id=actor_id,
@@ -135,15 +154,21 @@ class GovernanceFixture(unittest.TestCase):
             event_time=event_time or self.now,
             run_id=run_id,
             run_attempt=1,
+            policy_sha256=policy_sha256 or self.policy_sha256,
+            protected_files_sha256=(
+                protected_files_sha256 or self.protected_files_sha256
+            ),
         )
 
     def snapshot(
         self,
         *,
+        base_sha: str = BASE_SHA,
         head_sha: str = HEAD_SHA,
         head_repository_id: int = BASE_REPOSITORY_ID,
     ) -> PullRequestSnapshot:
         return PullRequestSnapshot(
+            base_sha=base_sha,
             head_sha=head_sha,
             head_repository_id=head_repository_id,
             base_repository_id=BASE_REPOSITORY_ID,
@@ -155,20 +180,28 @@ class GovernanceFixture(unittest.TestCase):
     def authorization(
         self,
         *,
+        base_sha: str = BASE_SHA,
         head_sha: str = HEAD_SHA,
         author_id: int = HUMAN_AUTHORIZER_ID,
         created_at: dt.datetime | None = None,
         nonce: str = "1" * 32,
         edited: bool = False,
+        policy_sha256: str | None = None,
+        protected_files_sha256: str | None = None,
     ) -> Comment:
         created_at = created_at or self.now - dt.timedelta(seconds=60)
         marker = make_authorization_record(
             policy=self.policy,
             pr_number=4,
+            base_sha=base_sha,
             head_sha=head_sha,
             authorizer_actor_id=HUMAN_AUTHORIZER_ID,
             ready_actor_id=OPERATOR_ID,
             now=created_at,
+            policy_sha256=policy_sha256 or self.policy_sha256,
+            protected_files_sha256=(
+                protected_files_sha256 or self.protected_files_sha256
+            ),
             nonce=nonce,
         )
         return Comment(
@@ -237,10 +270,13 @@ class ReadyGuardTests(GovernanceFixture):
             AUTH_MARKER,
             {
                 "authorizer_actor_id": OPERATOR_ID,
+                "base_sha": BASE_SHA,
                 "expires_at": format_time(created_at + dt.timedelta(seconds=300)),
                 "head_sha": HEAD_SHA,
                 "nonce": "9" * 32,
+                "policy_sha256": self.policy_sha256,
                 "pr_number": 4,
+                "protected_files_sha256": self.protected_files_sha256,
                 "ready_actor_id": OPERATOR_ID,
                 "repository_id": BASE_REPOSITORY_ID,
                 "schema": AUTH_SCHEMA,
@@ -311,6 +347,53 @@ class ReadyGuardTests(GovernanceFixture):
         self.assertEqual("denied", result.status)
         self.assertEqual("authorization_stale_head_sha", result.reason)
 
+    def test_stale_authorization_base_sha_is_rejected(self) -> None:
+        authorization = self.authorization(base_sha=STALE_BASE_SHA)
+        api = FakeApi(self.snapshot(), [authorization], self.policy, self.now)
+        result = execute_guard(api, self.event(), self.policy, self.now)
+        self.assertEqual("denied", result.status)
+        self.assertEqual("authorization_stale_base_sha", result.reason)
+
+    def test_current_base_change_is_rejected_before_authorization(self) -> None:
+        authorization = self.authorization()
+        api = FakeApi(
+            self.snapshot(base_sha=STALE_BASE_SHA),
+            [authorization],
+            self.policy,
+            self.now,
+        )
+        result = execute_guard(api, self.event(), self.policy, self.now)
+        self.assertEqual("denied", result.status)
+        self.assertEqual("current_base_sha_mismatch", result.reason)
+
+    def test_executable_governance_sha_must_match_base(self) -> None:
+        authorization = self.authorization()
+        api = FakeApi(self.snapshot(), [authorization], self.policy, self.now)
+        result = execute_guard(
+            api,
+            self.event(trusted_governance_sha=STALE_BASE_SHA),
+            self.policy,
+            self.now,
+        )
+        self.assertEqual("denied", result.status)
+        self.assertEqual("trusted_governance_sha_mismatch", result.reason)
+
+    def test_authorization_policy_hash_mismatch_is_rejected(self) -> None:
+        authorization = self.authorization(policy_sha256="e" * 64)
+        api = FakeApi(self.snapshot(), [authorization], self.policy, self.now)
+        result = execute_guard(api, self.event(), self.policy, self.now)
+        self.assertEqual("denied", result.status)
+        self.assertEqual("authorization_policy_hash_mismatch", result.reason)
+
+    def test_authorization_protected_manifest_mismatch_is_rejected(self) -> None:
+        authorization = self.authorization(protected_files_sha256="f" * 64)
+        api = FakeApi(self.snapshot(), [authorization], self.policy, self.now)
+        result = execute_guard(api, self.event(), self.policy, self.now)
+        self.assertEqual("denied", result.status)
+        self.assertEqual(
+            "authorization_protected_files_hash_mismatch", result.reason
+        )
+
     def test_current_head_change_is_rejected_before_authorization(self) -> None:
         authorization = self.authorization()
         api = FakeApi(
@@ -377,6 +460,32 @@ class WorkflowScannerTests(unittest.TestCase):
 
     def test_current_workflows_pass(self) -> None:
         self.assertEqual([], scan_workflows(ROOT))
+
+    def test_live_policy_pins_operator_reviewed_positioning(self) -> None:
+        policy = Policy.load(
+            ROOT / ".github" / "kapi-governance" / "policy-v1.json"
+        )
+        self.assertEqual("Operator-reviewed", policy.review_positioning)
+        self.assertFalse(policy.stronger_review_claims_allowed)
+
+    def test_policy_rejects_stronger_review_positioning(self) -> None:
+        source = ROOT / ".github" / "kapi-governance" / "policy-v1.json"
+        variants = (
+            ('"review_positioning": "Operator-reviewed"', '"review_positioning": "Autonomous"'),
+            ('"stronger_review_claims_allowed": false', '"stronger_review_claims_allowed": true'),
+        )
+        for original, replacement in variants:
+            with self.subTest(replacement=replacement):
+                with tempfile.TemporaryDirectory() as temporary:
+                    policy = pathlib.Path(temporary) / "policy.json"
+                    policy.write_text(
+                        source.read_text(encoding="utf-8").replace(
+                            original, replacement, 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(GovernanceError):
+                        Policy.load(policy)
 
     def test_missing_required_check_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -574,6 +683,9 @@ class WorkflowScannerTests(unittest.TestCase):
             ),
             ("PRIVATE_KEY: masked-source", "private-key bindings are forbidden"),
             ("${{ vars.KAPI_TOKEN }}", "credential-like vars/env bindings are forbidden"),
+            ("${{ secrets['KAPI_TOKEN'] }}", "secrets contexts are forbidden"),
+            ("KAPI_CREDENTIAL: masked-source", "credential-like YAML key is forbidden"),
+            ("export KAPI_API_KEY=masked-source", "credential-like shell assignment is forbidden"),
         )
         for injected, expected in variants:
             with self.subTest(injected=injected):
@@ -594,6 +706,43 @@ class WorkflowScannerTests(unittest.TestCase):
                 self.assertTrue(any(expected in error for error in errors), errors)
                 self.assertNotIn("masked-source", "\n".join(errors))
 
+    def test_every_checkout_must_disable_persisted_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "kapi.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "persist-credentials: false",
+                    "persist-credentials: true",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(
+            any("every checkout must set persist-credentials false" in error for error in errors)
+        )
+
+    def test_duplicate_checkout_credential_key_cannot_override_false(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "kapi.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "          persist-credentials: false",
+                    "          persist-credentials: false\n"
+                    "          persist-credentials: true",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(
+            any("every checkout must set persist-credentials false" in error for error in errors)
+        )
+
     def test_extra_github_token_binding_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
@@ -602,6 +751,25 @@ class WorkflowScannerTests(unittest.TestCase):
             workflow.write_text(
                 workflow.read_text(encoding="utf-8")
                 + "\nGITHUB_TOKEN: ${{ github.token }}\n",
+                encoding="utf-8",
+            )
+            errors = scan_workflows(root)
+        self.assertTrue(
+            any("GITHUB_TOKEN binding count must be exactly 2" in error for error in errors)
+        )
+
+    def test_duplicate_github_token_key_cannot_override_approved_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            self._copy_github(root)
+            workflow = root / ".github" / "workflows" / "ready-for-review-guard.yml"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "          GITHUB_TOKEN: ${{ github.token }}",
+                    "          GITHUB_TOKEN: ${{ github.token }}\n"
+                    "          GITHUB_TOKEN: unapproved-source",
+                    1,
+                ),
                 encoding="utf-8",
             )
             errors = scan_workflows(root)
@@ -667,6 +835,63 @@ class WorkflowScannerTests(unittest.TestCase):
                 for error in errors
             )
         )
+
+    def test_trusted_scanner_rejects_governance_readme_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            trusted = root / "trusted"
+            candidate = root / "candidate"
+            self._copy_github(trusted)
+            self._copy_github(candidate)
+            readme = candidate / ".github" / "kapi-governance" / "README.md"
+            readme.write_text(
+                readme.read_text(encoding="utf-8") + "\nUnsupported claim.\n",
+                encoding="utf-8",
+            )
+            errors = scan_workflows(candidate, trusted)
+        self.assertTrue(
+            any(
+                "candidate changes protected governance file .github/kapi-governance/README.md"
+                in error
+                for error in errors
+            )
+        )
+
+
+class EnvironmentParsingTests(unittest.TestCase):
+    def _environment(self) -> dict[str, str]:
+        return {
+            "EVENT_ACTOR_ID": str(OPERATOR_ID),
+            "EVENT_ACTOR_LOGIN": "curtis-KingyAI",
+            "EVENT_BASE_SHA": BASE_SHA,
+            "EVENT_HEAD_REPOSITORY_ID": str(BASE_REPOSITORY_ID),
+            "EVENT_HEAD_SHA": HEAD_SHA,
+            "EVENT_TIME": "2026-07-13T12:00:00Z",
+            "GITHUB_REPOSITORY_ID": str(BASE_REPOSITORY_ID),
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_RUN_ID": "700",
+            "PR_NODE_ID": "PR_kwTEST",
+            "PR_NUMBER": "4",
+            "TRUSTED_GOVERNANCE_SHA": BASE_SHA,
+        }
+
+    def test_missing_event_field_is_rejected(self) -> None:
+        environment = self._environment()
+        del environment["EVENT_HEAD_SHA"]
+        with mock.patch.dict(os.environ, environment, clear=True):
+            with self.assertRaises(GovernanceError):
+                event_from_environment(
+                    str(ROOT / ".github" / "kapi-governance" / "policy-v1.json")
+                )
+
+    def test_malformed_event_sha_is_rejected(self) -> None:
+        environment = self._environment()
+        environment["EVENT_BASE_SHA"] = "not-a-sha"
+        with mock.patch.dict(os.environ, environment, clear=True):
+            with self.assertRaises(GovernanceError):
+                event_from_environment(
+                    str(ROOT / ".github" / "kapi-governance" / "policy-v1.json")
+                )
 
 
 if __name__ == "__main__":

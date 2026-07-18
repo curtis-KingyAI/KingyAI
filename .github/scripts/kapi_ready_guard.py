@@ -7,6 +7,7 @@ import dataclasses
 import datetime as dt
 import json
 import os
+import pathlib
 import sys
 import time
 import urllib.error
@@ -15,16 +16,16 @@ import urllib.request
 from typing import Any, Sequence
 
 from kapi_governance import (
-    AUDIT_MARKER,
     Comment,
     Decision,
     GovernanceError,
     Policy,
     PullRequestEvent,
     PullRequestSnapshot,
+    SHA_RE,
     UTC,
     decide_transition,
-    extract_marker_payloads,
+    governance_file_bindings,
     make_audit_record,
     parse_audit,
     parse_time,
@@ -269,7 +270,7 @@ def execute_guard(
         snapshot = api.get_pull_request()
         comments = api.list_comments()
         decision = decide_transition(event, snapshot, comments, policy, now)
-    except Exception as exc:
+    except Exception:
         return _deny_and_revert(
             api,
             event,
@@ -322,12 +323,25 @@ def _required_env(name: str) -> str:
     return value
 
 
-def event_from_environment() -> PullRequestEvent:
+def event_from_environment(policy_path: str) -> PullRequestEvent:
+    root = pathlib.Path(policy_path).resolve().parents[2]
+    policy_sha256, protected_files_sha256 = governance_file_bindings(root)
+    base_sha = _required_env("EVENT_BASE_SHA")
+    trusted_governance_sha = _required_env("TRUSTED_GOVERNANCE_SHA")
     head_sha = _required_env("EVENT_HEAD_SHA")
+    for label, value in {
+        "event base": base_sha,
+        "trusted governance": trusted_governance_sha,
+        "event head": head_sha,
+    }.items():
+        if not SHA_RE.fullmatch(value):
+            raise GovernanceError(f"{label} SHA must be 40 lowercase hex characters")
     return PullRequestEvent(
         repository_id=int(_required_env("GITHUB_REPOSITORY_ID")),
         pr_number=int(_required_env("PR_NUMBER")),
         pr_node_id=_required_env("PR_NODE_ID"),
+        base_sha=base_sha,
+        trusted_governance_sha=trusted_governance_sha,
         head_sha=head_sha,
         head_repository_id=int(_required_env("EVENT_HEAD_REPOSITORY_ID")),
         actor_id=int(_required_env("EVENT_ACTOR_ID")),
@@ -335,13 +349,16 @@ def event_from_environment() -> PullRequestEvent:
         event_time=parse_time(_required_env("EVENT_TIME")),
         run_id=int(_required_env("GITHUB_RUN_ID")),
         run_attempt=int(_required_env("GITHUB_RUN_ATTEMPT")),
+        policy_sha256=policy_sha256,
+        protected_files_sha256=protected_files_sha256,
     )
 
 
 def main() -> int:
     try:
-        policy = Policy.load(_required_env("KAPI_GOVERNANCE_POLICY"))
-        event = event_from_environment()
+        policy_path = _required_env("KAPI_GOVERNANCE_POLICY")
+        policy = Policy.load(policy_path)
+        event = event_from_environment(policy_path)
         api = GitHubApi(
             token=_required_env("GITHUB_TOKEN"),
             repository=_required_env("GITHUB_REPOSITORY"),
