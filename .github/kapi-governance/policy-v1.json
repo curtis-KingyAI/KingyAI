@@ -11,6 +11,7 @@
   "dedicated_verifier_attested": false,
   "dedicated_verifier_integration_id": null,
   "default_branch": "main",
+  "draft_restoration_mode": "manual_operator",
   "human_authorizer_actor_ids": [],
   "repository_id": 1043002851,
   "production_required_check_name": "kapi-governance-external-v1",

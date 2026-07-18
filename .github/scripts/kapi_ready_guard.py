@@ -41,6 +41,7 @@ class ExecutionResult:
     status: str
     reason: str
     decision: Decision | None
+    restoration: str = "not_required"
     errors: tuple[str, ...] = ()
 
 
@@ -183,42 +184,25 @@ class GitHubApi:
                     time.sleep(min(2**attempt, 4))
         raise ApiError(str(last_error or "failed to append audit comment"))
 
-    def convert_to_draft(self) -> None:
-        query = (
-            "mutation($pullRequestId: ID!) { "
-            "convertPullRequestToDraft(input: {pullRequestId: $pullRequestId}) { "
-            "pullRequest { isDraft } } }"
-        )
-        raw = self._request(
-            "POST",
-            "/graphql",
-            {"query": query, "variables": {"pullRequestId": self.pr_node_id}},
-        )
-        if raw.get("errors"):
-            raise ApiError(f"draft mutation returned errors: {raw['errors']}")
-        is_draft = (
-            raw.get("data", {})
-            .get("convertPullRequestToDraft", {})
-            .get("pullRequest", {})
-            .get("isDraft")
-        )
-        if is_draft is not True:
-            raise ApiError("draft mutation did not confirm isDraft=true")
-
-    def add_reverted_label(self) -> None:
+    def add_denied_label(self) -> None:
         self._request(
             "POST",
             f"/repos/{self.repository}/issues/{self.pr_number}/labels",
-            {"labels": ["unauthorized-transition-reverted"]},
+            {"labels": ["invalid"]},
         )
 
 
 def _audit_body(action: str, reason: str, marker: str) -> str:
     if action == "consumed":
         summary = "KAPI governance consumed a one-use ready authorization."
+        recovery = ""
     else:
         summary = f"KAPI governance denied ready-for-review transition: `{reason}`."
-    return f"{summary}\n\n{marker}"
+        recovery = (
+            "\n\nAutomatic draft restoration is not an available control. "
+            "A human operator must return this pull request to draft if it remains ready."
+        )
+    return f"{summary}{recovery}\n\n{marker}"
 
 
 def _audit_is_confirmed(
@@ -241,34 +225,69 @@ def _audit_is_confirmed(
     return False
 
 
-def _deny_and_revert(
+def _denial_audit_is_confirmed(
+    comments: Sequence[Comment],
+    policy: Policy,
+    event: PullRequestEvent,
+    reason: str,
+) -> bool:
+    for comment in comments:
+        try:
+            record = parse_audit(comment, policy)
+        except GovernanceError:
+            continue
+        if (
+            record is not None
+            and record.action == "denied"
+            and record.event_fingerprint == event.fingerprint
+            and record.reason == reason
+            and record.base_sha == event.base_sha
+            and record.head_sha == event.head_sha
+            and record.policy_sha256 == event.policy_sha256
+            and record.protected_files_sha256 == event.protected_files_sha256
+        ):
+            return True
+    return False
+
+
+def _deny_and_record(
     api: Any,
     event: PullRequestEvent,
     snapshot: PullRequestSnapshot | None,
+    policy: Policy,
     reason: str,
     now: dt.datetime,
     decision: Decision | None,
 ) -> ExecutionResult:
     errors: list[str] = []
+    restoration = (
+        "state_check_required"
+        if snapshot is None
+        else "already_draft"
+        if snapshot.is_draft
+        else "manual_operator_required"
+    )
     try:
-        if snapshot is None or not snapshot.is_draft:
-            api.convert_to_draft()
-    except Exception as exc:  # operational failure must remain visible
-        errors.append(f"convert_to_draft: {exc}")
-    try:
-        api.add_reverted_label()
+        api.add_denied_label()
     except Exception as exc:
-        errors.append(f"add_reverted_label: {exc}")
+        errors.append(f"add_denied_label: {exc}")
     try:
-        marker = make_audit_record("denied", event, reason, now)
-        api.post_comment(_audit_body("denied", reason, marker))
+        if not _denial_audit_is_confirmed(
+            api.list_comments(), policy, event, reason
+        ):
+            marker = make_audit_record("denied", event, reason, now)
+            api.post_comment(_audit_body("denied", reason, marker))
+            if not _denial_audit_is_confirmed(
+                api.list_comments(), policy, event, reason
+            ):
+                raise ApiError("denial audit was not observable")
     except Exception as exc:
         errors.append(f"append_denied_audit: {exc}")
     if errors:
         return ExecutionResult(
-            "operational_failure", reason, decision, tuple(errors)
+            "operational_failure", reason, decision, restoration, tuple(errors)
         )
-    return ExecutionResult("denied", reason, decision)
+    return ExecutionResult("denied", reason, decision, restoration)
 
 
 def execute_guard(
@@ -285,10 +304,11 @@ def execute_guard(
         comments = api.list_comments()
         decision = decide_transition(event, snapshot, comments, policy, now)
     except Exception:
-        return _deny_and_revert(
+        return _deny_and_record(
             api,
             event,
             snapshot,
+            policy,
             "guard_read_failure",
             now,
             None,
@@ -299,10 +319,11 @@ def execute_guard(
 
     if decision.action == "consume" and decision.evidence is not None:
         if not allow_new_consumption:
-            return _deny_and_revert(
+            return _deny_and_record(
                 api,
                 event,
                 snapshot,
+                policy,
                 "reconciliation_missing_consumed_authorization",
                 now,
                 decision,
@@ -316,17 +337,18 @@ def execute_guard(
                 raise ApiError("consumed authorization audit was not observable")
             return ExecutionResult("authorized", decision.reason, decision)
         except Exception:
-            return _deny_and_revert(
+            return _deny_and_record(
                 api,
                 event,
                 snapshot,
+                policy,
                 "authorization_consumption_failed",
                 now,
                 decision,
             )
 
-    return _deny_and_revert(
-        api, event, snapshot, decision.reason, now, decision
+    return _deny_and_record(
+        api, event, snapshot, policy, decision.reason, now, decision
     )
 
 
@@ -390,6 +412,7 @@ def main() -> int:
             {
                 "errors": result.errors,
                 "reason": result.reason,
+                "restoration": result.restoration,
                 "status": result.status,
             },
             sort_keys=True,
@@ -398,7 +421,8 @@ def main() -> int:
     if result.status in {"authorized", "authorized_duplicate"}:
         return 0
     if result.status == "denied":
-        # A successful fail-closed reversal remains a visible red workflow run.
+        # A recorded denial remains a visible red workflow run until a human
+        # operator restores draft state or the PR is otherwise resolved.
         return 1
     return 2
 

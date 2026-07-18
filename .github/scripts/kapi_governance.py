@@ -104,6 +104,7 @@ class Policy:
     credential_separation_attested: bool
     dedicated_verifier_attested: bool
     dedicated_verifier_integration_id: int | None
+    draft_restoration_mode: str
     audit_actor_id: int
     audit_actor_login: str
     authorization_ttl_seconds: int
@@ -129,6 +130,7 @@ class Policy:
             "dedicated_verifier_attested",
             "dedicated_verifier_integration_id",
             "default_branch",
+            "draft_restoration_mode",
             "human_authorizer_actor_ids",
             "repository_id",
             "production_required_check_name",
@@ -171,6 +173,12 @@ class Policy:
             not isinstance(verifier_id, int) or verifier_id <= 0
         ):
             raise GovernanceError("dedicated verifier integration id must be positive")
+        restoration_mode = raw["draft_restoration_mode"]
+        if restoration_mode != "manual_operator":
+            raise GovernanceError(
+                "draft restoration mode must remain manual_operator until a "
+                "separately controlled GitHub identity is capability-tested"
+            )
         overlap = set(authorizers) & (set(ready) | set(automation))
         if overlap:
             raise GovernanceError(
@@ -219,6 +227,7 @@ class Policy:
             credential_separation_attested=separation,
             dedicated_verifier_attested=verifier_attested,
             dedicated_verifier_integration_id=verifier_id,
+            draft_restoration_mode=restoration_mode,
             audit_actor_id=int(raw["audit_actor_id"]),
             audit_actor_login=str(raw["audit_actor_login"]),
             authorization_ttl_seconds=ttl,
@@ -1205,6 +1214,9 @@ def scan_workflows(
             'cron: "*/5 * * * *"': "guard reconciliation must run every five minutes",
             "workflow_dispatch:": "guard reconciliation must support manual execution",
             "pull-requests: write": "guard needs job-scoped metadata write",
+            "authorize-or-deny:": "guard job must describe denial without claiming reversion",
+            "Draft restoration is a manual operator action.": "guard must document manual draft restoration",
+            "Validate one-use authorization or record denial": "guard step must describe denial without claiming restoration",
             "ref: ${{ github.event.pull_request.base.sha }}": "guard must checkout base SHA",
             "EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}": "guard event must bind base SHA",
             "TRUSTED_GOVERNANCE_SHA: ${{ github.event.pull_request.base.sha }}": "guard must bind executable governance SHA",
@@ -1226,6 +1238,13 @@ def scan_workflows(
             errors.append(f"{GUARD_WORKFLOW}: guard must never checkout PR head code")
         if "github.actor !=" in guard_text or "github.actor ==" in guard_text:
             errors.append(f"{GUARD_WORKFLOW}: login-only authorization is forbidden")
+        if re.search(
+            r"(?i)authorize-or-revert|restore draft state|automatic draft restoration",
+            guard_text,
+        ):
+            errors.append(
+                f"{GUARD_WORKFLOW}: workflow must not claim automatic draft restoration"
+            )
 
     return errors
 

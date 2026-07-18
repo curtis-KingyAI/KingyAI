@@ -10,8 +10,10 @@ the same authority boundary and cannot prove human/automation separation.
 
 `policy-v1.json` intentionally uses
 `blocked_pending_external_verifier_and_human_authorizer`. Until both prerequisites
-below are satisfied, every observed ready-for-review transition is denied and
-returned to draft, including a transition attributed to the repository owner.
+below are satisfied, every observed ready-for-review transition is denied with a
+visible failed run, audit record, and denial label, including a transition
+attributed to the repository owner. A human operator must return an unauthorized
+ready pull request to draft; repository automation does not claim that capability.
 
 Do not change `activation_state` to `active` merely to make a workflow green.
 
@@ -120,7 +122,9 @@ The metadata guard serializes events per PR and:
 5. rejects stale, expired, edited, ambiguous, or previously consumed evidence;
 6. appends a consumed audit comment before allowing ready state;
 7. confirms the consumed record is observable;
-8. returns the PR to draft and appends a denied record on any failure.
+8. appends and confirms a denied record on any failure, applies the existing
+   `invalid` label, and emits a failing result that requires manual operator
+   restoration if the pull request remains ready.
 
 The event fingerprint makes a duplicate delivery idempotent. Reusing the same
 comment, nonce, or evidence hash for a later ready event is a replay and is
@@ -128,8 +132,8 @@ denied.
 
 ## Trusted execution and fork handling
 
-The privileged guard uses `pull_request_target` so fork PRs can be reverted with
-the base repository token. It checks out only
+The privileged guard uses `pull_request_target` so fork PRs can be evaluated and
+audited with the base repository token. It checks out only
 `github.event.pull_request.base.sha` with persisted credentials disabled and
 executes only scripts from that trusted checkout. It never checks out, imports,
 builds, or executes the PR head.
@@ -153,7 +157,31 @@ accepts a transition that already has a consumed audit record for the exact
 event fingerprint, current base/head pair, policy hash, and protected-file
 manifest. It never consumes a fresh authorization on behalf of a missed event.
 Missing evidence, changed bases or heads, suppressed events, hash mismatches, or
-inactive policy cause draft restoration and a visible failed run.
+inactive policy cause a confirmed denial record, an `invalid` label, and a
+visible failed run. Reconciliation is detection and evidence; a human operator
+must restore draft state.
+
+## Draft-restoration capability boundary
+
+`draft_restoration_mode` is pinned to `manual_operator`. In smoke run
+`29634648786` (job `88054725374`), the trusted guard had `pull-requests: write`,
+completed its trusted checkout, executable-SHA proof, manifest validation,
+policy denial, label write, and audit comment, but GitHub rejected the
+`convertPullRequestToDraft` GraphQL mutation for the repository `GITHUB_TOKEN`
+with `FORBIDDEN — Resource not accessible by integration`.
+
+The guard therefore does not call a draft mutation and never reports an
+unauthorized transition as reverted. A denied ready PR remains visibly failed
+and labeled `invalid` until a human operator returns it to draft or otherwise
+resolves it. A human operator must restore draft state when the PR remains
+ready. The operator records the exact base/head SHAs, denial run and audit
+IDs, restoration timestamp, and operator identity. This manual recovery is not
+an independent reviewer or credential-separation control.
+
+KAPI remains blocked until the separately hosted verifier emits
+`kapi-governance-external-v1` from its exact ruleset-bound integration. That
+external required check, not draft state and not an Actions-owned check name,
+is the intended fail-closed merge boundary.
 
 ## Append-only record limitation
 
@@ -226,9 +254,9 @@ Use this PR #4-only sequence:
    Do not activate policy or remove the manual restriction before this binding
    is proven.
 9. Configure the separate human authorizer ID and attest both prerequisites in
-   a policy-only PR. Activate only after the external check, fork reversion,
-   one-use authorization, replay rejection, and scheduled reconciliation tests
-   all pass on GitHub.
+   a policy-only PR. Activate only after the external check, fork denial and
+   audit, one-use authorization, replay rejection, scheduled reconciliation,
+   and manual-recovery tests all pass on GitHub.
 
 Executable governance changes after bootstrap should use a new version and be
 evaluated by the external verifier. The Actions advisory deliberately fails if
