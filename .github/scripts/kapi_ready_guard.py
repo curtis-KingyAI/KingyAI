@@ -54,6 +54,18 @@ class GitHubApi:
         api_url: str = "https://api.github.com",
         attempts: int = 4,
     ) -> None:
+        parsed_api_url = urllib.parse.urlsplit(api_url)
+        if (
+            parsed_api_url.scheme != "https"
+            or not parsed_api_url.netloc
+            or parsed_api_url.username is not None
+            or parsed_api_url.password is not None
+            or parsed_api_url.query
+            or parsed_api_url.fragment
+        ):
+            raise GovernanceError("GitHub API URL must be a credential-free HTTPS origin")
+        if attempts < 1:
+            raise GovernanceError("GitHub API attempts must be positive")
         self.token = token
         self.repository = repository
         self.pr_number = pr_number
@@ -68,7 +80,9 @@ class GitHubApi:
         payload: dict[str, Any] | None = None,
         attempts: int | None = None,
     ) -> Any:
-        url = path if path.startswith("http") else f"{self.api_url}{path}"
+        if not path.startswith("/") or path.startswith("//"):
+            raise ApiError("GitHub API request path must remain on the configured origin")
+        url = f"{self.api_url}{path}"
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         headers = {
             "Accept": "application/vnd.github+json",

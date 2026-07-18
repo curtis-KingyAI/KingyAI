@@ -35,8 +35,13 @@ from kapi_governance import (  # noqa: E402
 )
 from kapi_ready_guard import (  # noqa: E402
     ApiError,
+    GitHubApi,
     event_from_environment,
     execute_guard,
+)
+from kapi_ready_reconcile import (  # noqa: E402
+    _latest_stage_event,
+    reconcile_pull_requests,
 )
 
 
@@ -59,12 +64,14 @@ class FakeApi:
         policy: Policy,
         now: dt.datetime,
         failures: dict[str, int] | None = None,
+        timeline: list[dict[str, object]] | None = None,
     ) -> None:
         self.snapshot = snapshot
         self.comments = list(comments)
         self.policy = policy
         self.now = now
         self.failures = dict(failures or {})
+        self.timeline = list(timeline or [])
         self.calls: list[str] = []
         self.next_comment_id = max((comment.id for comment in comments), default=100) + 1
 
@@ -83,6 +90,11 @@ class FakeApi:
         self.calls.append("list_comments")
         self._maybe_fail("list_comments")
         return list(self.comments)
+
+    def list_timeline(self) -> list[dict[str, object]]:
+        self.calls.append("list_timeline")
+        self._maybe_fail("list_timeline")
+        return list(self.timeline)
 
     def post_comment(self, body: str) -> None:
         self.calls.append("post_comment")
@@ -447,6 +459,205 @@ class ReadyGuardTests(GovernanceFixture):
         result = execute_guard(api, self.event(), self.policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("authorization_was_edited", result.reason)
+
+
+class GitHubApiSafetyTests(unittest.TestCase):
+    def _api(self, **overrides: object) -> GitHubApi:
+        values: dict[str, object] = {
+            "token": "synthetic-token-not-a-credential",
+            "repository": "owner/repository",
+            "pr_number": 4,
+            "pr_node_id": "PR_kwTEST",
+            "attempts": 2,
+        }
+        values.update(overrides)
+        return GitHubApi(**values)  # type: ignore[arg-type]
+
+    def test_api_origin_must_be_credential_free_https(self) -> None:
+        rejected = (
+            "http://api.github.com",
+            "https://user@example.invalid",
+            "https://api.github.com?redirect=example.invalid",
+        )
+        for api_url in rejected:
+            with self.subTest(api_url=api_url):
+                with self.assertRaises(GovernanceError):
+                    self._api(api_url=api_url)
+        with self.assertRaises(GovernanceError):
+            self._api(attempts=0)
+
+    def test_request_path_cannot_escape_configured_origin(self) -> None:
+        api = self._api()
+        for path in ("https://example.invalid/token-capture", "//example.invalid/path"):
+            with self.subTest(path=path):
+                with mock.patch("kapi_ready_guard.urllib.request.urlopen") as urlopen:
+                    with self.assertRaises(ApiError):
+                        api._request("GET", path)
+                    urlopen.assert_not_called()
+
+    def test_comment_retry_is_idempotent_after_disconnected_post(self) -> None:
+        api = self._api()
+        body = "synthetic audit marker"
+        existing = Comment(
+            id=1,
+            author_id=AUDIT_ID,
+            author_login="github-actions[bot]",
+            author_type="Bot",
+            body=body,
+            created_at=dt.datetime(2026, 7, 13, tzinfo=UTC),
+            updated_at=dt.datetime(2026, 7, 13, tzinfo=UTC),
+        )
+        with mock.patch.object(
+            api, "_request", side_effect=ApiError("synthetic disconnect")
+        ) as request:
+            with mock.patch.object(api, "list_comments", return_value=[existing]):
+                api.post_comment(body)
+        self.assertEqual(1, request.call_count)
+
+
+class ReadyReconciliationTests(GovernanceFixture):
+    def raw_pull_request(
+        self,
+        *,
+        draft: bool = False,
+        base_sha: str = BASE_SHA,
+        head_sha: str = HEAD_SHA,
+        head_repository_id: int = BASE_REPOSITORY_ID,
+    ) -> dict[str, object]:
+        return {
+            "number": 4,
+            "node_id": "PR_kwTEST",
+            "draft": draft,
+            "base": {"sha": base_sha},
+            "head": {
+                "sha": head_sha,
+                "repo": {"id": head_repository_id},
+            },
+        }
+
+    def reconcile(
+        self,
+        raw_pull_requests: list[dict[str, object]],
+        api: FakeApi,
+    ) -> tuple[list[dict[str, object]], int]:
+        return reconcile_pull_requests(
+            raw_pull_requests=raw_pull_requests,  # type: ignore[arg-type]
+            policy=self.policy,
+            repository="owner/repository",
+            repository_id=BASE_REPOSITORY_ID,
+            token="synthetic-token-not-a-credential",
+            api_url="https://api.github.com",
+            trusted_governance_sha=BASE_SHA,
+            run_id=700,
+            run_attempt=1,
+            policy_sha256=self.policy_sha256,
+            protected_files_sha256=self.protected_files_sha256,
+            now=self.now,
+            api_factory=lambda **_kwargs: api,
+        )
+
+    def test_latest_timeline_stage_is_selected(self) -> None:
+        latest = {
+            "event": "ready_for_review",
+            "created_at": "2026-07-13T12:00:00Z",
+        }
+        timeline = [
+            {
+                "event": "convert_to_draft",
+                "created_at": "2026-07-13T11:59:00Z",
+            },
+            latest,
+        ]
+        self.assertIs(latest, _latest_stage_event(timeline))
+
+    def test_conflicting_latest_timeline_stages_fail_closed(self) -> None:
+        timeline = [
+            {
+                "event": "ready_for_review",
+                "created_at": "2026-07-13T12:00:00Z",
+            },
+            {
+                "event": "convert_to_draft",
+                "created_at": "2026-07-13T12:00:00Z",
+            },
+        ]
+        with self.assertRaises(GovernanceError):
+            _latest_stage_event(timeline)
+
+    def test_draft_pull_request_is_not_reconciled(self) -> None:
+        api = FakeApi(self.snapshot(), [], self.policy, self.now)
+        results, exit_code = self.reconcile(
+            [self.raw_pull_request(draft=True)], api
+        )
+        self.assertEqual([], results)
+        self.assertEqual(0, exit_code)
+        self.assertEqual([], api.calls)
+
+    def test_malformed_pull_request_sha_fails_before_api_use(self) -> None:
+        api = FakeApi(self.snapshot(), [], self.policy, self.now)
+        results, exit_code = self.reconcile(
+            [self.raw_pull_request(head_sha="not-a-sha")], api
+        )
+        self.assertEqual(2, exit_code)
+        self.assertEqual("operational_failure", results[0]["status"])
+        self.assertEqual([], api.calls)
+
+    def test_ready_pr_without_prior_consumption_is_reverted(self) -> None:
+        timeline = [
+            {
+                "event": "ready_for_review",
+                "created_at": format_time(self.now),
+                "actor": {"id": OPERATOR_ID, "login": "operator"},
+            }
+        ]
+        api = FakeApi(
+            self.snapshot(),
+            [self.authorization()],
+            self.policy,
+            self.now,
+            timeline=timeline,
+        )
+        results, exit_code = self.reconcile([self.raw_pull_request()], api)
+        self.assertEqual(1, exit_code)
+        self.assertEqual("denied", results[0]["status"])
+        self.assertEqual(
+            "reconciliation_missing_consumed_authorization", results[0]["reason"]
+        )
+        self.assertTrue(api.snapshot.is_draft)
+
+    def test_duplicate_consumed_event_remains_authorized(self) -> None:
+        event = self.event()
+        authorization = self.authorization()
+        timeline = [
+            {
+                "event": "ready_for_review",
+                "created_at": format_time(self.now),
+                "actor": {"id": OPERATOR_ID, "login": "operator"},
+            }
+        ]
+        api = FakeApi(
+            self.snapshot(),
+            [authorization, self.consumed_comment(authorization, event)],
+            self.policy,
+            self.now,
+            timeline=timeline,
+        )
+        results, exit_code = self.reconcile([self.raw_pull_request()], api)
+        self.assertEqual(0, exit_code)
+        self.assertEqual("authorized_duplicate", results[0]["status"])
+        self.assertNotIn("convert_to_draft", api.calls)
+
+    def test_timeline_read_failure_is_visible_and_fail_closed(self) -> None:
+        api = FakeApi(
+            self.snapshot(),
+            [],
+            self.policy,
+            self.now,
+            failures={"list_timeline": 1},
+        )
+        results, exit_code = self.reconcile([self.raw_pull_request()], api)
+        self.assertEqual(2, exit_code)
+        self.assertEqual("operational_failure", results[0]["status"])
 
 
 class WorkflowScannerTests(unittest.TestCase):
