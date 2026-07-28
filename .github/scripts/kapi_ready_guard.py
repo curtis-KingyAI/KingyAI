@@ -317,6 +317,20 @@ def execute_guard(
     if decision.action == "duplicate":
         return ExecutionResult("authorized_duplicate", decision.reason, decision)
 
+    if decision.action == "permit":
+        # Operator-reviewed mode. Nothing is consumed because no authorization
+        # exists; the record says exactly that rather than borrowing the vocabulary
+        # of a control that is not in force. Idempotent by event fingerprint, so a
+        # reconciliation pass over the same ready event will not repost.
+        try:
+            marker = make_audit_record("permitted", event, decision.reason, now, None)
+            api.post_comment(_audit_body("permitted", decision.reason, marker))
+            return ExecutionResult("authorized", decision.reason, decision)
+        except Exception:
+            return _deny_and_record(
+                api, event, snapshot, policy, "permit_audit_failure", now, decision
+            )
+
     if decision.action == "consume" and decision.evidence is not None:
         if not allow_new_consumption:
             return _deny_and_record(
