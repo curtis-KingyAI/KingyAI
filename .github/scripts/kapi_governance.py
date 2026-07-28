@@ -26,6 +26,12 @@ AUDIT_MARKER = "kapi-ready-audit-v1"
 AUTH_SCHEMA = "kapi-ready-authorization/v1"
 AUDIT_SCHEMA = "kapi-ready-audit/v1"
 POLICY_SCHEMA = "kapi-governance-policy/v1"
+# Model v2. Operator-reviewed with independent mechanical verification: no human
+# authorizer is required or claimed. The only prerequisite is an attested dedicated
+# verifier distinct from the shared GitHub Actions App, which becomes the sole
+# independent component. The stricter "active" state is retained verbatim and
+# unreachable so a genuine two-key model can be adopted later without rebuilding it.
+ACTIVE_OPERATOR_REVIEWED = "active_operator_reviewed"
 REQUIRED_WORKFLOW = pathlib.PurePosixPath(
     ".github/workflows/kapi-governance-actions-advisory-v1.yml"
 )
@@ -197,6 +203,7 @@ class Policy:
         activation_state = str(raw["activation_state"])
         if activation_state not in {
             "active",
+            ACTIVE_OPERATOR_REVIEWED,
             "blocked_pending_external_verifier_and_human_authorizer",
         }:
             raise GovernanceError("unsupported governance activation state")
@@ -222,6 +229,12 @@ class Policy:
             raise GovernanceError(
                 "human authorizer ids must not overlap ready or automation identities"
             )
+        if activation_state == ACTIVE_OPERATOR_REVIEWED:
+            if not verifier_attested or verifier_id is None or verifier_id == 15368:
+                raise GovernanceError(
+                    "operator-reviewed activation requires an attested verifier "
+                    "integration distinct from GitHub Actions"
+                )
         if activation_state == "active":
             if not authorizers or not separation:
                 raise GovernanceError(
@@ -560,7 +573,7 @@ def parse_audit(comment: Comment, policy: Policy) -> AuditRecord | None:
     if set(payload) != expected or payload.get("schema") != AUDIT_SCHEMA:
         raise GovernanceError("audit keys do not match the v1 schema")
     action = str(payload["action"])
-    if action not in {"consumed", "denied"}:
+    if action not in {"consumed", "permitted", "denied"}:
         raise GovernanceError("unsupported audit action")
     parse_time(payload["recorded_at"])
     return AuditRecord(
@@ -641,12 +654,17 @@ def decide_transition(
 ) -> Decision:
     now = parse_time(now)
     fingerprint = event.fingerprint
-    if (
-        policy.activation_state != "active"
-        or not policy.credential_separation_attested
-        or not policy.dedicated_verifier_attested
-        or policy.dedicated_verifier_integration_id in {None, 15368}
-    ):
+    verifier_ready = (
+        policy.dedicated_verifier_attested
+        and policy.dedicated_verifier_integration_id not in {None, 15368}
+    )
+    if policy.activation_state == "active":
+        activated = verifier_ready and policy.credential_separation_attested
+    elif policy.activation_state == ACTIVE_OPERATOR_REVIEWED:
+        activated = verifier_ready
+    else:
+        activated = False
+    if not activated:
         return Decision("deny", "governance_policy_not_activated", fingerprint)
     if event.repository_id != policy.repository_id:
         return Decision("deny", "event_repository_mismatch", fingerprint)
@@ -681,7 +699,7 @@ def decide_transition(
     # a different event timestamp/fingerprint and is treated as replay.
     for audit in audits:
         if (
-            audit.action == "consumed"
+            audit.action in {"consumed", "permitted"}
             and audit.repository_id == event.repository_id
             and audit.pr_number == event.pr_number
             and audit.base_sha == event.base_sha
@@ -692,6 +710,19 @@ def decide_transition(
             and audit.protected_files_sha256 == event.protected_files_sha256
         ):
             return Decision("duplicate", "already_consumed_for_same_event", fingerprint)
+
+    if policy.activation_state == ACTIVE_OPERATOR_REVIEWED:
+        # No human authorization is required, and none is claimed. Every integrity
+        # check above still applied: repository identity, base/head SHA agreement,
+        # trusted-governance SHA, open state, and the allowed ready actor.
+        #
+        # The merge boundary in this mode is the external required check bound to
+        # the dedicated verifier's App identity and enforced by the branch ruleset --
+        # not this guard. A distinct action is used rather than reusing "consume" so
+        # the audit trail never records an authorization that did not exist.
+        return Decision(
+            "permit", "operator_reviewed_no_authorization_required", fingerprint
+        )
 
     candidates: list[AuthorizationEvidence] = []
     observed_errors: list[str] = []
@@ -775,8 +806,8 @@ def make_audit_record(
     recorded_at: dt.datetime,
     evidence: AuthorizationEvidence | None = None,
 ) -> str:
-    if action not in {"consumed", "denied"}:
-        raise GovernanceError("audit action must be consumed or denied")
+    if action not in {"consumed", "permitted", "denied"}:
+        raise GovernanceError("audit action must be consumed, permitted or denied")
     payload = {
         "action": action,
         "actor_id": event.actor_id,

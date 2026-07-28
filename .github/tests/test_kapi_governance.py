@@ -17,8 +17,10 @@ SCRIPTS = ROOT / ".github" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from kapi_governance import (  # noqa: E402
+    ACTIVE_OPERATOR_REVIEWED,
     AUTH_MARKER,
     AUTH_SCHEMA,
+    decide_transition,
     EXECUTABLE_GOVERNANCE_PATHS,
     NORMATIVE_GOVERNANCE_PATHS,
     VALIDATED_GOVERNANCE_PATHS,
@@ -1426,3 +1428,153 @@ class PolicyChangeLaneTests(unittest.TestCase):
             | set(VALIDATED_GOVERNANCE_PATHS),
         )
         self.assertEqual(len(PROTECTED_GOVERNANCE_PATHS), 10)
+
+
+class OperatorReviewedModelTests(GovernanceFixture):
+    """Model v2: operator-reviewed with independent mechanical verification.
+
+    No human authorizer is required or claimed. The dedicated verifier is the only
+    prerequisite and therefore the only independent component. Every integrity check
+    still applies -- what is removed is the authorization requirement, nothing else.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.v2 = dataclasses.replace(
+            self.policy,
+            activation_state=ACTIVE_OPERATOR_REVIEWED,
+            human_authorizer_actor_ids=frozenset(),
+            credential_separation_attested=False,
+        )
+
+    def _write_policy(self, root: pathlib.Path, **overrides) -> pathlib.Path:
+        source = ROOT / ".github" / "kapi-governance" / "policy-v1.json"
+        document = json.loads(source.read_text(encoding="utf-8"))
+        document.update(overrides)
+        path = root / "policy-v1.json"
+        path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+        return path
+
+    # -- Policy.load preconditions ----------------------------------------
+
+    def test_loads_with_an_attested_verifier_and_no_authorizer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(
+                pathlib.Path(tmp),
+                activation_state=ACTIVE_OPERATOR_REVIEWED,
+                human_authorizer_actor_ids=[],
+                credential_separation_attested=False,
+                dedicated_verifier_attested=True,
+                dedicated_verifier_integration_id=987654,
+            )
+            policy = Policy.load(path)
+        self.assertEqual(policy.activation_state, ACTIVE_OPERATOR_REVIEWED)
+        self.assertEqual(policy.human_authorizer_actor_ids, frozenset())
+
+    def test_rejected_without_an_attested_verifier(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(
+                pathlib.Path(tmp),
+                activation_state=ACTIVE_OPERATOR_REVIEWED,
+                dedicated_verifier_attested=False,
+                dedicated_verifier_integration_id=987654,
+            )
+            with self.assertRaises(GovernanceError):
+                Policy.load(path)
+
+    def test_rejected_when_the_verifier_is_the_actions_app(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(
+                pathlib.Path(tmp),
+                activation_state=ACTIVE_OPERATOR_REVIEWED,
+                dedicated_verifier_attested=True,
+                dedicated_verifier_integration_id=15368,
+            )
+            with self.assertRaises(GovernanceError):
+                Policy.load(path)
+
+    # -- the transition decision -------------------------------------------
+
+    def test_permits_without_any_authorization_comment(self):
+        decision = decide_transition(self.event(), self.snapshot(), [], self.v2, self.now)
+        self.assertEqual(decision.action, "permit")
+        self.assertEqual(decision.reason, "operator_reviewed_no_authorization_required")
+        self.assertIsNone(decision.evidence)
+
+    def test_permit_is_not_recorded_as_a_consumption(self):
+        """The audit vocabulary must not borrow a control that is not in force."""
+        decision = decide_transition(self.event(), self.snapshot(), [], self.v2, self.now)
+        self.assertNotEqual(decision.action, "consume")
+        marker = make_audit_record("permitted", self.event(), decision.reason, self.now, None)
+        self.assertIn("permitted", marker)
+        with self.assertRaises(GovernanceError):
+            make_audit_record("authorized", self.event(), decision.reason, self.now, None)
+
+    def test_integrity_checks_still_apply(self):
+        cases = {
+            "event_repository_mismatch": dict(event_kw={"actor_id": OPERATOR_ID}, policy_kw={"repository_id": 999}),
+            "base_branch_mismatch": dict(snapshot_kw={}, policy_kw={"default_branch": "trunk"}),
+            "event_actor_not_allowed": dict(event_kw={"actor_id": 424242}),
+        }
+        for reason, kw in cases.items():
+            with self.subTest(reason=reason):
+                policy = dataclasses.replace(self.v2, **kw.get("policy_kw", {}))
+                decision = decide_transition(
+                    self.event(**kw.get("event_kw", {})),
+                    self.snapshot(**kw.get("snapshot_kw", {})),
+                    [],
+                    policy,
+                    self.now,
+                )
+                self.assertEqual(decision.action, "deny", (reason, decision))
+
+    def test_head_sha_disagreement_still_denies(self):
+        decision = decide_transition(
+            self.event(), self.snapshot(head_sha=STALE_SHA), [], self.v2, self.now
+        )
+        self.assertEqual(decision.action, "deny")
+        self.assertEqual(decision.reason, "current_head_sha_mismatch")
+
+    def test_unattested_verifier_denies_the_transition(self):
+        policy = dataclasses.replace(self.v2, dedicated_verifier_attested=False)
+        decision = decide_transition(self.event(), self.snapshot(), [], policy, self.now)
+        self.assertEqual(decision.reason, "governance_policy_not_activated")
+
+    def test_actions_app_verifier_denies_the_transition(self):
+        policy = dataclasses.replace(self.v2, dedicated_verifier_integration_id=15368)
+        decision = decide_transition(self.event(), self.snapshot(), [], policy, self.now)
+        self.assertEqual(decision.reason, "governance_policy_not_activated")
+
+    def test_a_permitted_record_makes_the_same_event_idempotent(self):
+        event = self.event()
+        marker = make_audit_record("permitted", event, "operator_reviewed_no_authorization_required", self.now, None)
+        comment = Comment(
+            id=303,
+            author_id=self.v2.audit_actor_id,
+            author_login=self.v2.audit_actor_login,
+            author_type="Bot",
+            body=marker,
+            created_at=self.now,
+            updated_at=self.now,
+        )
+        decision = decide_transition(event, self.snapshot(), [comment], self.v2, self.now)
+        self.assertEqual(decision.action, "duplicate")
+
+    # -- the stricter model must survive untouched -------------------------
+
+    def test_active_still_requires_a_human_authorizer(self):
+        starved = dataclasses.replace(self.policy, human_authorizer_actor_ids=frozenset())
+        decision = decide_transition(self.event(), self.snapshot(), [], starved, self.now)
+        self.assertEqual(decision.action, "deny")
+
+    def test_active_still_requires_credential_separation(self):
+        starved = dataclasses.replace(self.policy, credential_separation_attested=False)
+        decision = decide_transition(self.event(), self.snapshot(), [], starved, self.now)
+        self.assertEqual(decision.reason, "governance_policy_not_activated")
+
+    def test_blocked_state_still_denies_everything(self):
+        blocked = dataclasses.replace(
+            self.v2, activation_state="blocked_pending_external_verifier_and_human_authorizer"
+        )
+        decision = decide_transition(self.event(), self.snapshot(), [], blocked, self.now)
+        self.assertEqual(decision.reason, "governance_policy_not_activated")

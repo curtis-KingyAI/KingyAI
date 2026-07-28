@@ -1,23 +1,65 @@
 # KAPI pull-request governance v1
 
-## Current status: fail closed, not activated
+## Review positioning — read this first
 
-KAPI's review positioning is exactly **Operator-reviewed**. This repository does
-not claim a stronger review boundary, autonomous review, or verified separation
-from the personal-repository owner. The owner retains administrative and
-recovery authority. Automation that can use the owner's credentials is inside
-the same authority boundary and cannot prove human/automation separation.
+**Operator-reviewed with independent mechanical verification.**
 
-`policy-v1.json` intentionally uses
-`blocked_pending_external_verifier_and_human_authorizer`. Until both prerequisites
-below are satisfied, every observed ready-for-review transition is denied with a
-visible failed run, audit record, and denial label, including a transition
-attributed to the repository owner. A human operator must return an unauthorized
-ready pull request to draft; repository automation does not claim that capability.
+Changes are reviewed by the operator and independently verified by a mechanical
+verifier that runs outside this repository, outside GitHub Actions, and outside
+any agent workspace, from a GitHub App identity that Actions cannot imitate.
 
-Do not change `activation_state` to `active` merely to make a workflow green.
+**No independent human review is claimed.** This repository does not claim
+two-key review, separation of duties, four-eyes, autonomous review, or verified
+separation from the personal-repository owner. The owner retains administrative
+and recovery authority. Automation that can use the owner's credentials is inside
+the same authority boundary and cannot prove human/automation separation — an
+agent acting on the owner's credentials is owner-bound automation, not a distinct
+reviewer, and cannot constrain the owner.
 
-## Mandatory identity boundary
+`stronger_review_claims_allowed` is `false` and exists to stop that language
+drifting back in.
+
+## The three activation states
+
+| State | Requires | Claim |
+|---|---|---|
+| `blocked_pending_external_verifier_and_human_authorizer` | — | nothing may transition; fully fail-closed |
+| **`active_operator_reviewed`** | an attested dedicated verifier whose integration is **not** `15368` | operator review + independent **mechanical** verification |
+| `active` | the above **plus** a separate human authorizer and attested credential separation | operator review + independent **human** authorization |
+
+`active` is retained verbatim and is not currently reachable. It is kept so that a
+genuine two-key model can be adopted later — most plausibly by engaging a paid
+institutional reviewer, which is a purchasing decision rather than a favour asked
+of an individual — without rebuilding the control.
+
+**Under `active_operator_reviewed` the dedicated verifier is the only
+prerequisite, and therefore the only independent component.** It is more
+load-bearing in this model, not less. A ready transition is permitted once every
+integrity check passes; the merge boundary is the external required check bound to
+the verifier's exact App identity and enforced by the branch ruleset — not by the
+ready guard. Permitted transitions are recorded with the audit action `permitted`,
+never `consumed`, so the trail never implies an authorization that did not exist.
+
+Every integrity check applies in all active states: repository identity, base and
+head SHA agreement, trusted-governance SHA, open state, allowed ready actor, policy
+hash and protected-file manifest hash.
+
+**Do not change `activation_state` merely to make a workflow green.**
+
+## ⚠️ This governs the repository, not KAPI releases
+
+This document governs **who may merge code**. It does not govern **what KAPI may
+publish**. A KAPI *final release* separately requires the roles
+`{primary_operator, independent_reviewer, methodology_owner}` and
+`minimum_distinct_humans: 2` (`kapi/lifecycle.py`, `week0-policy-overlay`). KAPI's
+own gate matrices record independent review as **failed**, and nothing here changes
+that. **Operator-reviewed merge governance must never be read as satisfying the
+release gate.**
+
+## Mandatory identity boundary — applies to the `active` state only
+
+> Not in force under `active_operator_reviewed`, which requires no human
+> authorizer. Retained in full because it is the specification for `active`.
 
 The account that authorizes readiness must be a separate, named natural-person
 identity. It must not be the repository owner identity currently available to
@@ -92,7 +134,10 @@ Never set the dedicated verifier ID to `15368`. Set
 `dedicated_verifier_attested` to `true` only after a pilot check proves the
 ruleset is bound to the external App, not merely to a matching name.
 
-## One-use authorization protocol
+## One-use authorization protocol — `active` state only
+
+> Not in force under `active_operator_reviewed`. Retained as the specification
+> for `active`, and exercised by the guard only in that state.
 
 After activation, the named human authorizer generates a marker from a trusted
 main checkout:
