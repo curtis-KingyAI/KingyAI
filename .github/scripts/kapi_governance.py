@@ -891,7 +891,11 @@ def scan_workflows(
             if candidate_file.read_bytes() != trusted_file.read_bytes():
                 errors.append(
                     f"candidate changes protected governance file {relative}; "
-                    "use the documented controlled two-phase update"
+                    "protected governance files cannot be changed by an ordinary pull "
+                    "request. See .github/kapi-governance/README.md: executable "
+                    "governance (scripts, tests, workflows) requires a new version "
+                    "evaluated by the external verifier, and policy changes are step 9 "
+                    "of the numbered sequence there"
                 )
 
     files = sorted(
