@@ -136,7 +136,7 @@ def verify_methodology_and_payloads(
     if methodology["version"] != "0.2.0":
         raise ValueError("unexpected methodology version")
     if methodology["capability"].get("metric") != "ECI":
-        raise ValueError("capability policy does not match the approved fixture")
+        raise ValueError("capability policy does not match the pinned fixture")
     if methodology["capability"].get("configuration_specific_score_allowed") is not False:
         raise ValueError("ECI must remain a coarse screen, not a configuration score")
     if methodology["base_period_weeks"] != BASE_WEEK_COUNT:

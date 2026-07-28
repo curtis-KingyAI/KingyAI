@@ -6,6 +6,14 @@ counts, weekly prices, corrections, methodology versions, calculations, and
 release lineage. It is a research data store; it does not publish a release or
 modify WordPress.
 
+`002_governance.sql` is a forward-only migration. It separates calculation,
+methodology/release assurance, and publication authorization; adds stable
+controller identities, appointed roles, append-only reviewer registration,
+supersession and revocation events, review/disclosure records, exact release
+bindings, signature-verification claim records, and append-only state events.
+Legacy `release_signoffs` rows remain readable but cannot authorize a schema-v2
+transition.
+
 ## Store API
 
 The public Python API is intentionally small and uses only the standard
@@ -21,7 +29,7 @@ connection.close()
 ```
 
 `init_database(path_or_connection)` accepts a filesystem path or a fresh
-`sqlite3.Connection`, enables foreign keys, applies schema version 1
+`sqlite3.Connection`, enables foreign keys, applies schema versions 1 and 2
 idempotently, and returns the configured connection. A path opened by the
 function must be closed by the caller.
 
@@ -52,7 +60,9 @@ prototype.
 | Method definition | `methodology_versions`, `methodology_base_weeks`, `methodology_thresholds`, `task_profiles`, `task_profile_features`, `methodology_sensitivities` | Pins calendar/policies, base weeks, qualification gate, rational profile weights, payload hashes, settings, graders, and sensitivities |
 | Frozen inputs | `weekly_snapshots`, `snapshot_inputs` | Connects a cutoff to an immutable manifest and the exact input IDs/hashes |
 | Calculation | `calculations`, `calculation_profile_results`, `calculation_selected_endpoints`, `calculation_validations` | Links code/environment/method versions to profile results, selected triples, price setters, index values, and validation outcomes |
-| Release | `releases`, `release_artifacts`, `release_signoffs`, `correction_releases` | Links a dated vintage to one calculation, permanent hashed artifacts, approvals, superseded releases, and corrections |
+| Release | `releases`, `release_artifacts`, `correction_releases` | Links a dated vintage to one calculation, permanent hashed artifacts, superseded releases, and corrections |
+| Historical signoffs | `release_signoffs` | Retained only for old-vintage reads; never a governance-v2 authorization source |
+| Governance | `governance_principals`, `governance_role_assignments`, `external_reviewer_registry`, `external_reviewer_registry_events`, `methodology_governance_gates`, `release_governance_bindings`, `external_review_records`, `signature_verification_attestations`, `governance_transition_events` | Separates identity/appointment, reviewer credential lifecycle, methodology assurance, exact-release assurance, and publication authorization |
 
 The intended lineage is:
 
@@ -143,14 +153,86 @@ facts are unique, while a different replacement value is allowed only when the
 bundle supplies an explicit chain.
 
 Finalization follows the same rule: it is a new release row, optionally using
-`supersedes_release_id`, with new artifact and sign-off rows.
+`supersedes_release_id`, with new artifacts and governance transition events.
+
+## Governance-v2 hard boundary
+
+The private local actor binding is test/adapter scaffolding, not
+authentication. Schema v2 creates each bound release in `unreviewed`, exposes
+no `unreviewed -> operator_reviewed` edge, constrains
+`trusted_verifier_gate` to `failed`, and exposes no publication transition.
+This makes operator-review, external-review, and publication claims unreachable
+until a later reviewed migration adds trusted operator identity and separate
+cryptographic signature verification.
+
+Methodology child rows freeze after a governance gate exists; snapshot inputs
+freeze after their snapshot is used by a calculation; calculation result,
+selected-endpoint, and validation rows freeze after release binding; and
+release artifacts/signoffs/correction links freeze after governance binding.
+The binding trigger recomputes the exact release-artifact membership digest
+through a registered SQLite function, so the stored digest cannot describe a
+different set. Methodology review records additionally bind the exact
+methodology ID, version, document hash, implementation commit, and review-
+artifact manifest hash.
+
+`external_reviewer_registry` retains the immutable initial registration.
+`external_reviewer_registry_events` begins with a matching sequence-1 event and
+then accepts only a single sequence of registrar-recorded `supersession` or
+`revocation` events. Updates, deletes, self-recording, stale predecessors,
+backdated chronology, no-op supersessions, and revocations that alter the prior
+credential snapshot are rejected. A review stores `reviewer_registry_event_id`
+for the latest active event at `reviewed_at`. Signature claims and all modeled
+future external/ready transitions recompute latest-event eligibility at their
+own timestamps, so a rotated or revoked key cannot advance a stale record.
+
+Both modeled publication-ready branches require the release binding's
+`code_commit` to equal the methodology gate's `implementation_commit`, in
+addition to exact review and artifact bindings. The exact-release branch does
+not receive a weaker commit rule than the routine branch.
+
+Lifecycle calculation diagnostics accept an exact empty caller object; every
+stored key is lifecycle-owned. Nested caller keys and strings are also scanned
+after Unicode normalization as defense in depth. Base-week states are controlled
+enum values. Policy v1.0.0 rejects every non-null caller-supplied secondary
+recalculation report, including exact checker output, and stores only a
+`not_supplied` lifecycle diagnostic. A future schema must represent internally
+recomputed, exact-calculation-hash-bound evidence rather than trusting caller
+status or count fields.
+
+Schema v2 also validates the exact stored diagnostic below the Python lifecycle
+API. `init_database` registers `kapi_validate_calculation_diagnostics` on the
+connection. `calculations_diagnostics_guard` requires its result to be exactly
+`1` before every new calculation insert; malformed or noncanonical JSON,
+aliases/extras, false review/publication/secondary fields, invalid release/base
+states, and status/disposition mismatches fail. The
+`release_governance_bindings_guard` separately repeats the validation against
+the calculation selected through the release and rejects a binding disposition
+that differs from the status-derived disposition. The SQL predicates use `IS
+NOT 1`, and a connection that never registered the function cannot execute
+either write, so missing validator registration fails closed.
+
+Migration is append-only: applying schema v2 to a schema-v1 database does not
+scan, rewrite, infer, or backfill `calculations.diagnostics_json`. Existing rows
+remain available as historical evidence. If an existing document does not equal
+the exact policy-v1 lifecycle document, its release cannot receive a policy-v1
+governance binding. This deliberate quarantine avoids turning legacy prose or a
+missing field into a newly asserted review state. New rows are guarded from the
+moment schema v2 is installed.
+
+These are application-integrity controls, not a security boundary against the
+owner of the SQLite file or host process. A production ledger must move trusted
+identity, signature verification, and durable audit authority outside the
+publisher-controlled process.
 
 ## Operational boundaries
 
-- The schema is prototype version 1 (`PRAGMA user_version = 1`); future changes
+- The schema is prototype version 2 (`PRAGMA user_version = 2`); future changes
   require a new migration, not edits to a deployed database.
 - Initialize a supplied connection outside an active transaction so SQLite can
   enable foreign keys.
+- Use `init_database` for every write-capable connection; opening the SQLite
+  file directly leaves the required validator unregistered and governed writes
+  fail closed.
 - The store validates data integrity and lineage shape. Headline eligibility,
   Grade-A-only selection, concentration withholding, and index calculation
   belong to the validator/calculation modules.

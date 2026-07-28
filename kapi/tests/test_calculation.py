@@ -8,7 +8,12 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 from pathlib import Path
 
-from kapi.calculation import CalculationError, calculate_index, chain_link
+from kapi.calculation import (
+    CalculationError,
+    _calculate_index_unchecked as calculate_index,
+    chain_link,
+)
+from kapi.governance import CURRENT_UNREVIEWED_LABEL
 
 
 PROFILE_SPECS = [
@@ -85,7 +90,7 @@ def make_methodology() -> dict:
         "selection": {
             "provider_count": 3,
             "creator_count": 3,
-            "method": "median_independent_three",
+            "method": "median_three_provider_three_creator_diverse",
             "tie_break": ["median", "total", "endpoint_ids"],
         },
         "concentration": {
@@ -310,14 +315,14 @@ class CalculationTests(unittest.TestCase):
         self.assertEqual(extraction["price_setter_endpoint_id"], "A")
         self.assertEqual(Decimal(extraction["headline_price"]), Decimal("0.0056"))
 
-    def test_independence_requires_three_providers_and_three_creators(self) -> None:
+    def test_diversity_requires_three_providers_and_three_creators(self) -> None:
         bundle = make_bundle()
         for endpoint in bundle["endpoints"]:
             endpoint["provider_id"] = "provider-A"
         result = calculate_index(bundle, make_methodology())
         self.assertEqual(result["status"], "pending_base")
         self.assertEqual(result["weeks"][0]["calculation_status"], "incomplete")
-        self.assertIn("no_independent_three_provider_creator_triple", profile_for(result["weeks"][0], "extraction")["diagnostics"])
+        self.assertIn("no_three_provider_three_creator_diverse_triple", profile_for(result["weeks"][0], "extraction")["diagnostics"])
 
     def test_entry_and_exit_are_applied_at_each_week_cutoff(self) -> None:
         bundle = make_bundle()
@@ -377,7 +382,12 @@ class CalculationTests(unittest.TestCase):
         self.assertEqual(official["weeks"][0]["release_status"], "withheld_incomplete")
         self.assertEqual(research["series_type"], "synthetic_research_policy_simulation")
         self.assertEqual(research["weeks"][0]["calculation_status"], "complete")
-        self.assertFalse(any(week["release_status"] == "publishable" for week in research["weeks"]))
+        self.assertFalse(
+            any(
+                week["release_status"] == "eligible_for_governance_review"
+                for week in research["weeks"]
+            )
+        )
 
     def test_rolling_alias_is_excluded_without_bridging(self) -> None:
         bundle = make_bundle()
@@ -394,7 +404,16 @@ class CalculationTests(unittest.TestCase):
         method["concentration"]["withhold_share"] = share
         method["concentration"]["withhold_profile_count"] = 7
         result = calculate_index(bundle, method)
-        self.assertEqual(result["weeks"][0]["release_status"], "publishable")
+        self.assertEqual(
+            result["weeks"][0]["release_status"],
+            "eligible_for_governance_review",
+        )
+        self.assertEqual(
+            result["weeks"][0]["review_label"],
+            CURRENT_UNREVIEWED_LABEL,
+        )
+        self.assertEqual(result["weeks"][0]["governance_state"], "unreviewed")
+        self.assertFalse(result["weeks"][0]["publication_eligible"])
         self.assertEqual(result["weeks"][-1]["release_status"], "withheld_concentration")
 
     def test_base_uses_earliest_thirteen_consecutive_complete_weeks(self) -> None:
@@ -468,7 +487,7 @@ class CalculationTests(unittest.TestCase):
         self.assertNotIn(original["id"], extraction["observation_ids"])
         self.assertIn("correction-A-input", extraction["lineage"]["correction_ids"])
 
-    def test_capability_threshold_hooks_are_calculated_independently(self) -> None:
+    def test_capability_threshold_hooks_are_calculated_separately(self) -> None:
         bundle = make_bundle()
         for record in bundle["capability_evidence"]:
             if record["endpoint_id"] in {"C", "D"}:
@@ -485,6 +504,11 @@ class CalculationTests(unittest.TestCase):
                 "cutoff_at",
                 "calculation_status",
                 "release_status",
+                "calculation_disposition",
+                "governance_state",
+                "review_label",
+                "publication_state",
+                "publication_eligible",
                 "basket_unit_cost",
                 "basket_60_cost",
                 "index_level",

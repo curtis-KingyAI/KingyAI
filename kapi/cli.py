@@ -9,10 +9,10 @@ from typing import Any, Sequence
 
 from .calculation import CalculationError, calculate_index
 from .exporter import ExportError, export_release, reproduce_release
-from .independent import IndependentCheckError, check_calculation
+from .governance import GovernanceError, governance_status
+from .secondary import SecondaryCheckError, check_secondary_calculation
 from .lifecycle import (
     LifecycleError,
-    append_weekly_vintage,
     record_incident,
     register_methodology,
 )
@@ -186,8 +186,8 @@ def command_dump(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_independent_check(args: argparse.Namespace) -> int:
-    report = check_calculation(load_json(args.calculation))
+def command_secondary_check(args: argparse.Namespace) -> int:
+    report = check_secondary_calculation(load_json(args.calculation))
     if args.output:
         write_json(args.output, report)
     _emit(report)
@@ -201,22 +201,15 @@ def command_register_methodology(args: argparse.Namespace) -> int:
             connection,
             load_json(args.method),
             effective_from=args.effective_from,
+            implementation_commit=args.implementation_commit,
+            review_artifact_manifest_sha256=(
+                args.review_artifact_manifest_sha256
+            ),
         )
         connection.commit()
     finally:
         connection.close()
     _emit({"registered": True, "database": str(Path(args.database).resolve())})
-    return 0
-
-
-def command_append_vintage(args: argparse.Namespace) -> int:
-    connection = init_database(args.database)
-    try:
-        summary = append_weekly_vintage(connection, load_json(args.envelope))
-        connection.commit()
-    finally:
-        connection.close()
-    _emit(summary)
     return 0
 
 
@@ -228,6 +221,16 @@ def command_record_incident(args: argparse.Namespace) -> int:
     finally:
         connection.close()
     _emit({"recorded": True, "incident_id": incident_id})
+    return 0
+
+
+def command_governance_status(args: argparse.Namespace) -> int:
+    connection = init_database(args.database)
+    try:
+        result = governance_status(connection, args.release_id)
+    finally:
+        connection.close()
+    _emit(result)
     return 0
 
 
@@ -285,7 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
     export.set_defaults(handler=command_export)
 
     reproduce = subparsers.add_parser(
-        "reproduce", help="verify hashes and independently recalculate a release"
+        "reproduce", help="verify hashes and recalculate a release"
     )
     reproduce.add_argument("--release-dir", required=True)
     reproduce.add_argument("--output")
@@ -312,13 +315,13 @@ def build_parser() -> argparse.ArgumentParser:
     dump.add_argument("--output", required=True)
     dump.set_defaults(handler=command_dump)
 
-    independent = subparsers.add_parser(
-        "independent-check",
-        help="independently recompute frozen selection and index arithmetic",
+    secondary = subparsers.add_parser(
+        "secondary-check",
+        help="run the implementation-isolated recalculation check",
     )
-    independent.add_argument("--calculation", required=True)
-    independent.add_argument("--output")
-    independent.set_defaults(handler=command_independent_check)
+    secondary.add_argument("--calculation", required=True)
+    secondary.add_argument("--output")
+    secondary.set_defaults(handler=command_secondary_check)
 
     register = subparsers.add_parser(
         "register-methodology", help="append a methodology version to SQLite"
@@ -326,14 +329,11 @@ def build_parser() -> argparse.ArgumentParser:
     register.add_argument("--database", required=True)
     register.add_argument("--method", required=True)
     register.add_argument("--effective-from", required=True)
-    register.set_defaults(handler=command_register_methodology)
-
-    append_vintage = subparsers.add_parser(
-        "append-vintage", help="append an immutable weekly lifecycle envelope"
+    register.add_argument("--implementation-commit", required=True)
+    register.add_argument(
+        "--review-artifact-manifest-sha256", required=True
     )
-    append_vintage.add_argument("--database", required=True)
-    append_vintage.add_argument("--envelope", required=True)
-    append_vintage.set_defaults(handler=command_append_vintage)
+    register.set_defaults(handler=command_register_methodology)
 
     incident = subparsers.add_parser(
         "record-incident", help="append an immutable incident state"
@@ -341,6 +341,13 @@ def build_parser() -> argparse.ArgumentParser:
     incident.add_argument("--database", required=True)
     incident.add_argument("--incident", required=True)
     incident.set_defaults(handler=command_record_incident)
+
+    status = subparsers.add_parser(
+        "governance-status", help="read the latest separated governance states"
+    )
+    status.add_argument("--database", required=True)
+    status.add_argument("--release-id", required=True)
+    status.set_defaults(handler=command_governance_status)
 
     return parser
 
@@ -355,7 +362,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         CalculationError,
         ExportError,
         StoreError,
-        IndependentCheckError,
+        SecondaryCheckError,
+        GovernanceError,
         LifecycleError,
     ) as error:
         payload: dict[str, Any] = {

@@ -1,0 +1,199 @@
+{
+  "policy_id": "kapi-governance",
+  "version": "1.0.0",
+  "effective_from": "2026-07-13T00:00:00Z",
+  "mode": "staged_hybrid",
+  "trusted_operator_identity_adapter": {
+    "status": "disabled_not_implemented",
+    "caller_configurable": false,
+    "local_context_binding_is_authentication": false,
+    "operator_review_claims_enabled": false,
+    "required_resolution": "new reviewed policy and schema vintage plus a trusted identity and operator-review event adapter"
+  },
+  "trusted_verifier_adapter": {
+    "status": "disabled_not_implemented",
+    "caller_configurable": false,
+    "local_context_binding_is_authentication": false,
+    "external_review_claims_enabled": false,
+    "publication_ready_transitions_enabled": false,
+    "required_resolution": "new reviewed migration plus a separately trusted identity and cryptographic signature-verification adapter"
+  },
+  "current_routine_status": {
+    "governance_state": "unreviewed",
+    "label": "Governance status: Unreviewed draft. Automated validation completed for this artifact; no operator or external methodology review is complete.",
+    "publication_eligible": false
+  },
+  "future_operator_review_status": {
+    "governance_state": "operator_reviewed",
+    "label": "Governance status: Operator-reviewed by Kingy.ai and automatically checked. No external methodology review is complete.",
+    "reachable_in_policy_v1_0_0": false
+  },
+  "methodology_assurance": {
+    "frequency": "once_per_exact_methodology_version_before_public_beta",
+    "required_scope": [
+      "evidence-policy",
+      "methodology",
+      "publication-claims",
+      "selection",
+      "validation"
+    ],
+    "routine_release_label": "Governance status: Operator-reviewed by Kingy.ai and automatically checked. External methodology review is complete; this release was not externally reviewed."
+  },
+  "release_assurance": {
+    "required_for_routine_release": false,
+    "required_scope_for_scoped_claim": [
+      "artifact-manifest",
+      "calculation",
+      "recalculation",
+      "release-claims"
+    ],
+    "exact_release_label": "Governance status: This exact release received named external review and recalculation under the recorded scope."
+  },
+  "reviewer_record_requirements": [
+    "registrar_verified_stable_identity_key",
+    "identity_evidence_sha256",
+    "full_name",
+    "affiliation",
+    "qualifications_sha256",
+    "relationship_disclosure_sha256",
+    "compensation_disclosure_sha256",
+    "conflict_declaration_sha256",
+    "appointment_sha256",
+    "reviewer_registry_event_id",
+    "reviewer_registry_event_evidence_sha256",
+    "reviewer_registry_public_key_sha256",
+    "findings_sha256",
+    "unresolved_issues_sha256",
+    "evidence_record_id",
+    "signature_scheme",
+    "signature_key_id",
+    "signature_evidence_sha256"
+  ],
+  "reviewer_registry_lifecycle": {
+    "initial_registration": "immutable_base_row_plus_sequence_1_event",
+    "later_changes": "append_only_supersession_or_revocation_events",
+    "updates_or_deletes_allowed": false,
+    "self_recording_allowed": false,
+    "separate_reviewer_registrar_assignment_required": true,
+    "review_record_binding": "exact_latest_active_event_at_reviewed_at",
+    "signature_claim_binding": "same_event_must_remain_latest_active_at_verified_at",
+    "future_transition_binding": "same_event_must_remain_latest_active_at_transitioned_at",
+    "public_attribution": [
+      "bound_and_latest_registry_events",
+      "revocation_state_and_evidence",
+      "stable_identity_and_appointment_evidence",
+      "qualifications_and_key_evidence",
+      "full_disclosures_scope_findings_and_unresolved_issues",
+      "signature_and_verifier_attestation_evidence"
+    ]
+  },
+  "separation_of_duties": {
+    "reviewer_cannot_be": [
+      "operator",
+      "methodology_owner",
+      "release_authorizer",
+      "publication_authorizer",
+      "identity_or_reviewer_registrar_for_self"
+    ],
+    "reviewer_self_registration": false,
+    "reviewer_self_appointment": false,
+    "reviewer_publication_authorization": false
+  },
+  "state_axes": {
+    "calculation_disposition": [
+      "eligible",
+      "withheld",
+      "incomplete"
+    ],
+    "governance_state": [
+      "unreviewed",
+      "operator_reviewed",
+      "external_release_reviewed",
+      "withdrawn"
+    ],
+    "publication_state": [
+      "not_authorized",
+      "ready",
+      "published",
+      "withdrawn"
+    ]
+  },
+  "publication_eligibility_rule": {
+    "calculation_disposition": "eligible",
+    "governance_state": [
+      "operator_reviewed",
+      "external_release_reviewed"
+    ],
+    "publication_state": "ready",
+    "exact_methodology_external_review": "approved_and_current",
+    "exact_release_external_review": "optional_and_never_inherited",
+    "methodology_technical_gate": "passed",
+    "methodology_operational_gate": "passed",
+    "release_code_commit_equals_methodology_implementation_commit": true,
+    "hashed_release_artifact_required": true,
+    "appointed_publication_authorizer_required": true,
+    "trusted_verifier_gate": "passed_unavailable_in_v1.0.0",
+    "current_result": false,
+    "derived_only": true,
+    "fail_closed": true
+  },
+  "immutable_binding_requirements": {
+    "release_id_basis": "dataset_hash_plus_methodology_hash_plus_mathematical_output_hash",
+    "governance_fields_excluded_from_release_id": true,
+    "methodology_review_binding": [
+      "methodology_id",
+      "methodology_version",
+      "methodology_sha256",
+      "implementation_commit",
+      "review_artifact_manifest_sha256",
+      "reviewer_registry_event_id"
+    ],
+    "exact_release_review_binding": [
+      "release_id",
+      "methodology_id",
+      "methodology_version",
+      "methodology_sha256",
+      "implementation_commit",
+      "release_artifact_manifest_sha256",
+      "reviewer_registry_event_id"
+    ],
+    "child_membership_freeze": [
+      "methodology_after_governance_gate",
+      "snapshot_after_calculation",
+      "calculation_after_release",
+      "release_after_governance_binding"
+    ]
+  },
+  "diagnostic_claim_controls": {
+    "caller_diagnostics_may_set_governance_or_review_claims": false,
+    "caller_diagnostics_schema": "exact_empty_object_no_caller_keys",
+    "caller_diagnostic_content_defense": "recursive_nfkd_casefold_combining_mark_and_common_confusable_claim_rejection",
+    "stored_diagnostics_schema": "exact_canonical_lifecycle_owned_policy_v1_document",
+    "database_insert_guard": "before_insert_calculations_registered_exact_validator",
+    "release_binding_revalidation": "separate_exact_validator_before_initial_governance_binding",
+    "missing_or_unregistered_validator": "fail_closed_no_calculation_or_binding_row",
+    "forward_bundle_schema": "exact_closed_object_keysets_and_declared_identity_map_paths_no_undeclared_nested_fields",
+    "forward_bundle_schema_change_requirement": "new_bundle_schema_vintage",
+    "forward_bundle_claim_key_policy": "recursive_nfkd_casefold_combining_mark_common_confusable_claim_stem_rejection_including_kapi_with_no_current_claim_key_allowlist_entries",
+    "forward_bundle_claim_value_policy": "recursive_nfkd_casefold_combining_mark_common_confusable_individual_string_same_nonroot_object_and_subject_bearing_list_aggregate_rejection",
+    "export_bundle_claim_revalidation": "required_before_frozen_input_render",
+    "legitimate_evidence_terms": "isolated_external_verified_reviewed_audit_or_approved_words_allowed_only_without_governance_or_publication_assertion_semantics",
+    "base_week_states": "controlled_enum_only",
+    "secondary_recalculation_report": "caller_supplied_reports_rejected_absence_only",
+    "future_secondary_recalculation_requirement": "trusted_internal_recomputation_from_exact_full_calculation_with_hash_binding",
+    "secondary_recalculation_is_human_external_review": false,
+    "missing_secondary_recalculation_status": "not_supplied"
+  },
+  "schema_v1_migration": {
+    "existing_calculation_rows_rewritten": false,
+    "diagnostics_backfill_permitted": false,
+    "reason": "rewriting or inferring governance diagnostics would falsify the historical record",
+    "nonconforming_existing_rows": "remain readable but cannot receive a policy_v1_governance_binding",
+    "new_calculation_rows": "exact_policy_v1_insert_guard_applies_after_migration"
+  },
+  "historical_vintages": {
+    "through_methodology_version": "0.2.2",
+    "immutable": true,
+    "authorization_source": false
+  }
+}

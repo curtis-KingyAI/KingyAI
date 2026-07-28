@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import timedelta
+from html import unescape
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
+from .governance import CURRENT_UNREVIEWED_LABEL, POLICY_ID, POLICY_VERSION
 from .util import (
     canonical_json_bytes,
     parse_decimal,
@@ -23,9 +26,575 @@ from .util import (
 
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]*$")
+MEDIA_TYPE_PATTERN = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9!#$%&'*+.^_`|~-]*/"
+    r"[A-Za-z0-9][A-Za-z0-9!#$%&'*+.^_`|~-]*$"
+)
+CLAIM_DECODE_ROUNDS = 4
+_LITERAL_CLAIM_ESCAPE_PATTERN = re.compile(
+    r"\\(?:u([0-9A-Fa-f]{4})|U([0-9A-Fa-f]{8})|x([0-9A-Fa-f]{2}))"
+)
 GRADES = {"A", "B", "C", "D"}
 PAYLOAD_FACTORS = ("0.75", "1.00", "1.25")
 PAYLOAD_FACTOR_IDS = {"0.75": "075", "1.00": "100", "1.25": "125"}
+CONTROLLED_METHODOLOGY_VERSIONS = {"0.2.0", "0.2.1", "0.2.2", "0.3.0"}
+PORTABLE_METHODOLOGY_VERSIONS = {"0.2.2", "0.3.0"}
+HISTORICAL_METHODOLOGY_VERSIONS = {"0.2.0", "0.2.1", "0.2.2"}
+PINNED_METHODOLOGY_SHA256 = {
+    "0.2.0": "8f9442b9cd38acd46602446a9bbcc848a29fd079dfc63fefc0cb24125eaacd59",
+    "0.2.1": "1cb3cdc12139dad6a6bbaefc31f5023323d1672ba4fba69c531312f5a8a275b0",
+    "0.2.2": "f75219ff27d059b7cc417ba2b2dc3d4e280ccf8e7d2ab0a2b1a38085a99a8ba8",
+    "0.3.0": "85668be220af2c724ae8c1cd68cf53eeec6d547259c066acb28c8a8185a97e04",
+}
+HISTORICAL_BOUNDED_FIXTURE_SHA256 = (
+    "6cba82133f26cf3da4642f60e0006682f8ee190517cac34e2f673be06bb9e8d7"
+)
+FORWARD_BUNDLE_SCHEMA_VERSION = "kapi-bundle-v0.3.0"
+FORWARD_METHODOLOGY_PATH = "kapi/config/methodology-v0.3.0.json"
+FORWARD_BOUNDED_FIXTURE_SHA256 = (
+    "d4a6fb3a0f51da7468ea684004ad7a84b8b2159e3653b62e677abc2f36703053"
+)
+FORWARD_ID_PREFIXES = {
+    "weeks": "week-",
+    "providers": "provider-",
+    "creators": "creator-",
+    "models": "model-",
+    "endpoints": "endpoint-",
+    "source_artifacts": "source-",
+    "capability_evidence": "capability-",
+    "token_counts": "tokens-",
+    "price_observations": "price-",
+    "corrections": "correction-",
+}
+
+
+def requires_forward_governance_contract(
+    bundle: Mapping[str, Any], methodology: Mapping[str, Any]
+) -> bool:
+    """Return whether either input attempts to enter the v0.3 governance lane.
+
+    The decision cannot depend only on the supplied methodology version.  A
+    caller could otherwise pair the canonical v0.3 bundle with an older valid
+    methodology and silently disable every forward-only guard.  Forward bundle
+    identity markers are included as defense in depth so changing only the
+    schema/version strings cannot downgrade the bounded fixture either.
+    """
+
+    schema_version = bundle.get("schema_version")
+    methodology_version = methodology.get("version")
+    binding = bundle.get("methodology")
+    return bool(
+        (
+            isinstance(schema_version, str)
+            and schema_version.startswith("kapi-bundle-v0.3")
+        )
+        or (
+            isinstance(methodology_version, str)
+            and methodology_version.startswith("0.3")
+        )
+        or bundle.get("dataset_id") == "synthetic-forward-governance-v0.3.0"
+        or (
+            isinstance(binding, Mapping)
+            and (
+                binding.get("version") == "0.3.0"
+                or binding.get("config_path") == FORWARD_METHODOLOGY_PATH
+            )
+        )
+    )
+FORWARD_BUNDLE_FIELDS = frozenset(
+    {
+        "schema_version",
+        "dataset_id",
+        "dataset_kind",
+        "weeks",
+        "providers",
+        "creators",
+        "models",
+        "endpoints",
+        "source_artifacts",
+        "capability_evidence",
+        "token_counts",
+        "price_observations",
+        "corrections",
+        "methodology",
+    }
+)
+FORWARD_CAPABILITY_SYNTHETIC_CONTENT_FIELDS = frozenset(
+    {
+        "capability_scope",
+        "configuration_id",
+        "dataset_kind",
+        "endpoint_id",
+        "metric",
+        "metric_version",
+        "model_calls_performed",
+        "network_access_used",
+        "score",
+        "score_is_configuration_specific",
+    }
+)
+FORWARD_PRICE_SYNTHETIC_CONTENT_FIELDS = frozenset(
+    {
+        "currency",
+        "dataset_kind",
+        "endpoint_id",
+        "input_amount_per_million",
+        "model_calls_performed",
+        "network_access_used",
+        "output_amount_per_million",
+        "regime",
+        "tier",
+        "unit",
+        "week_id",
+    }
+)
+FORWARD_BUNDLE_OBJECT_FIELDS = {
+    "bundle": FORWARD_BUNDLE_FIELDS,
+    "bundle.weeks[]": frozenset({"cutoff_at", "id"}),
+    "bundle.providers[]": frozenset({"id", "name", "synthetic"}),
+    "bundle.creators[]": frozenset({"id", "name", "synthetic"}),
+    "bundle.models[]": frozenset(
+        {"alias_type", "creator_id", "id", "immutable_version", "version"}
+    ),
+    "bundle.endpoints[]": frozenset(
+        {
+            "available_from",
+            "available_until",
+            "available_us",
+            "billing_tokenizer",
+            "configuration_id",
+            "construction_tokenizer",
+            "features",
+            "ga",
+            "id",
+            "model_id",
+            "on_demand",
+            "provider_id",
+            "public",
+            "reasoning_mode",
+            "region",
+            "standard_list_price",
+            "synchronous",
+            "tier",
+            "tokenizer_reproducible",
+        }
+    ),
+    "bundle.source_artifacts[]": frozenset(
+        {
+            "content_sha256",
+            "evidence_grade",
+            "id",
+            "license_note",
+            "media_type",
+            "retrieved_at",
+            "snapshot_path",
+            "synthetic_content",
+            "url",
+        }
+    ),
+    "bundle.source_artifacts[].synthetic_content": (
+        FORWARD_CAPABILITY_SYNTHETIC_CONTENT_FIELDS
+        | FORWARD_PRICE_SYNTHETIC_CONTENT_FIELDS
+    ),
+    "bundle.capability_evidence[]": frozenset(
+        {
+            "configuration_id",
+            "data_vintage",
+            "endpoint_id",
+            "evaluated_at",
+            "evidence_grade",
+            "id",
+            "metric",
+            "metric_version",
+            "model_id",
+            "score",
+            "score_is_configuration_specific",
+            "source_id",
+        }
+    ),
+    "bundle.token_counts[]": frozenset(
+        {
+            "billing_tokenizer",
+            "billing_usage_count_status",
+            "construction_count_evidence_class",
+            "construction_tokenizer",
+            "endpoint_id",
+            "id",
+            "input_payload_path",
+            "input_payload_sha256",
+            "input_tokens",
+            "output_payload_path",
+            "output_payload_sha256",
+            "output_tokens",
+            "profile_id",
+            "size_variant",
+            "synthetic_count_note",
+        }
+    ),
+    "bundle.price_observations[]": frozenset(
+        {
+            "amount_per_million",
+            "component",
+            "context_max_tokens",
+            "context_min_tokens",
+            "currency",
+            "effective_at",
+            "endpoint_id",
+            "evidence_grade",
+            "id",
+            "observed_at",
+            "region",
+            "source_id",
+            "supersedes_observation_id",
+            "tier",
+            "unit",
+            "week_id",
+        }
+    ),
+    "bundle.corrections[]": frozenset(
+        {
+            "detected_at",
+            "id",
+            "impact",
+            "new_vintage",
+            "replacement_observation_id",
+            "resolution",
+            "superseded_observation_id",
+            "supersedes_correction_id",
+        }
+    ),
+    "bundle.methodology": frozenset(
+        {"config_path", "config_sha256", "id", "version"}
+    ),
+}
+
+# v0.3 is a bounded synthetic governance fixture, not an open-ended ingestion
+# format. Every string that can be copied into a release is therefore either a
+# closed value or a narrowly specified machine grammar. New prose/status paths
+# require a new reviewed schema vintage instead of silently becoming assertion
+# carriers in the current one.
+_FORWARD_SAFE_LICENSE_NOTE = (
+    "Synthetic fixture evidence created locally for validation; not a real "
+    "provider or benchmark source."
+)
+_FORWARD_SAFE_COUNT_NOTE = (
+    "Exact local construction count under explicit o200k_base chunk "
+    "construction; not a provider preflight count, not billing usage, and not "
+    "obtained from a model call."
+)
+_FORWARD_PROFILES = (
+    "analysis-reasoning|code-repair|grounded-rag|structured-extraction|"
+    "summarization-transformation|tool-workflow"
+)
+_FORWARD_TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
+_FORWARD_WEEK_ID_PATTERN = r"week-\d{4}-\d{2}-\d{2}"
+_FORWARD_PRICE_ID_PATTERN = (
+    r"price-\d{4}-\d{2}-\d{2}-[a-d]-(?:input|output)"
+)
+_FORWARD_CORRECTION_ID_PATTERN = (
+    r"correction-\d{4}-\d{2}-\d{2}-[0-9]+"
+)
+FORWARD_EXACT_STRING_VALUES: dict[str, frozenset[str]] = {
+    "bundle.schema_version": frozenset({FORWARD_BUNDLE_SCHEMA_VERSION}),
+    "bundle.dataset_id": frozenset({"synthetic-forward-governance-v0.3.0"}),
+    "bundle.dataset_kind": frozenset({"synthetic"}),
+    "bundle.providers[].name": frozenset(
+        {f"Synthetic Provider {letter}" for letter in "ABCD"}
+    ),
+    "bundle.creators[].name": frozenset(
+        {f"Synthetic Creator {letter}" for letter in "ABCD"}
+    ),
+    "bundle.models[].alias_type": frozenset({"immutable"}),
+    "bundle.models[].version": frozenset(
+        {f"synthetic-{letter}-1.0.0" for letter in "ABCD"}
+    ),
+    "bundle.endpoints[].billing_tokenizer": frozenset(
+        {"provider-billing-counts-unverified"}
+    ),
+    "bundle.endpoints[].construction_tokenizer": frozenset(
+        {"tiktoken-0.13.0:o200k_base(explicit_construction)"}
+    ),
+    "bundle.endpoints[].features[]": frozenset(
+        {"function_calling", "structured_output", "text_input", "text_output"}
+    ),
+    "bundle.endpoints[].reasoning_mode": frozenset({"disabled"}),
+    "bundle.endpoints[].region": frozenset({"US"}),
+    "bundle.endpoints[].tier": frozenset({"standard"}),
+    "bundle.source_artifacts[].evidence_grade": frozenset({"A"}),
+    "bundle.source_artifacts[].license_note": frozenset(
+        {_FORWARD_SAFE_LICENSE_NOTE}
+    ),
+    "bundle.source_artifacts[].media_type": frozenset({"application/json"}),
+    "bundle.source_artifacts[].synthetic_content.capability_scope": frozenset(
+        {"model_level_or_best_across_settings_coarse_screen"}
+    ),
+    "bundle.source_artifacts[].synthetic_content.currency": frozenset({"USD"}),
+    "bundle.source_artifacts[].synthetic_content.dataset_kind": frozenset(
+        {"synthetic"}
+    ),
+    "bundle.source_artifacts[].synthetic_content.metric": frozenset({"ECI"}),
+    "bundle.source_artifacts[].synthetic_content.metric_version": frozenset(
+        {"synthetic-eci-v1"}
+    ),
+    "bundle.source_artifacts[].synthetic_content.regime": frozenset(
+        {"base", "current"}
+    ),
+    "bundle.source_artifacts[].synthetic_content.tier": frozenset({"standard"}),
+    "bundle.source_artifacts[].synthetic_content.unit": frozenset(
+        {"per_million_native_tokens"}
+    ),
+    "bundle.capability_evidence[].data_vintage": frozenset(
+        {"synthetic-eci-2026-04-02"}
+    ),
+    "bundle.capability_evidence[].evidence_grade": frozenset({"A"}),
+    "bundle.capability_evidence[].metric": frozenset({"ECI"}),
+    "bundle.capability_evidence[].metric_version": frozenset(
+        {"synthetic-eci-v1"}
+    ),
+    "bundle.token_counts[].billing_tokenizer": frozenset(
+        {"provider-billing-counts-unverified"}
+    ),
+    "bundle.token_counts[].billing_usage_count_status": frozenset(
+        {"unverified_no_provider_call"}
+    ),
+    "bundle.token_counts[].construction_count_evidence_class": frozenset(
+        {"construction_count"}
+    ),
+    "bundle.token_counts[].construction_tokenizer": frozenset(
+        {"tiktoken-0.13.0:o200k_base(explicit_construction)"}
+    ),
+    "bundle.token_counts[].profile_id": frozenset(_FORWARD_PROFILES.split("|")),
+    "bundle.token_counts[].size_variant": frozenset(
+        {
+            f"{input_factor}x{output_factor}"
+            for input_factor in ("075", "100", "125")
+            for output_factor in ("075", "100", "125")
+        }
+    ),
+    "bundle.token_counts[].synthetic_count_note": frozenset(
+        {_FORWARD_SAFE_COUNT_NOTE}
+    ),
+    "bundle.price_observations[].component": frozenset({"input", "output"}),
+    "bundle.price_observations[].currency": frozenset({"USD"}),
+    "bundle.price_observations[].evidence_grade": frozenset({"A"}),
+    "bundle.price_observations[].region": frozenset({"US"}),
+    "bundle.price_observations[].tier": frozenset({"standard"}),
+    "bundle.price_observations[].unit": frozenset(
+        {"per_million_native_tokens"}
+    ),
+    "bundle.corrections[].impact": frozenset(
+        {
+            "current_index_recalculation_required",
+            "historical_index_recalculation_required",
+            "metadata_only_no_index_change",
+        }
+    ),
+    "bundle.corrections[].resolution": frozenset(
+        {"replacement_observation_supersedes_target"}
+    ),
+    "bundle.methodology.config_path": frozenset({FORWARD_METHODOLOGY_PATH}),
+    "bundle.methodology.id": frozenset({"kapi-sw-methodology"}),
+    "bundle.methodology.version": frozenset({"0.3.0"}),
+}
+FORWARD_STRING_PATTERNS: dict[str, re.Pattern[str]] = {
+    "bundle.weeks[].cutoff_at": re.compile(_FORWARD_TIMESTAMP_PATTERN),
+    "bundle.weeks[].id": re.compile(_FORWARD_WEEK_ID_PATTERN),
+    "bundle.providers[].id": re.compile(r"provider-[a-d]"),
+    "bundle.creators[].id": re.compile(r"creator-[a-d]"),
+    "bundle.models[].creator_id": re.compile(r"creator-[a-d]"),
+    "bundle.models[].id": re.compile(r"model-[a-d]-v1"),
+    "bundle.endpoints[].available_from": re.compile(_FORWARD_TIMESTAMP_PATTERN),
+    "bundle.endpoints[].available_until": re.compile(_FORWARD_TIMESTAMP_PATTERN),
+    "bundle.endpoints[].configuration_id": re.compile(
+        r"config-[a-d]-reasoning-disabled"
+    ),
+    "bundle.endpoints[].id": re.compile(r"endpoint-[a-d]-v1"),
+    "bundle.endpoints[].model_id": re.compile(r"model-[a-d]-v1"),
+    "bundle.endpoints[].provider_id": re.compile(r"provider-[a-d]"),
+    "bundle.source_artifacts[].content_sha256": SHA256_PATTERN,
+    "bundle.source_artifacts[].id": re.compile(
+        r"source-(?:capability-[a-d]|price-\d{4}-\d{2}-\d{2}-[a-d])"
+    ),
+    "bundle.source_artifacts[].retrieved_at": re.compile(
+        _FORWARD_TIMESTAMP_PATTERN
+    ),
+    "bundle.source_artifacts[].snapshot_path": re.compile(
+        r"embedded://source_artifacts/source-(?:capability-[a-d]|"
+        r"price-\d{4}-\d{2}-\d{2}-[a-d])"
+    ),
+    "bundle.source_artifacts[].url": re.compile(
+        r"synthetic://(?:capability/endpoint-[a-d]-v1|"
+        r"prices/endpoint-[a-d]-v1/week-\d{4}-\d{2}-\d{2})"
+    ),
+    "bundle.source_artifacts[].synthetic_content.configuration_id": re.compile(
+        r"config-[a-d]-reasoning-disabled"
+    ),
+    "bundle.source_artifacts[].synthetic_content.endpoint_id": re.compile(
+        r"endpoint-[a-d]-v1"
+    ),
+    "bundle.source_artifacts[].synthetic_content.input_amount_per_million": re.compile(
+        r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+    ),
+    "bundle.source_artifacts[].synthetic_content.output_amount_per_million": re.compile(
+        r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+    ),
+    "bundle.source_artifacts[].synthetic_content.score": re.compile(
+        r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+    ),
+    "bundle.source_artifacts[].synthetic_content.week_id": re.compile(
+        _FORWARD_WEEK_ID_PATTERN
+    ),
+    "bundle.capability_evidence[].configuration_id": re.compile(
+        r"config-[a-d]-reasoning-disabled"
+    ),
+    "bundle.capability_evidence[].endpoint_id": re.compile(r"endpoint-[a-d]-v1"),
+    "bundle.capability_evidence[].evaluated_at": re.compile(
+        _FORWARD_TIMESTAMP_PATTERN
+    ),
+    "bundle.capability_evidence[].id": re.compile(r"capability-[a-d]"),
+    "bundle.capability_evidence[].model_id": re.compile(r"model-[a-d]-v1"),
+    "bundle.capability_evidence[].score": re.compile(
+        r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+    ),
+    "bundle.capability_evidence[].source_id": re.compile(r"source-capability-[a-d]"),
+    "bundle.token_counts[].endpoint_id": re.compile(r"endpoint-[a-d]-v1"),
+    "bundle.token_counts[].id": re.compile(
+        rf"tokens-endpoint-[a-d]-v1-(?:{_FORWARD_PROFILES})-"
+        r"(?:075|100|125)x(?:075|100|125)"
+    ),
+    "bundle.token_counts[].input_payload_path": re.compile(
+        rf"kapi/profiles/(?:{_FORWARD_PROFILES})/input-(?:075|100|125)\.json"
+    ),
+    "bundle.token_counts[].input_payload_sha256": SHA256_PATTERN,
+    "bundle.token_counts[].output_payload_path": re.compile(
+        rf"kapi/profiles/(?:{_FORWARD_PROFILES})/output-(?:075|100|125)\.json"
+    ),
+    "bundle.token_counts[].output_payload_sha256": SHA256_PATTERN,
+    "bundle.price_observations[].amount_per_million": re.compile(
+        r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+    ),
+    "bundle.price_observations[].effective_at": re.compile(
+        _FORWARD_TIMESTAMP_PATTERN
+    ),
+    "bundle.price_observations[].endpoint_id": re.compile(r"endpoint-[a-d]-v1"),
+    "bundle.price_observations[].id": re.compile(_FORWARD_PRICE_ID_PATTERN),
+    "bundle.price_observations[].observed_at": re.compile(
+        _FORWARD_TIMESTAMP_PATTERN
+    ),
+    "bundle.price_observations[].source_id": re.compile(
+        r"source-price-\d{4}-\d{2}-\d{2}-[a-d]"
+    ),
+    "bundle.price_observations[].supersedes_observation_id": re.compile(
+        _FORWARD_PRICE_ID_PATTERN
+    ),
+    "bundle.price_observations[].week_id": re.compile(_FORWARD_WEEK_ID_PATTERN),
+    "bundle.corrections[].detected_at": re.compile(_FORWARD_TIMESTAMP_PATTERN),
+    "bundle.corrections[].id": re.compile(_FORWARD_CORRECTION_ID_PATTERN),
+    "bundle.corrections[].new_vintage": re.compile(
+        r"vintage-\d{4}-\d{2}-\d{2}"
+    ),
+    "bundle.corrections[].replacement_observation_id": re.compile(
+        _FORWARD_PRICE_ID_PATTERN
+    ),
+    "bundle.corrections[].superseded_observation_id": re.compile(
+        _FORWARD_PRICE_ID_PATTERN
+    ),
+    "bundle.corrections[].supersedes_correction_id": re.compile(
+        _FORWARD_CORRECTION_ID_PATTERN
+    ),
+    "bundle.methodology.config_sha256": SHA256_PATTERN,
+}
+FORWARD_LIST_PATHS = frozenset(
+    {
+        "bundle.weeks",
+        "bundle.providers",
+        "bundle.creators",
+        "bundle.models",
+        "bundle.endpoints",
+        "bundle.endpoints[].features",
+        "bundle.source_artifacts",
+        "bundle.capability_evidence",
+        "bundle.token_counts",
+        "bundle.price_observations",
+        "bundle.corrections",
+    }
+)
+FORWARD_EXACT_NON_STRING_VALUES: dict[
+    str, tuple[tuple[type[Any], Any], ...]
+] = {
+    "bundle.providers[].synthetic": ((bool, True),),
+    "bundle.creators[].synthetic": ((bool, True),),
+    "bundle.models[].immutable_version": ((bool, True),),
+    "bundle.endpoints[].available_us": ((bool, True),),
+    "bundle.endpoints[].ga": ((bool, True),),
+    "bundle.endpoints[].on_demand": ((bool, True),),
+    "bundle.endpoints[].public": ((bool, True),),
+    "bundle.endpoints[].standard_list_price": ((bool, True),),
+    "bundle.endpoints[].synchronous": ((bool, True),),
+    "bundle.endpoints[].tokenizer_reproducible": ((bool, True),),
+    "bundle.source_artifacts[].synthetic_content.model_calls_performed": (
+        (int, 0),
+    ),
+    "bundle.source_artifacts[].synthetic_content.network_access_used": (
+        (bool, False),
+    ),
+    "bundle.source_artifacts[].synthetic_content.score_is_configuration_specific": (
+        (bool, False),
+    ),
+    "bundle.capability_evidence[].score_is_configuration_specific": (
+        (bool, False),
+    ),
+}
+FORWARD_INTEGER_MINIMUMS: dict[str, int] = {
+    "bundle.token_counts[].input_tokens": 1,
+    "bundle.token_counts[].output_tokens": 1,
+    "bundle.price_observations[].context_min_tokens": 0,
+    "bundle.price_observations[].context_max_tokens": 0,
+}
+FORWARD_NULLABLE_SCALAR_PATHS = frozenset(
+    {
+        "bundle.endpoints[].available_until",
+        "bundle.price_observations[].context_min_tokens",
+        "bundle.price_observations[].context_max_tokens",
+        "bundle.price_observations[].supersedes_observation_id",
+        "bundle.corrections[].supersedes_correction_id",
+    }
+)
+FORBIDDEN_INPUT_CLAIM_KEY_STEMS = frozenset(
+    {
+        "accredit",
+        "approv",
+        "assur",
+        "attest",
+        "audit",
+        "authoriz",
+        "certif",
+        "clear",
+        "deploy",
+        "endorse",
+        "golive",
+        "governance",
+        "independen",
+        "kapi",
+        "launch",
+        "operator",
+        "publicat",
+        "publish",
+        "ready",
+        "review",
+        "signat",
+        "signedby",
+        "signedoff",
+        "signer",
+        "signoff",
+        "verif",
+    }
+)
+
+# The current v0.3 bundle schema has no legitimate claim-bearing keys. Keep the
+# allowlist explicit so a future schema addition must name an exact path and can
+# be paired with value validation instead of weakening the recursive boundary.
+ALLOWED_FORWARD_BUNDLE_CLAIM_KEY_PATHS: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -76,6 +645,730 @@ def _records(
         else:
             records.append(record)
     return records
+
+
+_CLAIM_CONFUSABLES = str.maketrans(
+    {
+        "а": "a",
+        "ɑ": "a",
+        "α": "a",
+        "Ь": "b",
+        "с": "c",
+        "ԁ": "d",
+        "е": "e",
+        "ε": "e",
+        "һ": "h",
+        "і": "i",
+        "ι": "i",
+        "ј": "j",
+        "κ": "k",
+        "к": "k",
+        "ⅼ": "l",
+        "м": "m",
+        "ո": "n",
+        "о": "o",
+        "ο": "o",
+        "р": "p",
+        "ρ": "p",
+        "ѕ": "s",
+        "τ": "t",
+        "т": "t",
+        "ν": "v",
+        "ѵ": "v",
+        "ԝ": "w",
+        "х": "x",
+        "χ": "x",
+        "у": "y",
+        "υ": "y",
+    }
+)
+
+
+def _decode_literal_claim_escape(match: re.Match[str]) -> str:
+    encoded = next(group for group in match.groups() if group is not None)
+    codepoint = int(encoded, 16)
+    if 0xD800 <= codepoint <= 0xDFFF or codepoint > 0x10FFFF:
+        return match.group(0)
+    return chr(codepoint)
+
+
+def _decoded_claim_text(value: str) -> str:
+    """Decode ordinary renderer/browser encodings with a strict round bound."""
+
+    decoded = value
+    for _ in range(CLAIM_DECODE_ROUNDS):
+        expanded = _LITERAL_CLAIM_ESCAPE_PATTERN.sub(
+            _decode_literal_claim_escape,
+            unescape(unquote(decoded)),
+        )
+        if expanded == decoded:
+            break
+        decoded = expanded
+    return decoded
+
+
+_RESIDUAL_PERCENT_ESCAPE_PATTERN = re.compile(r"%[0-9A-Fa-f]{2}")
+_RESIDUAL_HTML_ESCAPE_PATTERN = re.compile(
+    r"&(?:#[0-9]+|#[xX][0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);"
+)
+
+
+def _has_residual_claim_encoding(value: str) -> bool:
+    """Reject still-encoded input after the deliberately bounded decoder."""
+
+    decoded = _decoded_claim_text(value)
+    return bool(
+        _RESIDUAL_PERCENT_ESCAPE_PATTERN.search(decoded)
+        or _RESIDUAL_HTML_ESCAPE_PATTERN.search(decoded)
+        or _LITERAL_CLAIM_ESCAPE_PATTERN.search(decoded)
+    )
+
+
+def _normalized_claim_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", _decoded_claim_text(value)).casefold()
+    normalized = "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    ).translate(_CLAIM_CONFUSABLES)
+    return "".join(character for character in normalized if character.isalnum())
+
+
+_NORMALIZED_FORBIDDEN_INPUT_CLAIM_KEY_STEMS = frozenset(
+    _normalized_claim_text(stem) for stem in FORBIDDEN_INPUT_CLAIM_KEY_STEMS
+)
+_UNSCOPED_INPUT_CLAIM_VALUES = frozenset(
+    {
+        "approved",
+        "audited",
+        "authorized",
+        "certified",
+        "cleared",
+        "deployed",
+        "greenlit",
+        "launched",
+        "live",
+        "passed",
+        "published",
+        "ready",
+        "readytogo",
+        "released",
+        "reviewed",
+        "reviewer",
+        "signoff",
+        "statusapproved",
+        "statusverified",
+        "verified",
+    }
+)
+
+
+def _is_claim_bearing_text(value: str) -> bool:
+    """Recognize assertion-like review/authorization prose, not isolated words.
+
+    Evidence records legitimately use terms such as ``external``, ``verified``,
+    ``reviewed``, ``audit``, and ``approved``. A value is rejected only when
+    normalized signals combine into a governance/publication assertion. This
+    leaves ordinary source and license prose available while closing free-form
+    metadata carriers for stronger KAPI status claims.
+    """
+
+    raw_compact = _normalized_claim_text(value)
+    if not raw_compact:
+        return False
+    if value in {
+        "provider-billing-counts-unverified",
+        "unverified_no_provider_call",
+    }:
+        return False
+    ambiguous_negative = any(
+        fragment in raw_compact
+        for fragment in (
+            "nolongernotreviewed",
+            "nolongerunreviewed",
+            "nolongerunverified",
+            "notnotreviewed",
+            "notnotverified",
+            "notunreviewed",
+            "notunverified",
+            "notwithoutreview",
+            "unreviewedno",
+            "unverifiedno",
+        )
+    )
+    if ambiguous_negative:
+        return True
+    scoped_technical_review = (
+        "sourcehashverifiedagainstretainedbytes" in raw_compact
+        and "licensereviewedforarchivalcompleteness" in raw_compact
+    )
+    compact = raw_compact
+    for explicit_negative in (
+        "notreviewed",
+        "notverified",
+        "unreviewed",
+        "unverified",
+    ):
+        compact = compact.replace(explicit_negative, "")
+    if not compact:
+        return False
+    if compact in _UNSCOPED_INPUT_CLAIM_VALUES:
+        return True
+    review = "review" in compact
+    audit = "audit" in compact
+    verified = "verif" in compact
+    signoff = "signoff" in compact or "signedoff" in compact
+    independent = "independen" in compact
+    operator = "operator" in compact
+    external = "external" in compact
+    human_reviewer = any(
+        fragment in compact
+        for fragment in (
+            "assessor",
+            "consultant",
+            "editor",
+            "expert",
+            "human",
+            "outside",
+            "peer",
+        )
+    )
+    named_or_third_party = "namedreview" in compact or "thirdparty" in compact
+    decision = any(
+        fragment in compact
+        for fragment in ("approv", "authoriz", "certif", "attest", "endors")
+    )
+    publication = any(
+        fragment in compact
+        for fragment in (
+            "readyforpublication",
+            "publicationready",
+            "readyforrelease",
+            "releaseready",
+            "readytopublish",
+            "readytogolive",
+            "approvedforpublication",
+            "approvedforrelease",
+            "approvedtopublish",
+            "approvedtogolive",
+            "authorizedforpublication",
+            "authorizedforrelease",
+            "authorizedtopublish",
+            "authorizedtogolive",
+            "clearedforpublication",
+            "clearedforrelease",
+            "clearedforlaunch",
+            "clearedtogolive",
+            "greenlitforpublication",
+            "greenlitforrelease",
+            "greenlittogolive",
+            "publishable",
+        )
+    )
+    subject = any(
+        fragment in compact for fragment in ("kapi", "governance", "publication")
+    )
+    strong_actor = independent or operator or named_or_third_party
+    assurance_actor = strong_actor or external or human_reviewer
+    attributed_assurance = any(
+        fragment in compact
+        for fragment in (
+            "approvalby",
+            "approvedby",
+            "attestedby",
+            "auditby",
+            "auditedby",
+            "authorizedby",
+            "certifiedby",
+            "endorsedby",
+            "reviewby",
+            "reviewedby",
+            "signedby",
+            "signoffby",
+            "verificationby",
+            "verifiedby",
+        )
+    )
+    completed_assurance = any(
+        fragment in compact
+        for fragment in (
+            "approvalcomplete",
+            "attestationcomplete",
+            "auditcomplete",
+            "certificationcomplete",
+            "reviewcomplete",
+            "reviewcompleted",
+            "reviewdone",
+            "reviewfinished",
+            "signoffcomplete",
+            "verificationcomplete",
+        )
+    )
+    generic_completion_assertion = any(
+        fragment in compact
+        for fragment in (
+            "approvalgranted",
+            "approvedstatus",
+            "authorizationgranted",
+            "certifiedcompliant",
+            "externallyvalidated",
+            "fullyapproved",
+            "haspassed",
+            "launchcleared",
+            "productionready",
+            "validatedby",
+            "vettedby",
+            "assessedby",
+        )
+    )
+    generic_review_assertion = "reviewed" in compact and not scoped_technical_review
+    subject_claim = subject and (
+        review
+        or audit
+        or verified
+        or signoff
+        or independent
+        or operator
+        or decision
+        or "ready" in compact
+        or "publish" in compact
+    )
+    live_state = subject and any(
+        fragment in compact
+        for fragment in (
+            "deployed",
+            "golive",
+            "launched",
+            "published",
+            "released",
+        )
+    )
+    return (
+        "governancestatus" in compact
+        or publication
+        or attributed_assurance
+        or completed_assurance
+        or generic_completion_assertion
+        or generic_review_assertion
+        or subject_claim
+        or live_state
+        or (review and (assurance_actor or decision))
+        or (audit and (assurance_actor or decision or subject))
+        or (
+            verified
+            and (subject or strong_actor or decision or (external and subject))
+        )
+        or (signoff and (assurance_actor or decision or subject or review))
+        or (decision and subject)
+        or (external and "check" in compact)
+    )
+
+
+_EXACT_CLAIM_SUBJECT_FRAGMENTS = frozenset({"governance", "kapi", "publication"})
+_RECORD_LOCAL_CLAIM_ACTOR_FRAGMENTS = frozenset(
+    {
+        "assessor",
+        "consultant",
+        "editor",
+        "expert",
+        "external",
+        "human",
+        "independen",
+        "namedreview",
+        "operator",
+        "outside",
+        "peer",
+        "thirdparty",
+    }
+)
+_RECORD_LOCAL_CLAIM_ACTION_FRAGMENTS = frozenset(
+    {
+        "approv",
+        "attest",
+        "audit",
+        "authoriz",
+        "certif",
+        "check",
+        "endors",
+        "review",
+        "signed",
+        "signoff",
+        "signedoff",
+        "verif",
+    }
+)
+
+
+def _contains_split_claim(fragments: Iterable[str]) -> bool:
+    parts = [part for part in fragments if part]
+    return (
+        len(parts) >= 2
+        and any(
+            _normalized_claim_text(part) in _EXACT_CLAIM_SUBJECT_FRAGMENTS
+            for part in parts
+        )
+        and _is_claim_bearing_text(" ".join(parts))
+    )
+
+
+def _contains_record_local_claim(fragments: Iterable[str]) -> bool:
+    """Reject a split claim within one record without combining unrelated records."""
+
+    parts = [part for part in fragments if part]
+    if len(parts) < 2:
+        return False
+    compact_parts = [_normalized_claim_text(part) for part in parts]
+    compact = _normalized_claim_text(" ".join(parts))
+    actor_and_action = any(
+        fragment in compact for fragment in _RECORD_LOCAL_CLAIM_ACTOR_FRAGMENTS
+    ) and any(
+        fragment in compact for fragment in _RECORD_LOCAL_CLAIM_ACTION_FRAGMENTS
+    )
+    attributed_action = any(
+        part.startswith("by") for part in compact_parts
+    ) and any(
+        fragment in compact for fragment in _RECORD_LOCAL_CLAIM_ACTION_FRAGMENTS
+    )
+    subject_and_claim = any(
+        subject in part
+        for subject in _EXACT_CLAIM_SUBJECT_FRAGMENTS
+        for part in compact_parts
+    ) and _is_claim_bearing_text(" ".join(parts))
+    return (
+        actor_and_action
+        or attributed_action
+        or subject_and_claim
+        or _contains_split_claim(parts)
+    )
+
+
+def _nested_claim_fragments(value: Any) -> list[str]:
+    fragments: list[str] = []
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if isinstance(key, str):
+                fragments.append(key)
+            fragments.extend(_nested_claim_fragments(item))
+    elif isinstance(value, list):
+        for item in value:
+            fragments.extend(_nested_claim_fragments(item))
+    elif isinstance(value, str):
+        fragments.append(value)
+    return fragments
+
+
+def _record_claim_fragments(value: Any) -> list[str]:
+    """Collect semantic record values while excluding fixed technical carriers."""
+
+    fragments: list[str] = []
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            normalized_key = (
+                _normalized_claim_text(key) if isinstance(key, str) else ""
+            )
+            technical_carrier = (
+                normalized_key == "id"
+                or normalized_key.endswith("id")
+                or normalized_key.endswith("ids")
+                or normalized_key.endswith("path")
+                or normalized_key.endswith("sha256")
+                or "tokenizer" in normalized_key
+            )
+            if technical_carrier:
+                continue
+            fragments.extend(_record_claim_fragments(item))
+    elif isinstance(value, list):
+        for item in value:
+            fragments.extend(_record_claim_fragments(item))
+    elif isinstance(value, str):
+        fragments.append(value)
+    return fragments
+
+
+def find_input_claim_paths(value: Any, *, path: str = "bundle") -> list[str]:
+    """Return normalized claim-bearing key or string paths recursively.
+
+    The boundary applies to forward/current input data, not the immutable v0.2.x
+    files retained for historical hash continuity. A structured source
+    schema has no claim-key allowlist entries: bare reviewer, auditor,
+    certification, approval, signature, verification, governance, or
+    publication metadata is rejected regardless of nesting. Assertion-like
+    free-form prose is rejected even under otherwise neutral keys.
+    """
+
+    paths: set[str] = set()
+
+    def visit(item: Any, item_path: str) -> None:
+        if isinstance(item, Mapping):
+            if item_path == path:
+                root_fragments = [
+                    key for key in item if isinstance(key, str)
+                ] + [
+                    child for child in item.values() if isinstance(child, str)
+                ]
+                contains_local_claim = _contains_split_claim(root_fragments)
+            else:
+                contains_local_claim = _contains_record_local_claim(
+                    _record_claim_fragments(item)
+                )
+            if contains_local_claim:
+                paths.add(item_path)
+            for key, child_item in item.items():
+                child_path = f"{item_path}.{key}"
+                if isinstance(key, str):
+                    normalized_key = _normalized_claim_text(key)
+                    if not key.isascii() or _has_residual_claim_encoding(key) or (
+                        child_path not in ALLOWED_FORWARD_BUNDLE_CLAIM_KEY_PATHS
+                        and any(
+                            stem in normalized_key
+                            for stem in _NORMALIZED_FORBIDDEN_INPUT_CLAIM_KEY_STEMS
+                        )
+                    ):
+                        paths.add(child_path)
+                visit(child_item, child_path)
+        elif isinstance(item, list):
+            if any(isinstance(child_item, str) for child_item in item) and (
+                _is_claim_bearing_text(
+                    " ".join(_nested_claim_fragments(item))
+                )
+            ):
+                paths.add(item_path)
+            for position, child_item in enumerate(item):
+                visit(child_item, f"{item_path}[{position}]")
+        elif isinstance(item, str):
+            if (
+                not item.isascii()
+                or _has_residual_claim_encoding(item)
+                or _is_claim_bearing_text(item)
+            ):
+                paths.add(item_path)
+
+    visit(value, path)
+    return sorted(paths)
+
+
+def _forward_bundle_object_schema() -> dict[str, frozenset[str]]:
+    return dict(FORWARD_BUNDLE_OBJECT_FIELDS)
+
+
+def _forward_required_object_fields(
+    schema_path: str, item: Mapping[Any, Any]
+) -> frozenset[str] | None:
+    """Return the exact keyset, or None for an ambiguous source variant."""
+
+    if schema_path != "bundle.source_artifacts[].synthetic_content":
+        return FORWARD_BUNDLE_OBJECT_FIELDS.get(schema_path)
+    keys = {key for key in item if isinstance(key, str)}
+    common = (
+        FORWARD_CAPABILITY_SYNTHETIC_CONTENT_FIELDS
+        & FORWARD_PRICE_SYNTHETIC_CONTENT_FIELDS
+    )
+    has_capability_marker = bool(
+        keys & (FORWARD_CAPABILITY_SYNTHETIC_CONTENT_FIELDS - common)
+    )
+    has_price_marker = bool(keys & (FORWARD_PRICE_SYNTHETIC_CONTENT_FIELDS - common))
+    if has_capability_marker == has_price_marker:
+        return None
+    if has_capability_marker:
+        return FORWARD_CAPABILITY_SYNTHETIC_CONTENT_FIELDS
+    return FORWARD_PRICE_SYNTHETIC_CONTENT_FIELDS
+
+
+def forward_bundle_schema_definition_gaps() -> list[str]:
+    """Return declared v0.3 fields missing a container or scalar/type rule."""
+
+    known_paths = (
+        set(FORWARD_BUNDLE_OBJECT_FIELDS)
+        | set(FORWARD_LIST_PATHS)
+        | set(FORWARD_EXACT_STRING_VALUES)
+        | set(FORWARD_STRING_PATTERNS)
+        | set(FORWARD_EXACT_NON_STRING_VALUES)
+        | set(FORWARD_INTEGER_MINIMUMS)
+        | set(FORWARD_NULLABLE_SCALAR_PATHS)
+    )
+    return sorted(
+        f"{parent}.{field}"
+        for parent, fields in FORWARD_BUNDLE_OBJECT_FIELDS.items()
+        for field in fields
+        if f"{parent}.{field}" not in known_paths
+    )
+
+
+def find_forward_bundle_scalar_grammar_violations(
+    value: Any, *, path: str = "bundle"
+) -> list[str]:
+    """Return paths outside the complete v0.3 container/leaf type grammar."""
+
+    violations: set[str] = set()
+    object_paths = frozenset(FORWARD_BUNDLE_OBJECT_FIELDS)
+    scalar_paths = frozenset(
+        set(FORWARD_EXACT_STRING_VALUES)
+        | set(FORWARD_STRING_PATTERNS)
+        | set(FORWARD_EXACT_NON_STRING_VALUES)
+        | set(FORWARD_INTEGER_MINIMUMS)
+        | set(FORWARD_NULLABLE_SCALAR_PATHS)
+    )
+
+    def visit(item: Any, schema_path: str, report_path: str) -> None:
+        if schema_path in object_paths:
+            if not isinstance(item, Mapping):
+                violations.add(report_path)
+                return
+            required = _forward_required_object_fields(schema_path, item)
+            if required is None:
+                violations.add(report_path)
+            else:
+                actual_keys = {key for key in item if isinstance(key, str)}
+                violations.update(
+                    f"{report_path}.{field}" for field in required - actual_keys
+                )
+            for key, child_item in item.items():
+                child_schema_path = f"{schema_path}.{key}"
+                child_report_path = f"{report_path}.{key}"
+                visit(child_item, child_schema_path, child_report_path)
+            return
+        if schema_path in FORWARD_LIST_PATHS:
+            if not isinstance(item, list):
+                violations.add(report_path)
+                return
+            for position, child_item in enumerate(item):
+                visit(
+                    child_item,
+                    f"{schema_path}[]",
+                    f"{report_path}[{position}]",
+                )
+            return
+        if schema_path not in scalar_paths:
+            violations.add(report_path)
+            return
+        if item is None:
+            if schema_path not in FORWARD_NULLABLE_SCALAR_PATHS:
+                violations.add(report_path)
+            return
+        if isinstance(item, (Mapping, list)):
+            violations.add(report_path)
+            return
+        valid = False
+        if isinstance(item, str):
+            exact = FORWARD_EXACT_STRING_VALUES.get(schema_path)
+            pattern = FORWARD_STRING_PATTERNS.get(schema_path)
+            valid = (exact is not None and item in exact) or (
+                pattern is not None and pattern.fullmatch(item) is not None
+            )
+        exact_non_string = FORWARD_EXACT_NON_STRING_VALUES.get(schema_path, ())
+        valid = valid or any(
+            type(item) is expected_type and item == expected_value
+            for expected_type, expected_value in exact_non_string
+        )
+        minimum = FORWARD_INTEGER_MINIMUMS.get(schema_path)
+        valid = valid or (
+            minimum is not None and type(item) is int and item >= minimum
+        )
+        if not valid:
+            violations.add(report_path)
+
+    visit(value, path, path)
+    return sorted(violations)
+
+
+def _validate_forward_bundle_closed_schema(
+    collector: _Collector,
+    bundle: Mapping[str, Any],
+    methodology: Mapping[str, Any],
+) -> None:
+    """Reject every undeclared object key/path in the forward bundle vintage."""
+
+    schema = _forward_bundle_object_schema()
+
+    def visit(item: Any, schema_path: str, report_path: str) -> None:
+        if isinstance(item, Mapping):
+            allowed = schema.get(schema_path)
+            if allowed is None:
+                collector.error(
+                    "unexpected_forward_bundle_field",
+                    report_path,
+                    "v0.3.0 does not permit an object at this bundle path",
+                )
+                return
+            required = _forward_required_object_fields(schema_path, item)
+            if required is None:
+                collector.error(
+                    "forward_record_variant",
+                    report_path,
+                    "v0.3.0 synthetic content must match exactly one capability "
+                    "or price record variant",
+                )
+                required = allowed
+            actual_keys = {key for key in item if isinstance(key, str)}
+            for missing_key in sorted(required - actual_keys):
+                collector.error(
+                    "missing_forward_bundle_field",
+                    f"{report_path}.{missing_key}",
+                    "v0.3.0 requires this field in the exact object keyset",
+                )
+            for key, child_item in item.items():
+                child_report_path = f"{report_path}.{key}"
+                if not isinstance(key, str) or key not in required:
+                    collector.error(
+                        "unexpected_forward_bundle_field",
+                        child_report_path,
+                        "v0.3.0 does not permit this field at this bundle path",
+                    )
+                    continue
+                visit(child_item, f"{schema_path}.{key}", child_report_path)
+        elif isinstance(item, list):
+            for position, child_item in enumerate(item):
+                visit(
+                    child_item,
+                    f"{schema_path}[]",
+                    f"{report_path}[{position}]",
+                )
+
+    visit(bundle, "bundle", "bundle")
+
+
+def _validate_forward_bundle_binding(
+    collector: _Collector,
+    bundle: Mapping[str, Any],
+    methodology: Mapping[str, Any],
+) -> None:
+    collector.check(
+        methodology.get("version") == "0.3.0",
+        "forward_methodology_pair",
+        "methodology.version",
+        "a v0.3 forward bundle requires the exact v0.3.0 methodology",
+    )
+    collector.check(
+        bundle.get("schema_version") == FORWARD_BUNDLE_SCHEMA_VERSION,
+        "forward_bundle_binding",
+        "schema_version",
+        f"v0.3.0 requires {FORWARD_BUNDLE_SCHEMA_VERSION}",
+    )
+    collector.check(
+        sha256_bytes(canonical_json_bytes(bundle))
+        == FORWARD_BOUNDED_FIXTURE_SHA256,
+        "bounded_fixture_identity",
+        "bundle",
+        "v0.3.0 accepts only the canonical deterministic forward fixture; "
+        "dynamic or observed inputs require a new reviewed schema vintage",
+    )
+    collector.check(
+        "expected_result" not in bundle and "generation" not in bundle,
+        "forward_bundle_binding",
+        "bundle",
+        "forward/public inputs cannot contain a caller oracle or spend-success metadata",
+    )
+    binding = bundle.get("methodology")
+    expected_binding = {
+        "config_path": FORWARD_METHODOLOGY_PATH,
+        "config_sha256": sha256_bytes(canonical_json_bytes(methodology)),
+        "id": methodology.get("methodology_id"),
+        "version": methodology.get("version"),
+    }
+    collector.check(
+        isinstance(binding, Mapping) and dict(binding) == expected_binding,
+        "forward_bundle_binding",
+        "methodology",
+        "bundle methodology binding must exactly match the supplied v0.3.0 document",
+    )
 
 
 def _index_records(
@@ -232,7 +1525,7 @@ def validate_methodology(
         methodology.get("base_period_weeks") == 13,
         "base_period",
         "base_period_weeks",
-        "approved prototype requires 13 base weeks",
+        "controlled prototype requires 13 base weeks",
     )
 
     capability = methodology.get("capability", {})
@@ -243,7 +1536,7 @@ def validate_methodology(
         capability.get("metric") == "ECI",
         "capability_metric",
         "capability.metric",
-        "approved capability metric is ECI",
+        "configured capability metric is ECI",
     )
     try:
         threshold = parse_decimal(
@@ -254,7 +1547,7 @@ def validate_methodology(
             threshold == 130,
             "capability_threshold",
             "capability.headline_threshold",
-            "approved headline threshold is 130",
+            "configured headline threshold is 130",
         )
     except ValueError as error:
         collector.error("invalid_decimal", "capability.headline_threshold", str(error))
@@ -267,7 +1560,7 @@ def validate_methodology(
             sensitivity_thresholds == {125, 135},
             "capability_sensitivities",
             "capability.sensitivity_thresholds",
-            "approved sensitivity thresholds are 125 and 135",
+            "configured sensitivity thresholds are 125 and 135",
         )
     except ValueError as error:
         collector.error(
@@ -303,14 +1596,32 @@ def validate_methodology(
 
     reference = methodology.get("reference_tokenizer", {})
     collector.check(
-        isinstance(reference, Mapping)
-        and reference.get("id") == "o200k_base",
+        isinstance(reference, Mapping) and reference.get("id") == "o200k_base",
         "reference_tokenizer",
         "reference_tokenizer.id",
         "construction reference must be o200k_base",
     )
     methodology_version = methodology.get("version")
-    if methodology_version in {"0.2.0", "0.2.1", "0.2.2"}:
+    collector.check(
+        methodology_version in CONTROLLED_METHODOLOGY_VERSIONS,
+        "methodology_version",
+        "version",
+        "only the pinned v0.2.x historical vintages and current v0.3.0 "
+        "methodology are recognized",
+    )
+    expected_methodology_hash = PINNED_METHODOLOGY_SHA256.get(
+        methodology_version
+    )
+    if expected_methodology_hash is not None:
+        collector.check(
+            sha256_bytes(canonical_json_bytes(methodology))
+            == expected_methodology_hash,
+            "methodology_vintage_identity",
+            "methodology",
+            "recognized methodology versions must exactly match their pinned "
+            "committed document",
+        )
+    if methodology_version in CONTROLLED_METHODOLOGY_VERSIONS:
         collector.check(
             capability.get("configuration_specific_score_allowed") is False,
             "eci_scope",
@@ -318,13 +1629,26 @@ def validate_methodology(
             "ECI may be used only as a coarse screen, not a configuration score",
         )
         construction = methodology.get("construction_reference", {})
+        if methodology_version == "0.3.0":
+            construction_count_status_valid = (
+                isinstance(construction, Mapping)
+                and construction.get("construction_reference_count_status")
+                == "verified_exact_local_reference_counts_only"
+                and "counts_verified" not in construction
+            )
+        else:
+            construction_count_status_valid = (
+                isinstance(construction, Mapping)
+                and construction.get("counts_verified") is True
+            )
         collector.check(
             isinstance(construction, Mapping)
-            and construction.get("counts_verified") is True
+            and construction_count_status_valid
             and construction.get("tolerance_tokens") == 0,
             "construction_count_policy",
             "construction_reference",
-            "v0.2.x requires exact local construction counts with zero tolerance",
+            "controlled methodology vintages require the vintage-specific exact "
+            "local construction-count status with zero tolerance",
         )
         collector.check(
             isinstance(reference, Mapping)
@@ -336,13 +1660,13 @@ def validate_methodology(
             "reference_tokenizer",
             "o200k_base may be verified only as an explicit construction reference",
         )
-        if methodology_version == "0.2.2":
+        if methodology_version in PORTABLE_METHODOLOGY_VERSIONS:
             manifest = methodology.get("construction_manifest", {})
             if not isinstance(manifest, Mapping):
                 collector.error(
                     "construction_manifest",
                     "construction_manifest",
-                    "v0.2.2 requires a frozen portable construction manifest",
+                    "portable methodology vintages require a frozen construction manifest",
                 )
                 manifest = {}
             collector.check(
@@ -352,7 +1676,7 @@ def validate_methodology(
                 and manifest.get("source_asset_vendored") is False,
                 "construction_manifest",
                 "construction_manifest",
-                "v0.2.2 requires exactly 12 derived entries and must not vendor the source asset",
+                "portable methodology vintages require exactly 12 derived entries and must not vendor the source asset",
             )
             _validate_file_hash(
                 collector,
@@ -406,7 +1730,7 @@ def validate_methodology(
             collector.error(
                 "evidence_classes",
                 "evidence_classes",
-                "v0.2.x requires distinct evidence classes",
+                "controlled methodology vintages require distinct evidence classes",
             )
             evidence_classes = {}
         collector.check(
@@ -433,7 +1757,9 @@ def validate_methodology(
         billing_counts = methodology.get("endpoint_specific_billing_counts", {})
         collector.check(
             isinstance(billing_counts, Mapping)
-            and billing_counts.get("construction_reference_may_substitute_for_billing_counts")
+            and billing_counts.get(
+                "construction_reference_may_substitute_for_billing_counts"
+            )
             is False
             and billing_counts.get("verified_billing_rows") == 0,
             "billing_counts_unverified",
@@ -482,9 +1808,7 @@ def validate_methodology(
                 and isinstance(candidate.get("candidate_id"), str)
             }
             openai = candidates_by_id.get("openai-gpt54mini-reasoning-none", {})
-            google = candidates_by_id.get(
-                "google-gemini25flash-thinking-budget-0", {}
-            )
+            google = candidates_by_id.get("google-gemini25flash-thinking-budget-0", {})
             anthropic = candidates_by_id.get(
                 "anthropic-claude-sonnet-4-6-thinking-omitted", {}
             )
@@ -503,7 +1827,7 @@ def validate_methodology(
                 not in candidates_by_id,
                 "candidate_review_set",
                 "candidate_configurations",
-                "v0.2.1+ requires exactly the blocked OpenAI, supported-doc Google, and thinking-omitted Anthropic review candidates",
+                "controlled vintages after v0.2.0 require exactly the blocked OpenAI, supported-doc Google, and thinking-omitted Anthropic review candidates",
             )
             collector.check(
                 openai.get("model_id") == "gpt-5.4-mini-2026-03-17"
@@ -519,8 +1843,7 @@ def validate_methodology(
                 google.get("model_id") == "gemini-2.5-flash"
                 and google.get("priced_configuration") == {"thinkingBudget": 0}
                 and google.get("eligibility_status") == "review_candidate_only"
-                and google_docs.get("status")
-                == "supported_configuration_and_pricing",
+                and google_docs.get("status") == "supported_configuration_and_pricing",
                 "candidate_official_evidence",
                 "candidate_configurations.google-gemini25flash-thinking-budget-0",
                 "Gemini 2.5 Flash thinkingBudget=0 may be marked only as official-document supported",
@@ -531,8 +1854,7 @@ def validate_methodology(
                 and anthropic_configuration == {"thinking_parameter": "omitted"}
                 and "thinking" not in anthropic_configuration
                 and anthropic.get("eligibility_status") == "review_candidate_only"
-                and anthropic_docs.get("status")
-                == "supported_when_parameter_omitted",
+                and anthropic_docs.get("status") == "supported_when_parameter_omitted",
                 "candidate_official_evidence",
                 "candidate_configurations.anthropic-claude-sonnet-4-6-thinking-omitted",
                 "Claude Sonnet 4.6 must represent thinking off by parameter omission, not an explicit disabled value",
@@ -570,7 +1892,7 @@ def validate_methodology(
                 and official_evidence.get("billing_checks_performed") == 0,
                 "official_provider_evidence",
                 "official_provider_evidence",
-                "v0.2.1+ official evidence must remain documentation-only with zero provider and billing actions",
+                "controlled vintages after v0.2.0 require documentation-only evidence with zero provider and billing actions",
             )
             if isinstance(official_evidence, Mapping):
                 _validate_file_hash(
@@ -581,17 +1903,100 @@ def validate_methodology(
                     path_prefix="official_provider_evidence",
                 )
         gates = methodology.get("readiness_gates", {})
-        collector.check(
+        common_gates_failed = (
             isinstance(gates, Mapping)
             and gates.get("technical_go") == "failed_no_go"
             and gates.get("observed_dry_run") == "failed_not_authorized_not_performed"
             and gates.get("shadow_week_1") == "failed_not_authorized_not_started"
-            and gates.get("independent_review")
-            == "failed_self_review_is_not_independent",
-            "readiness_gates",
-            "readiness_gates",
-            "technical GO, independent review, observed dry run, and Shadow Week 1 must stay failed",
         )
+        if methodology_version == "0.3.0":
+            pinned_method_path = root / "kapi/config/methodology-v0.3.0.json"
+            try:
+                pinned_method_bytes = pinned_method_path.read_bytes()
+            except OSError as error:
+                collector.error(
+                    "forward_methodology_vintage",
+                    "methodology",
+                    f"could not read the pinned v0.3.0 document: {error}",
+                )
+            else:
+                collector.check(
+                    canonical_json_bytes(methodology) == pinned_method_bytes,
+                    "forward_methodology_vintage",
+                    "methodology",
+                    "v0.3.0 must exactly match the committed pinned document",
+                )
+            collector.check(
+                common_gates_failed
+                and "independent_review" not in gates
+                and gates.get("external_methodology_review")
+                == "failed_no_trusted_identity_or_signature_verifier_adapter"
+                and gates.get("trusted_verifier_adapter") == "failed_not_implemented"
+                and gates.get("operator_review")
+                == "failed_no_trusted_operator_identity_adapter",
+                "readiness_gates",
+                "readiness_gates",
+                "v0.3.0 requires failed technical, operational, external-review, and trusted-verifier gates",
+            )
+            governance_policy = methodology.get("governance_policy", {})
+            collector.check(
+                isinstance(governance_policy, Mapping)
+                and governance_policy.get("policy_id") == POLICY_ID
+                and governance_policy.get("policy_version") == POLICY_VERSION
+                and governance_policy.get("policy_path")
+                == "kapi/config/governance-policy-v1.0.0.json"
+                and governance_policy.get("current_review_label")
+                == CURRENT_UNREVIEWED_LABEL
+                and governance_policy.get("governance_state") == "unreviewed"
+                and governance_policy.get("operator_review") == "not_complete"
+                and governance_policy.get("external_methodology_review")
+                == "not_complete"
+                and governance_policy.get("publication_state") == "not_authorized"
+                and governance_policy.get("publication_eligible") is False,
+                "governance_policy",
+                "governance_policy",
+                "v0.3.0 must pin the fail-closed governance policy and exact unreviewed label",
+            )
+            if isinstance(governance_policy, Mapping):
+                _validate_file_hash(
+                    collector,
+                    root,
+                    governance_policy.get("policy_path"),
+                    governance_policy.get("policy_sha256"),
+                    path_prefix="governance_policy",
+                )
+            amendment = methodology.get("methodology_amendment", {})
+            collector.check(
+                isinstance(amendment, Mapping)
+                and amendment.get("supersedes_version") == "0.2.2"
+                and amendment.get("decision_record_path")
+                == "kapi/docs/GOVERNANCE_POLICY_v1.0.0.md"
+                and amendment.get("change_class")
+                == "governance_terminology_and_authorization_control_only_no_index_math_change"
+                and amendment.get("status")
+                == "implemented_forward_governance_vintage_not_externally_reviewed",
+                "methodology_amendment",
+                "methodology_amendment",
+                "v0.3.0 must identify its exact v0.2.2 predecessor and governance-only change class",
+            )
+            selection = methodology.get("selection", {})
+            collector.check(
+                isinstance(selection, Mapping)
+                and selection.get("method")
+                == "lowest feasible provider-and-creator-diverse three-endpoint median",
+                "selection_method",
+                "selection.method",
+                "v0.3.0 must use precise provider/creator diversity terminology",
+            )
+        else:
+            collector.check(
+                common_gates_failed
+                and gates.get("independent_review")
+                == "failed_self_review_is_not_independent",
+                "readiness_gates",
+                "readiness_gates",
+                "historical v0.2.x readiness gates must stay failed",
+            )
 
     concentration = methodology.get("concentration", {})
     if isinstance(concentration, Mapping):
@@ -606,7 +2011,7 @@ def validate_methodology(
                 concentration.get(key) == value,
                 "concentration_rule",
                 f"concentration.{key}",
-                f"approved value is {value!r}",
+                f"configured value is {value!r}",
             )
     else:
         collector.error(
@@ -619,7 +2024,7 @@ def validate_methodology(
         len(profile_index) == 6,
         "profile_count",
         "profiles",
-        "approved basket contains six profiles",
+        "configured basket contains six profiles",
     )
     total_count = 0
     total_weight = 0
@@ -627,15 +2032,18 @@ def validate_methodology(
         path = f"profiles[{position}]"
         count = profile.get("count")
         if not isinstance(count, int) or count <= 0:
-            collector.error("profile_count", f"{path}.count", "must be a positive integer")
+            collector.error(
+                "profile_count", f"{path}.count", "must be a positive integer"
+            )
         else:
             total_count += count
         try:
             weight = rational_decimal(profile.get("weight", {}), field=f"{path}.weight")
             total_weight += weight
             collector.check(
-                weight == rational_decimal(
-                    {"numerator": 1, "denominator": 6}, field="approved weight"
+                weight
+                == rational_decimal(
+                    {"numerator": 1, "denominator": 6}, field="configured weight"
                 ),
                 "profile_weight",
                 f"{path}.weight",
@@ -712,7 +2120,7 @@ def validate_methodology(
                     entry.get("sha256"),
                     path_prefix=entry_path,
                 )
-                if methodology.get("version") in {"0.2.0", "0.2.1", "0.2.2"}:
+                if methodology.get("version") in CONTROLLED_METHODOLOGY_VERSIONS:
                     document = _load_payload_document(
                         collector, root, entry.get("path"), entry_path
                     )
@@ -727,7 +2135,7 @@ def validate_methodology(
                             document.get("construction_count_tolerance_tokens") == 0,
                             "payload_construction_count",
                             f"{entry_path}.path",
-                            "v0.2.x payload count tolerance must be zero",
+                            "controlled methodology payload count tolerance must be zero",
                         )
                         collector.check(
                             document.get("construction_token_count")
@@ -757,8 +2165,7 @@ def validate_methodology(
             )
             headline = by_factor.get("1.00", {})
             collector.check(
-                headline.get("path") == relative
-                and headline.get("sha256") == digest,
+                headline.get("path") == relative and headline.get("sha256") == digest,
                 "headline_payload",
                 f"{path}.{kind}_payload",
                 "headline path/hash must match the 1.00 payload definition",
@@ -767,7 +2174,7 @@ def validate_methodology(
         total_count == 60,
         "basket_count",
         "profiles",
-        "approved fixed basket contains 60 profiles",
+        "configured fixed basket contains 60 profiles",
     )
     collector.check(
         total_weight == 1,
@@ -844,7 +2251,7 @@ def validate_methodology(
         normalized_grid == expected_grid,
         "payload_grid",
         "sensitivities.payload_size_grid",
-        "must contain the complete approved 3x3 factor grid",
+        "must contain the complete configured 3x3 factor grid",
     )
 
     return _report(
@@ -866,6 +2273,40 @@ def validate_bundle(
     methodology_report = validate_methodology(methodology, repository_root=root)
     for issue in methodology_report["errors"] + methodology_report["warnings"]:
         collector.issues.append(ValidationIssue(**issue))
+
+    forward_contract = requires_forward_governance_contract(bundle, methodology)
+    if forward_contract:
+        for path in forward_bundle_schema_definition_gaps():
+            collector.error(
+                "forward_schema_definition",
+                path,
+                "declared v0.3.0 field lacks a container/leaf type rule",
+            )
+        _validate_forward_bundle_binding(collector, bundle, methodology)
+        _validate_forward_bundle_closed_schema(collector, bundle, methodology)
+        for path in find_forward_bundle_scalar_grammar_violations(bundle):
+            collector.error(
+                "forward_scalar_grammar",
+                path,
+                "v0.3.0 values must match the closed path-specific container/"
+                "leaf type and scalar grammar",
+            )
+        for path in find_input_claim_paths(bundle):
+            collector.error(
+                "input_governance_claim",
+                path,
+                "frozen input data cannot carry a governance/review/publication "
+                "claim key, assertion-like string, or non-ASCII public value",
+            )
+    elif methodology.get("version") in HISTORICAL_METHODOLOGY_VERSIONS:
+        collector.check(
+            sha256_bytes(canonical_json_bytes(bundle))
+            == HISTORICAL_BOUNDED_FIXTURE_SHA256,
+            "historical_fixture_identity",
+            "bundle",
+            "v0.2.x validation is read-only compatibility for the exact pinned "
+            "historical fixture; it cannot validate new or altered input",
+        )
 
     for field in ("schema_version", "dataset_id", "dataset_kind"):
         if field not in bundle:
@@ -905,6 +2346,23 @@ def validate_bundle(
             "corrections",
         )
     }
+    if forward_contract:
+        collector.check(
+            isinstance(bundle.get("dataset_id"), str)
+            and bundle.get("dataset_id", "").startswith("synthetic-forward-"),
+            "forward_id_namespace",
+            "dataset_id",
+            "v0.3.0 synthetic forward dataset IDs must start with synthetic-forward-",
+        )
+        for collection, prefix in FORWARD_ID_PREFIXES.items():
+            for index, record in enumerate(arrays[collection]):
+                collector.check(
+                    isinstance(record.get("id"), str)
+                    and record.get("id", "").startswith(prefix),
+                    "forward_id_namespace",
+                    f"{collection}[{index}].id",
+                    f"v0.3.0 {collection} IDs must start with {prefix}",
+                )
 
     week_times: list[tuple[str, Any]] = []
     for index, week in enumerate(arrays["weeks"]):
@@ -918,7 +2376,9 @@ def validate_bundle(
                 "weekly cutoff must be Friday",
             )
         except ValueError as error:
-            collector.error("invalid_timestamp", f"weeks[{index}].cutoff_at", str(error))
+            collector.error(
+                "invalid_timestamp", f"weeks[{index}].cutoff_at", str(error)
+            )
     sorted_times = sorted(week_times, key=lambda item: item[1])
     collector.check(
         sorted_times == week_times,
@@ -936,9 +2396,7 @@ def validate_bundle(
 
     for index, model in enumerate(arrays["models"]):
         path = f"models[{index}]"
-        _require_reference(
-            collector, model, "creator_id", indexes["creators"], path
-        )
+        _require_reference(collector, model, "creator_id", indexes["creators"], path)
         collector.check(
             model.get("alias_type") in {"immutable", "resolved_immutable", "rolling"},
             "alias_type",
@@ -977,8 +2435,7 @@ def validate_bundle(
         _require_reference(collector, endpoint, "model_id", indexes["models"], path)
         for flag, expected in required_endpoint_flags.items():
             collector.check(
-                isinstance(endpoint.get(flag), bool)
-                and endpoint.get(flag) is expected,
+                isinstance(endpoint.get(flag), bool) and endpoint.get(flag) is expected,
                 "endpoint_flag",
                 f"{path}.{flag}",
                 f"required eligibility flag must be {expected!r}",
@@ -1029,10 +2486,11 @@ def validate_bundle(
         )
         collector.check(
             isinstance(source.get("media_type"), str)
-            and bool(source.get("media_type")),
+            and MEDIA_TYPE_PATTERN.fullmatch(source.get("media_type", ""))
+            is not None,
             "source_metadata",
             f"{path}.media_type",
-            "media type is required",
+            "media type must use type/subtype syntax without parameters",
         )
         collector.check(
             isinstance(source.get("license_note"), str),
@@ -1053,8 +2511,7 @@ def validate_bundle(
                 "embedded snapshots are allowed only in synthetic bundles",
             )
             collector.check(
-                snapshot_path
-                == f"embedded://source_artifacts/{source.get('id')}",
+                snapshot_path == f"embedded://source_artifacts/{source.get('id')}",
                 "source_snapshot",
                 f"{path}.snapshot_path",
                 "embedded snapshot must identify its source artifact",
@@ -1105,12 +2562,9 @@ def validate_bundle(
     methodology_capability = methodology.get("capability", {})
     if not isinstance(methodology_capability, Mapping):
         methodology_capability = {}
-    capability_ids = indexes["capability_evidence"]
     for index, capability in enumerate(arrays["capability_evidence"]):
         path = f"capability_evidence[{index}]"
-        _require_reference(
-            collector, capability, "model_id", indexes["models"], path
-        )
+        _require_reference(collector, capability, "model_id", indexes["models"], path)
         _require_reference(collector, capability, "endpoint_id", endpoint_ids, path)
         _require_reference(collector, capability, "source_id", source_ids, path)
         endpoint = endpoint_ids.get(capability.get("endpoint_id"), {})
@@ -1122,8 +2576,7 @@ def validate_bundle(
             "must match the endpoint model",
         )
         collector.check(
-            capability.get("configuration_id")
-            == endpoint.get("configuration_id"),
+            capability.get("configuration_id") == endpoint.get("configuration_id"),
             "capability_endpoint",
             f"{path}.configuration_id",
             "must match the endpoint configuration",
@@ -1175,11 +2628,15 @@ def validate_bundle(
         side_by_factor: dict[str, dict[str, Mapping[str, Any]]] = {}
         for side in ("input", "output"):
             entries = payloads.get(side, [])
-            side_by_factor[side] = {
-                str(entry.get("size_factor")): entry
-                for entry in entries
-                if isinstance(entry, Mapping)
-            } if isinstance(entries, list) else {}
+            side_by_factor[side] = (
+                {
+                    str(entry.get("size_factor")): entry
+                    for entry in entries
+                    if isinstance(entry, Mapping)
+                }
+                if isinstance(entries, list)
+                else {}
+            )
         for variant_id, cell in grid_by_id.items():
             input_entry = side_by_factor["input"].get(str(cell.get("input_factor")))
             output_entry = side_by_factor["output"].get(str(cell.get("output_factor")))
@@ -1212,11 +2669,12 @@ def validate_bundle(
             isinstance(variant, str) and variant in grid_by_id,
             "payload_variant",
             f"{path}.size_variant",
-            "must reference an approved payload-grid cell",
+            "must reference a configured payload-grid cell",
         )
         for field in ("input_tokens", "output_tokens"):
             collector.check(
-                isinstance(token_count.get(field), int) and token_count.get(field, 0) > 0,
+                isinstance(token_count.get(field), int)
+                and token_count.get(field, 0) > 0,
                 "token_count",
                 f"{path}.{field}",
                 "must be a positive integer",
@@ -1230,7 +2688,7 @@ def validate_bundle(
             f"{path}.billing_tokenizer",
             "must match endpoint billing tokenizer",
         )
-        if methodology.get("version") in {"0.2.0", "0.2.1", "0.2.2"}:
+        if methodology.get("version") in CONTROLLED_METHODOLOGY_VERSIONS:
             collector.check(
                 token_count.get("construction_count_evidence_class")
                 == "construction_count",
@@ -1281,13 +2739,12 @@ def validate_bundle(
     )
     for index, observation in enumerate(arrays["price_observations"]):
         path = f"price_observations[{index}]"
-        _require_reference(
-            collector, observation, "endpoint_id", endpoint_ids, path
-        )
+        _require_reference(collector, observation, "endpoint_id", endpoint_ids, path)
         _require_reference(collector, observation, "week_id", indexes["weeks"], path)
         _require_reference(collector, observation, "source_id", source_ids, path)
         collector.check(
-            observation.get("component") in {"input", "output", "cache_read", "cache_write"},
+            observation.get("component")
+            in {"input", "output", "cache_read", "cache_write"},
             "price_component",
             f"{path}.component",
             "unsupported price component",
@@ -1332,13 +2789,11 @@ def validate_bundle(
                     f"{path}.{field}",
                     "must be null or a nonnegative integer",
                 )
-        if (
-            isinstance(observation.get("context_min_tokens"), int)
-            and isinstance(observation.get("context_max_tokens"), int)
+        if isinstance(observation.get("context_min_tokens"), int) and isinstance(
+            observation.get("context_max_tokens"), int
         ):
             collector.check(
-                observation["context_min_tokens"]
-                <= observation["context_max_tokens"],
+                observation["context_min_tokens"] <= observation["context_max_tokens"],
                 "context_tier",
                 path,
                 "context minimum cannot exceed maximum",
@@ -1358,9 +2813,7 @@ def validate_bundle(
                     "observation cannot supersede itself",
                 )
             else:
-                observation_supersession[str(observation.get("id"))] = str(
-                    supersedes
-                )
+                observation_supersession[str(observation.get("id"))] = str(supersedes)
                 superseded_ids.add(str(supersedes))
         group_key = _price_identity(observation)
         observation_groups[group_key].append(observation)
@@ -1425,9 +2878,7 @@ def validate_bundle(
                     "correction cannot supersede itself",
                 )
             else:
-                correction_supersession[str(correction_id)] = str(
-                    prior_correction_id
-                )
+                correction_supersession[str(correction_id)] = str(prior_correction_id)
         superseded_id = correction.get("superseded_observation_id")
         replacement_id = correction.get("replacement_observation_id")
         superseded = observation_ids.get(superseded_id)
@@ -1464,10 +2915,7 @@ def validate_bundle(
         collector,
         kind="bundle",
         document=bundle,
-        stats={
-            name: len(indexes.get(name, arrays[name]))
-            for name in names
-        },
+        stats={name: len(indexes.get(name, arrays[name])) for name in names},
     )
 
 
@@ -1490,9 +2938,7 @@ def _report(
     document: Mapping[str, Any],
     stats: Mapping[str, Any],
 ) -> dict[str, Any]:
-    errors = [
-        asdict(issue) for issue in collector.issues if issue.severity == "error"
-    ]
+    errors = [asdict(issue) for issue in collector.issues if issue.severity == "error"]
     warnings = [
         asdict(issue) for issue in collector.issues if issue.severity == "warning"
     ]

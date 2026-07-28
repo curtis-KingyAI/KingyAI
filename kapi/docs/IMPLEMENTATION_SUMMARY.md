@@ -2,10 +2,9 @@
 
 ## Workspace
 
-- Source worktree: /Users/curtispyke/Documents/Codex/2026-07-09/goal-implement-a-bounded-zero-spend/work/KingyAI-kapi-v021-pr-clean
-- Isolated worktree: /Users/curtispyke/Documents/Codex/2026-07-09/goal-implement-a-bounded-zero-spend/work/KingyAI-kapi-v022-ci-portability-local
-- Isolated branch: agent/kapi-v022-ci-portability-local
-- Starting commit: 6c1568c0659d7c865b238b71047c6f799b1810de
+- Isolated worktree: /Users/curtispyke/Documents/Codex/2026-07-09/goal-implement-a-bounded-zero-spend/work/KingyAI-kapi-ci-workflow-local
+- Isolated branch: agent/kapi-ci-workflow-local
+- Starting commit: 2f1b1d61520b115bd09797a5b7318cff9e090e11
 
 The original dirty worktree was not edited, cleaned, reset, committed, or
 overwritten.
@@ -20,10 +19,13 @@ overwritten.
 | kapi/__main__.py | python3 -m kapi entry point |
 | kapi/cli.py | validate, calculate, export, reproduce, init-db, ingest, and dump commands |
 | kapi/util.py | Canonical JSON/CSV, SHA-256, Decimal, UTC, and atomic-write helpers |
-| kapi/validation.py | Method, payload, schema, identity, evidence, price, tier, and conflict gates |
-| kapi/calculation.py | Pure Decimal eligibility, selection, index, sensitivity, concentration, contribution, and lineage engine |
-| kapi/exporter.py | Frozen CSV/JSON release bundle, provenance manifest, and byte-exact reproduction |
+| kapi/validation.py | Method, payload, identity, evidence, price, tier, and conflict gates plus closed forward object/type/scalar schemas, exact current/historical vintage hashes, bounded-decoder residual rejection, and recursive/split claim-carrier defense |
+| kapi/calculation.py | Pure Decimal eligibility, selection, index, sensitivity, concentration, contribution, and lineage engine with an exact-v0.3-only active entry-point gate and internal arithmetic test harness |
+| kapi/exporter.py | Frozen CSV/JSON release bundle, exact-v0.3-only pre-write gate, content-derived release identity, authoritative validation/calculation recomputation, recursive governance-envelope enforcement, provenance manifest, and byte-exact reproduction |
 | kapi/store.py | Transactional append-only SQLite ingestion and canonical dump |
+| kapi/governance.py | Separated governance records, append-only reviewer supersession/revocation, complete review attribution, labels, and fail-closed transition API |
+| kapi/config/governance-policy-v1.0.0.json | Current staged-hybrid target, registry lifecycle, immutable binding rules, diagnostic claim controls, and hard-disabled operator/verifier adapters |
+| kapi/schema/002_governance.sql | Forward-only unreviewed governance migration, exact calculation-diagnostic insert/binding guards, exact binding/child-set freeze, reviewer-lifecycle guards, and transition guards |
 
 ### Data and methodology
 
@@ -37,13 +39,19 @@ overwritten.
 | kapi/docs/DECISION_RECORD_v0.2.1.md | Human-readable v0.2.1 candidate and evidence decision record |
 | kapi/docs/ENDPOINT_AND_GATE_MATRICES_v0.2.1.md | v0.2.1 documentation, count-evidence, and readiness matrices |
 | kapi/config/methodology-v0.2.2.json | CI-portability amendment separating frozen-manifest reproduction from full source-asset proof |
-| kapi/fixtures/o200k-construction-manifest-v1.json | Canonical 12-entry derived chunk/rank manifest; no complete tokenizer asset |
+| kapi/config/methodology-v0.3.0.json | Current forward governance vintage; calculation rules unchanged, ambiguous review terminology removed, policy v1.0.0 pinned fail-closed |
+| kapi/secondary.py | Standalone implementation-isolated arithmetic cross-check; not human review and not accepted as caller-supplied lifecycle evidence in policy v1.0.0 |
+| kapi/independent.py | Byte-immutable v0.2.x historical module retained only for manifest hash continuity; not imported by active code |
+| kapi/fixtures/o200k-construction-manifest-v1.json | Byte-immutable historical v0.2.2 12-entry manifest; retained for exact reproduction |
+| kapi/fixtures/o200k-construction-manifest-v2.json | Current 12-entry pinned chunk/rank manifest; no complete tokenizer asset |
 | kapi/docs/DECISION_RECORD_v0.2.2.md | Human-readable v0.2.2 portability decision record |
 | kapi/docs/ENDPOINT_AND_GATE_MATRICES_v0.2.2.md | v0.2.2 construction-evidence and readiness matrices |
 | kapi/profiles/* | 36 frozen synthetic input/output payloads across six profiles and 75/100/125 size variants |
 | kapi/fixtures/build_payloads.py | Portable payload generator/checker plus explicit full source-asset proof mode |
 | kapi/fixtures/build_synthetic.py | Offline deterministic fixture generator/checker |
-| kapi/fixtures/synthetic-hand-example-v1.json | Four-provider, 14-week, 216-token-count, 112-price-observation regression bundle |
+| kapi/fixtures/synthetic-hand-example-v1.json | Byte-immutable historical four-provider regression bundle retained for v0.2.x reproduction |
+| kapi/fixtures/build_forward_bundle.py | Deterministic forward-only projection generator/checker; removes caller result/spend and redundant derived-week metadata, and pins the exact v0.3.0 methodology |
+| kapi/fixtures/synthetic-forward-governance-v0.3.0.json | Sole accepted bounded synthetic v0.3.0 bundle, canonical-hash pinned with closed public scalar/type grammar and no caller oracle/generation fields |
 | kapi/schema/001_initial.sql | Normalized source-to-release schema and 29-table append-only triggers |
 
 ### Tests
@@ -53,10 +61,11 @@ overwritten.
 | kapi/tests/test_calculation.py | 25 calculation, eligibility, price, selection, base, sensitivity, correction-cycle, and concentration regressions |
 | kapi/tests/test_store.py | 12 schema, required-ID/link, source-hash, append-only, rollback, conflict, supersession/correction-cycle, lineage, and round-trip tests |
 | kapi/tests/test_fixtures.py | 16 methodology, portability, version-preservation, official-evidence, payload, hash, grid, offline-generation, and hand-example tests |
-| kapi/tests/test_validation.py | 15 strict source-byte, portability-contract, candidate-evidence, evidence-hash, runtime-gate, cross-record, payload-grid, Decimal, identity, supersession-cycle, and conflict tests |
-| kapi/tests/test_exporter.py | 8 required-artifact, labeling, coverage, manifest/inventory-tamper, weight-reproduction, and deterministic export tests |
+| kapi/tests/test_validation.py | 21 strict source-byte, portability-contract, closed forward schema/keyset/type/scalar grammar, bounded-fixture and historical-vintage identity, coordinated downgrade rejection, recursive normalized claim-key/prose and split-carrier, candidate-evidence, runtime-gate, cross-record, payload-grid, Decimal, supersession-cycle, and conflict tests |
+| kapi/tests/test_exporter.py | 14 required-artifact, pre-render recursive/split claim-carrier, exact bounded-fixture identity, coordinated downgrade/direct fail-closed calculation/render/export, recursive governance-label, coverage, stable-ID, manifest/inventory-tamper, weight-reproduction, and deterministic export tests |
 | kapi/tests/test_cli.py | 2 end-to-end CLI, database, export, and reproduction tests |
-| kapi/tests/test_week0_controls.py | 5 truthful-label, base-policy, independent-check, lifecycle, and 10x-unit drill regressions |
+| kapi/tests/test_week0_controls.py | 6 truthful-label, base-policy, standalone secondary-check, absence-only secondary-input, exact diagnostic-schema/claim-carrier, raw-SQL/schema-v1 migration, lifecycle, and 10x-unit drill regressions |
+| kapi/tests/test_governance.py | 10 identity, role, disclosure, registry rotation/revocation, complete-attribution, exact-binding, child-set freeze, signature-claim, transition, hard-gate, and historical-immutability regressions |
 
 ### Documentation
 
@@ -71,12 +80,14 @@ overwritten.
 | kapi/docs/LIMITATIONS.md | Data, tokenizer, quality, statistical, and engineering limits |
 | kapi/docs/SPENDING_REPORT.md | $0 limits and actual external actions |
 | kapi/docs/VERIFICATION.md | Final command, test, hash, and boundary evidence |
+| kapi/docs/GOVERNANCE_POLICY_v1.0.0.md | Current unreviewed boundary and named-reviewer activation standard |
 
 ### Generated synthetic releases
 
-The historical directories `kapi/outputs/sample-release` and
-`kapi/outputs/sample-release-v0.2.1` retain their prior vintages. The
-current-code directory `kapi/outputs/sample-release-v0.2.2` contains:
+The historical directories `kapi/outputs/sample-release`,
+`kapi/outputs/sample-release-v0.2.1`, and
+`kapi/outputs/sample-release-v0.2.2` retain their prior vintages. The
+current-code directory `kapi/outputs/sample-release-governance-v1.0.0` contains:
 
 - frozen dataset and methodology inputs;
 - calculation.json;

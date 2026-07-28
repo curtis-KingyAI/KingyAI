@@ -55,7 +55,21 @@ Validation fails closed on:
 - invalid payload-grid IDs or alternate payload files;
 - wrong basket weights/counts;
 - missing canonical payloads;
-- methodology values outside the approved D1–D20 defaults.
+- methodology values outside the adopted D1–D20 defaults.
+- undeclared object keys/paths in a closed v0.3.0 bundle schema; future fields
+  require a new schema vintage;
+- any wrong container/leaf type or public string outside its path-specific
+  exact value, enum, hash, timestamp, reference, or narrow identifier grammar,
+  including arbitrary license/status prose and non-ASCII values;
+- caller `expected_result` oracles, caller `generation` spend/provider metadata,
+  or a methodology binding that differs from the exact committed document;
+- any canonical object hash other than the deterministic bounded forward
+  fixture; dynamic and observed inputs require a new reviewed vintage;
+- percent, HTML-entity, or literal-codepoint encoding that remains after the
+  bounded four-round claim decoder;
+- normalized claim-bearing keys, assertion-like governance/publication prose,
+  same-record cross-depth splits, or subject-bearing list splits anywhere in a
+  v0.3.0 bundle; no current claim-key allowlist entries exist.
 
 ### Calculation
 
@@ -65,7 +79,7 @@ The engine has no I/O. It uses Decimal arithmetic and:
 2. applies capability, commercial, evidence, feature, and context rules;
 3. selects applicable input/output tariff tiers;
 4. computes endpoint/profile costs;
-5. enumerates independent provider/creator triples;
+5. enumerates three-provider/three-creator-diverse triples;
 6. selects by median, total, and endpoint-ID tie-breaks;
 7. aggregates six equal-weight profiles;
 8. establishes the first 13 complete weeks as base;
@@ -89,8 +103,34 @@ The manifest hashes all other files and implementation modules, and records the
 verified content hash for every source artifact used. Reproduce rejects
 missing/changed bytes, compares a fresh calculation/render byte-for-byte, and
 regenerates the complete manifest to authenticate its identity, lineage,
-spending, notice, and implementation metadata.
+spending state, notice, and implementation metadata. Spending is explicitly
+`not_measured_not_evidenced` with scope
+`artifact_generation_spend_and_provider_activity_not_bound`; caller bundle
+metadata cannot convert that into a zero-spend or provider-activity claim.
 Files not declared by that manifest are rejected during reproduction.
+The release ID is derived from the frozen dataset, exact methodology, and
+mathematical calculation content. Governance/presentation fields are excluded
+from that identity, so a later governance event cannot create a different ID
+for the same mathematical release. The release-artifact membership set and
+methodology/snapshot/calculation child sets freeze when their parent is bound
+to governance.
+Export also treats its caller as untrusted: it recomputes the validation report
+and the complete calculation from the frozen inputs, requiring canonical byte
+equality before any caller-supplied object is copied into an artifact. The
+forward methodology must exactly match its committed document. Forward input
+bundles reject every undeclared object key/path, wrong container/leaf type, and
+value outside the closed path grammar. Recursive normalized claim-key/prose,
+encoded-value, and split-carrier scans remain defense in depth; export repeats
+the checks before writing frozen input bytes. A final canonical fixture-identity
+gate rejects even in-grammar permutations or hash-repaired embedded snapshots.
+The active calculation and renderer admit only the exact current v0.3.0 pair.
+Legacy v0.2.x validation is restricted to the pinned historical bundle and
+methodology hashes, while exact historical release evidence is reproduced from
+its corresponding old code checkout. Current code cannot render a fresh legacy
+artifact, including after coordinated schema/dataset/method marker rewrites.
+Manifest construction separately rerenders the complete seven-file payload
+and refuses any filename or byte mismatch, so a caller cannot obtain provenance
+for a forged release/latest document, release ID, or CSV.
 
 ## Determinism
 
@@ -107,3 +147,17 @@ Files not declared by that manifest are rejected during reproduction.
 There is no WordPress adapter, scheduler, HTTP POST, deployment configuration,
 or publishing credential. A later consumer would read a signed/frozen release
 artifact after separate authorization and publication gates.
+
+Governance policy v1.0.0 separates calculation disposition, methodology/release
+assurance, and publication authorization in schema v2. The local process has
+neither a trusted operator-identity adapter nor a cryptographic signature-
+verifier adapter. Current output is therefore unreviewed/not-authorized, with
+stronger edges unreachable. The local ContextVar/SQLite binding protects test
+flow integrity only; it is not an identity security boundary.
+
+Reviewer credentials are versioned as append-only registration, supersession,
+and revocation events. A review signs and stores one exact event ID; later
+signature claims and modeled claim-bearing transitions require that event to
+remain the latest active state at their own timestamp. Public attribution shows
+both the bound event and latest event, including revocation, rather than hiding
+post-review credential changes.

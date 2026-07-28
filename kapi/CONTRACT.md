@@ -14,10 +14,49 @@ It is not a production API and does not authorize publication.
 - Grade A is the only live/headline evidence. B/C are research-only. D is invalid.
 - Dynamic reasoning is disabled; endpoint-specific billing-token counts are supplied
   explicitly and tied to frozen payload hashes.
+- Calculation, governance assurance, and publication authorization are separate
+  axes. A technical recalculation is not a human external review.
+- Policy v1.0.0 has no trusted operator-identity adapter and hard-fails the
+  trusted-verifier gate. Only the exact unreviewed/not-authorized envelope may
+  be exported; caller-supplied identity, attribution, or nested week fields
+  cannot enable an operator, external-review, or publication claim.
+- Every named review binds the exact latest active append-only reviewer-registry
+  event. Supersession and revocation are new rows, and stale registry events
+  cannot satisfy modeled signature or future transition gates.
+- Caller diagnostics use an exact empty-object schema; all stored diagnostic
+  keys are lifecycle-owned. Normalized recursive content checks and controlled
+  base-week states provide additional claim barriers. Policy v1.0.0 rejects
+  every caller-supplied secondary report and records only `not_supplied`. The
+  standalone checker is a non-authorizing tool; a future lifecycle path must
+  recompute internally from and hash-bind the exact full frozen calculation.
+- New calculation rows must also pass the registered canonical policy-v1
+  diagnostics validator in SQLite. Initial release binding separately
+  revalidates the stored calculation, so direct SQL, missing validator
+  registration, and nonconforming pre-migration rows fail closed.
+- The v0.3.0 bundle uses exact allowed object-key sets and a closed
+  path-specific scalar grammar. Every string path is classified as an exact
+  safe value, closed enum, SHA-256, timestamp, reference, or narrow machine
+  identifier; an unclassified string fails. Arbitrary source/license/status
+  prose, `expected_result` caller oracles, and `generation` spend/provider
+  metadata are not bundle fields. Values and keys are ASCII-only in this
+  vintage. A four-round percent/HTML/literal-escape decoder rejects decoded
+  claims and any residual encoding syntax rather than decoding without bound.
+  Recursive claim-key/prose and record/list aggregate scans remain an additional
+  barrier. Source media types are fixed to `application/json` for this fixture.
+  The canonical object hash must also equal the reproducible generated forward
+  fixture. Future fields, prose, character sets, grammars, dynamic data, or
+  observed data require a new reviewed bundle-schema vintage. The calculator
+  and exporter repeat the contract before output.
+- Current calculation/render/export is v0.3.0-only and requires the exact
+  canonical bundle plus exact committed methodology. The v0.2.x documents and
+  fixture are accepted only as hash-pinned, read-only compatibility inputs;
+  their releases are reproduced from their pinned historical code vintages,
+  never newly rendered by current code. Coordinated schema, dataset, and
+  methodology-marker rewrites do not create a downgrade lane.
 
 ## Bundle shape
 
-The top-level bundle has:
+The forward top-level bundle has exactly:
 
 - schema_version
 - dataset_id
@@ -32,6 +71,13 @@ The top-level bundle has:
 - token_counts
 - price_observations
 - corrections
+- methodology
+
+It has no `expected_result` or `generation` field. The committed v0.3.0
+projection is synthetic-only; historical v0.2.x fixtures remain byte-immutable
+and are validated under their original contracts. Base-period IDs and the
+current week are derived from ordered weeks plus the pinned methodology; their
+redundant historical input fields are deliberately absent.
 
 Identity objects use stable IDs. A model declares creator_id, exact version,
 alias_type, and immutable_version. An endpoint declares provider_id, model_id,
@@ -104,3 +150,11 @@ The release directory inventory must exactly equal the manifest file list plus
 provenance-manifest.json; undeclared files are a reproduction failure.
 Calculation and CSV artifacts carry explicit synthetic, citation-prohibited,
 and not-for-publication labels so they remain safe when detached.
+Before rendering, the exporter recomputes both validation and the complete
+calculation from the frozen inputs and requires exact canonical equality. This
+rejects caller-added alias fields as well as known governance fields.
+
+External-review fields are forward schema only. Until a later migration adds a
+trusted operator identity adapter and a separate cryptographic verifier
+adapter, no operator-review label, external-review label, publication-ready
+state, or publication eligibility is a valid output.

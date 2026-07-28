@@ -14,11 +14,15 @@ import os
 import re
 import sqlite3
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit
+
+from .util import canonical_json_bytes
 
 
 __all__ = [
@@ -64,10 +68,67 @@ APPEND_ONLY_TABLES = (
     "release_artifacts",
     "release_signoffs",
     "correction_releases",
+    "governance_principals",
+    "governance_role_assignments",
+    "external_reviewer_registry",
+    "external_reviewer_registry_events",
+    "methodology_governance_gates",
+    "release_governance_bindings",
+    "external_review_records",
+    "signature_verification_attestations",
+    "governance_transition_events",
 )
 
-_SCHEMA_PATH = Path(__file__).with_name("schema") / "001_initial.sql"
+_SCHEMA_PATHS = (
+    Path(__file__).with_name("schema") / "001_initial.sql",
+    Path(__file__).with_name("schema") / "002_governance.sql",
+)
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_LOCAL_ACTOR_BINDING: ContextVar[str | None] = ContextVar(
+    "kapi_local_actor_binding", default=None
+)
+_CURRENT_UNREVIEWED_LABEL = (
+    "Governance status: Unreviewed draft. Automated validation completed for this "
+    "artifact; no operator or external methodology review is complete."
+)
+_CALCULATION_DIAGNOSTIC_KEYS = frozenset(
+    {
+        "base_week_states",
+        "calculation_disposition",
+        "governance_state",
+        "publication_eligible",
+        "publication_state",
+        "release_kind",
+        "review_label",
+        "secondary_recalculation",
+    }
+)
+_SECONDARY_RECALCULATION_NOT_SUPPLIED = {
+    "human_external_review": False,
+    "lifecycle_handling": (
+        "no secondary recalculation report accepted by policy v1.0.0"
+    ),
+    "status": "not_supplied",
+}
+_CALCULATION_DISPOSITION_BY_STATUS = {
+    "complete": "eligible",
+    "invalid": "incomplete",
+    "pending_base": "incomplete",
+    "withheld": "withheld",
+}
+_RELEASE_KINDS = frozenset(
+    {"pending_base", "provisional_base", "final_base", "weekly", "correction"}
+)
+_NONCOUNTING_BASE_STATES = frozenset(
+    {
+        "incomplete",
+        "unsigned",
+        "irreproducible",
+        "materially_corrected",
+        "withheld_concentration",
+    }
+)
+_BASE_STATES = _NONCOUNTING_BASE_STATES | {"counting"}
 _TOP_LEVEL_KEYS = {
     "schema_version",
     "dataset_id",
@@ -161,10 +222,79 @@ _PRICE_FIELDS = {
 }
 
 
+def _calculation_diagnostics_are_valid(
+    diagnostics_json: Any, calculation_status: Any
+) -> int:
+    """Validate the exact lifecycle-owned policy-v1 diagnostics document.
+
+    This callback is deliberately total: invalid input returns zero instead of
+    raising through SQLite. The SQL triggers use ``IS NOT 1`` so a missing,
+    unregistered, NULL-returning, or rejecting validator fails closed.
+    """
+
+    if type(diagnostics_json) is not str or type(calculation_status) is not str:
+        return 0
+
+    def reject_nonstandard_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON constant: {value}")
+
+    try:
+        document = json.loads(
+            diagnostics_json,
+            parse_constant=reject_nonstandard_constant,
+        )
+    except (TypeError, ValueError, RecursionError):
+        return 0
+    if type(document) is not dict or set(document) != _CALCULATION_DIAGNOSTIC_KEYS:
+        return 0
+
+    try:
+        canonical = canonical_json_bytes(document).decode("utf-8").rstrip("\n")
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        return 0
+    if diagnostics_json != canonical:
+        return 0
+
+    if (
+        document.get("governance_state") != "unreviewed"
+        or document.get("review_label") != _CURRENT_UNREVIEWED_LABEL
+        or document.get("publication_state") != "not_authorized"
+        or document.get("publication_eligible") is not False
+        or document.get("secondary_recalculation")
+        != _SECONDARY_RECALCULATION_NOT_SUPPLIED
+    ):
+        return 0
+
+    expected_disposition = _CALCULATION_DISPOSITION_BY_STATUS.get(calculation_status)
+    if (
+        expected_disposition is None
+        or document.get("calculation_disposition") != expected_disposition
+    ):
+        return 0
+
+    release_kind = document.get("release_kind")
+    base_states = document.get("base_week_states")
+    if release_kind not in _RELEASE_KINDS or type(base_states) is not list:
+        return 0
+    if any(
+        type(state) is not str or state not in _BASE_STATES for state in base_states
+    ):
+        return 0
+    if release_kind == "final_base":
+        if len(base_states) != 13 or any(state != "counting" for state in base_states):
+            return 0
+    elif release_kind in {"pending_base", "provisional_base"}:
+        if base_states and len(base_states) != 13:
+            return 0
+    elif base_states:
+        return 0
+    return 1
+
+
 def init_database(
     path_or_connection: str | os.PathLike[str] | sqlite3.Connection,
 ) -> sqlite3.Connection:
-    """Initialize schema version 1 and return a configured connection.
+    """Initialize the current forward-only schema and return a connection.
 
     If *path_or_connection* is a path, this function owns opening but not closing
     the returned connection.  A supplied connection must not have a transaction
@@ -187,11 +317,68 @@ def init_database(
         raise StoreError("SQLite foreign-key enforcement could not be enabled")
 
     try:
-        schema_sql = _SCHEMA_PATH.read_text(encoding="utf-8")
-        connection.executescript(schema_sql)
+
+        def release_artifact_manifest_sha256(release_id: Any) -> str:
+            rows = connection.execute(
+                "SELECT path, media_type, content_sha256 "
+                "FROM release_artifacts WHERE release_id = ? ORDER BY path",
+                (str(release_id),),
+            ).fetchall()
+            artifacts = [
+                {
+                    "path": row[0],
+                    "media_type": row[1],
+                    "content_sha256": row[2],
+                }
+                for row in rows
+            ]
+            return hashlib.sha256(canonical_json_bytes(artifacts)).hexdigest()
+
+        connection.create_function(
+            "kapi_local_actor_binding",
+            0,
+            lambda: _LOCAL_ACTOR_BINDING.get(),
+        )
+        connection.create_function(
+            "kapi_sha256",
+            1,
+            lambda value: hashlib.sha256(str(value).encode("utf-8")).hexdigest(),
+            deterministic=True,
+        )
+        connection.create_function(
+            "kapi_release_artifact_manifest_sha256",
+            1,
+            release_artifact_manifest_sha256,
+        )
+        connection.create_function(
+            "kapi_validate_calculation_diagnostics",
+            2,
+            _calculation_diagnostics_are_valid,
+            deterministic=True,
+        )
+        for schema_path in _SCHEMA_PATHS:
+            connection.executescript(schema_path.read_text(encoding="utf-8"))
     except (OSError, sqlite3.Error) as exc:
         raise StoreError(f"could not initialize KAPI database: {exc}") from exc
     return connection
+
+
+@contextmanager
+def _local_actor_binding(principal_id: str):
+    """Bind an actor for trusted-adapter development and adversarial tests.
+
+    This private ContextVar is not authentication and is not exposed by the
+    CLI. A process/file owner can bypass it. Current fail-closed controls are
+    the exact unreviewed initial state, absence of an operator-review or
+    publication edge, and the hard-failed trusted-verifier gate; none is a
+    production host-security boundary.
+    """
+
+    token = _LOCAL_ACTOR_BINDING.set(principal_id)
+    try:
+        yield
+    finally:
+        _LOCAL_ACTOR_BINDING.reset(token)
 
 
 def ingest_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) -> None:
@@ -243,7 +430,9 @@ def dump_bundle(connection: sqlite3.Connection) -> dict[str, Any]:
         raise StoreError("the KAPI store contains more than one dataset")
     root = dataset[0]
 
-    result: dict[str, Any] = _load_object(root["metadata_json"], "datasets.metadata_json")
+    result: dict[str, Any] = _load_object(
+        root["metadata_json"], "datasets.metadata_json"
+    )
     normalized_root: dict[str, Any] = {
         "schema_version": root["schema_version"],
         "dataset_id": root["id"],
@@ -262,13 +451,12 @@ def dump_bundle(connection: sqlite3.Connection) -> dict[str, Any]:
     overlap = set(result).intersection(normalized_root)
     if overlap:
         raise StoreError(
-            "dataset metadata conflicts with normalized fields: " + ", ".join(sorted(overlap))
+            "dataset metadata conflicts with normalized fields: "
+            + ", ".join(sorted(overlap))
         )
     result.update(normalized_root)
 
-    for row in connection.execute(
-        "SELECT * FROM weeks ORDER BY cutoff_at, id"
-    ):
+    for row in connection.execute("SELECT * FROM weeks ORDER BY cutoff_at, id"):
         result["weeks"].append(
             _with_metadata({"id": row["id"], "cutoff_at": row["cutoff_at"]}, row)
         )
@@ -379,9 +567,7 @@ def dump_bundle(connection: sqlite3.Connection) -> dict[str, Any]:
         }
         if row["id"] is not None:
             record["id"] = row["id"]
-        result["token_counts"].append(
-            _with_metadata(record, row)
-        )
+        result["token_counts"].append(_with_metadata(record, row))
 
     for row in connection.execute("SELECT * FROM price_observations ORDER BY id"):
         record = {
@@ -503,7 +689,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         _text(record, "id", context)
         creator_id = _text(record, "creator_id", context)
         if creator_id not in creator_ids:
-            raise StoreError(f"{context}.creator_id does not identify a bundled creator")
+            raise StoreError(
+                f"{context}.creator_id does not identify a bundled creator"
+            )
         _text(record, "version", context)
         _text(record, "alias_type", context)
         _boolean(record, "immutable_version", context)
@@ -529,7 +717,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         provider_id = _text(record, "provider_id", context)
         model_id = _text(record, "model_id", context)
         if provider_id not in provider_ids:
-            raise StoreError(f"{context}.provider_id does not identify a bundled provider")
+            raise StoreError(
+                f"{context}.provider_id does not identify a bundled provider"
+            )
         if model_id not in model_ids:
             raise StoreError(f"{context}.model_id does not identify a bundled model")
         for key in (
@@ -564,7 +754,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         if available_until is not None:
             until = _timestamp(record, "available_until", context)
             if until <= available_from:
-                raise StoreError(f"{context}.available_until must follow available_from")
+                raise StoreError(
+                    f"{context}.available_until must follow available_from"
+                )
         natural = (
             provider_id,
             model_id,
@@ -626,7 +818,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         model_id = _text(record, "model_id", context)
         endpoint_id = _text(record, "endpoint_id", context)
         if endpoint_id not in endpoint_map:
-            raise StoreError(f"{context}.endpoint_id does not identify a bundled endpoint")
+            raise StoreError(
+                f"{context}.endpoint_id does not identify a bundled endpoint"
+            )
         endpoint = endpoint_map[endpoint_id]
         if model_id != endpoint["model_id"]:
             raise StoreError(f"{context}.model_id conflicts with the endpoint model")
@@ -654,7 +848,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         context = f"token_counts[{index}]"
         endpoint_id = _text(record, "endpoint_id", context)
         if endpoint_id not in endpoint_map:
-            raise StoreError(f"{context}.endpoint_id does not identify a bundled endpoint")
+            raise StoreError(
+                f"{context}.endpoint_id does not identify a bundled endpoint"
+            )
         profile_id = _text(record, "profile_id", context)
         size_variant = _text(record, "size_variant", context)
         _integer(record, "input_tokens", context, minimum=0)
@@ -673,9 +869,7 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
             )
 
     week_ids = {record["id"] for record in bundle["weeks"]}
-    price_by_id = {
-        record["id"]: record for record in bundle["price_observations"]
-    }
+    price_by_id = {record["id"]: record for record in bundle["price_observations"]}
     price_ids = set(price_by_id)
     price_natural: dict[tuple[Any, ...], list[str]] = {}
     price_identity_by_id: dict[str, tuple[Any, ...]] = {}
@@ -685,7 +879,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         price_id = _text(record, "id", context)
         endpoint_id = _text(record, "endpoint_id", context)
         if endpoint_id not in endpoint_map:
-            raise StoreError(f"{context}.endpoint_id does not identify a bundled endpoint")
+            raise StoreError(
+                f"{context}.endpoint_id does not identify a bundled endpoint"
+            )
         week_id = _text(record, "week_id", context)
         if week_id not in week_ids:
             raise StoreError(f"{context}.week_id does not identify a bundled week")
@@ -694,11 +890,15 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
         _decimal(record, "amount_per_million", context, nonnegative=True)
         currency = _text(record, "currency", context)
         if len(currency) != 3 or currency != currency.upper():
-            raise StoreError(f"{context}.currency must be a three-letter uppercase code")
+            raise StoreError(
+                f"{context}.currency must be a three-letter uppercase code"
+            )
         context_min = _integer(record, "context_min_tokens", context, minimum=0)
         context_max = _integer(record, "context_max_tokens", context, minimum=0)
         if context_max < context_min:
-            raise StoreError(f"{context}.context_max_tokens is below context_min_tokens")
+            raise StoreError(
+                f"{context}.context_max_tokens is below context_min_tokens"
+            )
         for key in (
             "cache_treatment",
             "batch_treatment",
@@ -722,7 +922,9 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
             target = record["supersedes_observation_id"]
             if target is not None:
                 if not isinstance(target, str) or not target.strip():
-                    raise StoreError(f"{context}.supersedes_observation_id must be an ID or null")
+                    raise StoreError(
+                        f"{context}.supersedes_observation_id must be an ID or null"
+                    )
                 if target not in price_ids:
                     raise StoreError(f"{context} supersedes an unknown observation")
                 if target == price_id:
@@ -796,10 +998,7 @@ def _validate_records(bundle: Mapping[str, Any]) -> None:
             raise StoreError(
                 f"{context} observations do not share one applicability identity"
             )
-        if (
-            price_by_id[replacement_id].get("supersedes_observation_id")
-            != target_id
-        ):
+        if price_by_id[replacement_id].get("supersedes_observation_id") != target_id:
             raise StoreError(
                 f"{context}.replacement_observation_id must explicitly "
                 "supersede the target"
@@ -818,7 +1017,9 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
         "INSERT INTO datasets(singleton, id, schema_version, dataset_kind, metadata_json) "
         "VALUES(1, ?, ?, ?, ?)",
         (
-            dataset_id, bundle["schema_version"], bundle["dataset_kind"],
+            dataset_id,
+            bundle["schema_version"],
+            bundle["dataset_kind"],
             bundle["_metadata_json"],
         ),
     )
@@ -826,13 +1027,23 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
     for record in bundle["weeks"]:
         connection.execute(
             "INSERT INTO weeks(id, dataset_id, cutoff_at, metadata_json) VALUES(?, ?, ?, ?)",
-            (record["id"], dataset_id, record["cutoff_at"], _extras(record, _WEEK_FIELDS)),
+            (
+                record["id"],
+                dataset_id,
+                record["cutoff_at"],
+                _extras(record, _WEEK_FIELDS),
+            ),
         )
     for table in ("providers", "creators"):
         for record in bundle[table]:
             connection.execute(
                 f"INSERT INTO {table}(id, dataset_id, name, metadata_json) VALUES(?, ?, ?, ?)",
-                (record["id"], dataset_id, record.get("name"), _extras(record, _PARTY_FIELDS)),
+                (
+                    record["id"],
+                    dataset_id,
+                    record.get("name"),
+                    _extras(record, _PARTY_FIELDS),
+                ),
             )
     for record in bundle["models"]:
         connection.execute(
@@ -840,10 +1051,16 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "immutable_version, released_at, retired_at, tokenizer, modality, "
             "metadata_json) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record["id"], dataset_id, record["creator_id"], record["version"],
-                record["alias_type"], int(record["immutable_version"]),
-                record.get("released_at"), record.get("retired_at"),
-                record.get("tokenizer"), record.get("modality"),
+                record["id"],
+                dataset_id,
+                record["creator_id"],
+                record["version"],
+                record["alias_type"],
+                int(record["immutable_version"]),
+                record.get("released_at"),
+                record.get("retired_at"),
+                record.get("tokenizer"),
+                record.get("modality"),
                 _extras(record, _MODEL_FIELDS),
             ),
         )
@@ -856,13 +1073,24 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "tokenizer_reproducible, available_from, available_until, metadata_json"
             ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record["id"], dataset_id, record["provider_id"], record["model_id"],
-                record["configuration_id"], record["region"], record["tier"],
-                int(record["public"]), int(record["ga"]), int(record["synchronous"]),
-                int(record["on_demand"]), int(record["available_us"]),
-                int(record["standard_list_price"]), record["reasoning_mode"],
-                record["billing_tokenizer"], int(record["tokenizer_reproducible"]),
-                record["available_from"], record.get("available_until"),
+                record["id"],
+                dataset_id,
+                record["provider_id"],
+                record["model_id"],
+                record["configuration_id"],
+                record["region"],
+                record["tier"],
+                int(record["public"]),
+                int(record["ga"]),
+                int(record["synchronous"]),
+                int(record["on_demand"]),
+                int(record["available_us"]),
+                int(record["standard_list_price"]),
+                record["reasoning_mode"],
+                record["billing_tokenizer"],
+                int(record["tokenizer_reproducible"]),
+                record["available_from"],
+                record.get("available_until"),
                 _extras(record, _ENDPOINT_FIELDS),
             ),
         )
@@ -878,10 +1106,17 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "content_sha256, snapshot_path, license_note, reviewer, metadata_json"
             ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record["id"], dataset_id, record["url"], record["retrieved_at"],
-                record.get("effective_at"), record["evidence_grade"], record["media_type"],
-                record["content_sha256"], record["snapshot_path"],
-                record["license_note"], record.get("reviewer"),
+                record["id"],
+                dataset_id,
+                record["url"],
+                record["retrieved_at"],
+                record.get("effective_at"),
+                record["evidence_grade"],
+                record["media_type"],
+                record["content_sha256"],
+                record["snapshot_path"],
+                record["license_note"],
+                record.get("reviewer"),
                 _extras(record, _SOURCE_FIELDS),
             ),
         )
@@ -894,13 +1129,23 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "qualification_until, metadata_json"
             ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record["id"], dataset_id, record["model_id"], record["endpoint_id"],
-                record["metric"], record["metric_version"], record["score"],
-                record.get("score_lower"), record.get("score_upper"),
+                record["id"],
+                dataset_id,
+                record["model_id"],
+                record["endpoint_id"],
+                record["metric"],
+                record["metric_version"],
+                record["score"],
+                record.get("score_lower"),
+                record.get("score_upper"),
                 record.get("threshold_score"),
-                record["configuration_id"], record["evaluated_at"],
-                record["data_vintage"], record["source_id"], record["evidence_grade"],
-                record.get("qualification_from"), record.get("qualification_until"),
+                record["configuration_id"],
+                record["evaluated_at"],
+                record["data_vintage"],
+                record["source_id"],
+                record["evidence_grade"],
+                record.get("qualification_from"),
+                record.get("qualification_until"),
                 _extras(record, _CAPABILITY_FIELDS),
             ),
         )
@@ -912,10 +1157,16 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "size_variant, metadata_json"
             ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record.get("id"), dataset_id, record["endpoint_id"], record["profile_id"],
-                record["input_tokens"], record["output_tokens"],
-                record["input_payload_sha256"], record["output_payload_sha256"],
-                record["billing_tokenizer"], record["size_variant"],
+                record.get("id"),
+                dataset_id,
+                record["endpoint_id"],
+                record["profile_id"],
+                record["input_tokens"],
+                record["output_tokens"],
+                record["input_payload_sha256"],
+                record["output_payload_sha256"],
+                record["billing_tokenizer"],
+                record["size_variant"],
                 _extras(record, _TOKEN_FIELDS),
             ),
         )
@@ -929,14 +1180,27 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "supersedes_observation_id, supersedes_present, metadata_json"
             ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record["id"], dataset_id, record["endpoint_id"], record["week_id"],
-                record["component"], record["amount_per_million"], record["currency"],
-                record["unit"], record["region"], record["tier"],
-                record["context_min_tokens"], record["context_max_tokens"],
-                record.get("cache_treatment"), record.get("batch_treatment"),
-                record.get("priority_treatment"), record.get("tool_fee_treatment"),
-                record["effective_at"], record["observed_at"], record["source_id"],
-                record["evidence_grade"], record.get("supersedes_observation_id"),
+                record["id"],
+                dataset_id,
+                record["endpoint_id"],
+                record["week_id"],
+                record["component"],
+                record["amount_per_million"],
+                record["currency"],
+                record["unit"],
+                record["region"],
+                record["tier"],
+                record["context_min_tokens"],
+                record["context_max_tokens"],
+                record.get("cache_treatment"),
+                record.get("batch_treatment"),
+                record.get("priority_treatment"),
+                record.get("tool_fee_treatment"),
+                record["effective_at"],
+                record["observed_at"],
+                record["source_id"],
+                record["evidence_grade"],
+                record.get("supersedes_observation_id"),
                 int("supersedes_observation_id" in record),
                 _extras(record, _PRICE_FIELDS),
             ),
@@ -949,12 +1213,17 @@ def _insert_bundle(connection: sqlite3.Connection, bundle: Mapping[str, Any]) ->
             "replacement_observation_id, record_json"
             ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                record["id"], dataset_id, record.get("detected_at"),
-                record.get("impact"), record.get("resolution"),
-                record.get("approved_by"), record.get("new_vintage"),
+                record["id"],
+                dataset_id,
+                record.get("detected_at"),
+                record.get("impact"),
+                record.get("resolution"),
+                record.get("approved_by"),
+                record.get("new_vintage"),
                 record.get("supersedes_correction_id"),
                 record.get("superseded_observation_id"),
-                record.get("replacement_observation_id"), _canonical_json(record),
+                record.get("replacement_observation_id"),
+                _canonical_json(record),
             ),
         )
 
@@ -964,8 +1233,8 @@ def _require_initialized(connection: sqlite3.Connection) -> None:
     if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
         raise StoreError("SQLite foreign-key enforcement is not enabled")
     row = connection.execute("PRAGMA user_version").fetchone()
-    if row is None or row[0] != 1:
-        raise StoreError("KAPI schema version 1 is not initialized")
+    if row is None or row[0] != 2:
+        raise StoreError("KAPI schema version 2 is not initialized")
 
 
 def _mapping(value: Any, context: str) -> Mapping[str, Any]:
@@ -995,9 +1264,7 @@ def _boolean(record: Mapping[str, Any], key: str, context: str) -> bool:
     return record[key]
 
 
-def _integer(
-    record: Mapping[str, Any], key: str, context: str, *, minimum: int
-) -> int:
+def _integer(record: Mapping[str, Any], key: str, context: str, *, minimum: int) -> int:
     if key not in record or type(record[key]) is not int:
         raise StoreError(f"{context}.{key} must be an integer")
     if record[key] < minimum:
@@ -1023,7 +1290,9 @@ def _decimal(
 def _timestamp(record: Mapping[str, Any], key: str, context: str) -> datetime:
     value = _text(record, key, context)
     if not value.endswith("Z"):
-        raise StoreError(f"{context}.{key} must be an ISO-8601 UTC timestamp ending in Z")
+        raise StoreError(
+            f"{context}.{key} must be an ISO-8601 UTC timestamp ending in Z"
+        )
     try:
         parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError as exc:
@@ -1061,7 +1330,10 @@ def _reject_cycles(edges: Mapping[str, str], context: str) -> None:
 def _canonical_json(value: Any) -> str:
     try:
         return json.dumps(
-            value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
             allow_nan=False,
         )
     except (TypeError, ValueError) as exc:
@@ -1070,7 +1342,9 @@ def _canonical_json(value: Any) -> str:
 
 def _extras(record: Mapping[str, Any], known_fields: Iterable[str]) -> str:
     known = set(known_fields)
-    return _canonical_json({key: value for key, value in record.items() if key not in known})
+    return _canonical_json(
+        {key: value for key, value in record.items() if key not in known}
+    )
 
 
 def _load_object(value: str, context: str) -> dict[str, Any]:
@@ -1087,6 +1361,8 @@ def _with_metadata(record: dict[str, Any], row: sqlite3.Row) -> dict[str, Any]:
     extras = _load_object(row["metadata_json"], "metadata_json")
     overlap = set(extras).intersection(record)
     if overlap:
-        raise StoreError("metadata conflicts with normalized fields: " + ", ".join(sorted(overlap)))
+        raise StoreError(
+            "metadata conflicts with normalized fields: " + ", ".join(sorted(overlap))
+        )
     extras.update(record)
     return extras

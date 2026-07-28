@@ -15,7 +15,13 @@ from decimal import Decimal, InvalidOperation, localcontext
 from itertools import combinations, product
 from typing import Any, Iterable, Mapping, Sequence
 
-from .util import artifact_notice
+from .governance import CURRENT_UNREVIEWED_LABEL
+from .util import artifact_notice, canonical_json_bytes, sha256_bytes
+from .validation import (
+    FORWARD_BOUNDED_FIXTURE_SHA256,
+    find_forward_bundle_scalar_grammar_violations,
+    requires_forward_governance_contract,
+)
 
 
 class CalculationError(ValueError):
@@ -855,7 +861,7 @@ class _Calculator:
                 exclusions.append({"endpoint_id": endpoint_id, "reasons": reasons})
             else:
                 candidates.append(candidate)
-        independent_triples = []
+        provider_creator_diverse_triples = []
         for triple in combinations(candidates, 3):
             if len({item["provider_id"] for item in triple}) != 3:
                 continue
@@ -864,7 +870,7 @@ class _Calculator:
             ordered = sorted(triple, key=lambda item: (item["cost"], item["endpoint_id"]))
             total = sum((item["cost"] for item in triple), Decimal(0))
             endpoint_ids = tuple(sorted(str(item["endpoint_id"]) for item in triple))
-            independent_triples.append(
+            provider_creator_diverse_triples.append(
                 {
                     "members": triple,
                     "ordered": ordered,
@@ -874,18 +880,18 @@ class _Calculator:
                     "endpoint_ids": endpoint_ids,
                 }
             )
-        if not independent_triples:
+        if not provider_creator_diverse_triples:
             return {
                 "profile_id": profile["id"],
                 "status": "withheld_incomplete",
-                "diagnostics": ["no_independent_three_provider_creator_triple"],
+                "diagnostics": ["no_three_provider_three_creator_diverse_triple"],
                 "eligible_candidate_count": len(candidates),
                 "candidates": candidates,
                 "exclusions": exclusions,
             }
 
-        selected = min(independent_triples, key=lambda item: (item["median"], item["total"], item["endpoint_ids"]))
-        mean_selected = min(independent_triples, key=lambda item: (item["mean"], item["median"], item["total"], item["endpoint_ids"]))
+        selected = min(provider_creator_diverse_triples, key=lambda item: (item["median"], item["total"], item["endpoint_ids"]))
+        mean_selected = min(provider_creator_diverse_triples, key=lambda item: (item["mean"], item["median"], item["total"], item["endpoint_ids"]))
         setter = selected["ordered"][1]
         frontier = min(candidates, key=lambda item: (item["cost"], item["endpoint_id"]))
         selected_lineage = {
@@ -1041,7 +1047,7 @@ class _Calculator:
                     "cutoff": week["cutoff"],
                     "declared_complete": declared_complete,
                     "complete": complete,
-                    "publishable": complete and concentration["status"] != "withhold" and self.evidence_mode == "official",
+                    "eligible_for_governance_review": complete and concentration["status"] != "withhold" and self.evidence_mode == "official",
                     "status": status,
                     "profiles": profiles,
                     "representative_profile_cost": basket,
@@ -1136,7 +1142,7 @@ class _Calculator:
         previous_cutoff: datetime | None = None
         for index, week in enumerate(week_results):
             # The calculator applies deterministic calculation-state policy.
-            # Human signoff, reproduction and material-correction states are
+            # Human governance, reproduction and material-correction states are
             # applied by the append-only lifecycle gate before finalization.
             if not week["complete"] or week.get("status") in noncounting:
                 run = []
@@ -1237,7 +1243,14 @@ class _Calculator:
             elif week["status"] == "research_only":
                 release_status = "research_only"
             else:
-                release_status = "publishable"
+                release_status = "eligible_for_governance_review"
+            calculation_disposition = (
+                "eligible"
+                if release_status == "eligible_for_governance_review"
+                else "incomplete"
+                if release_status == "withheld_incomplete"
+                else "withheld"
+            )
             condensed_weeks.append(
                 {
                     "week_id": week["id"],
@@ -1246,6 +1259,11 @@ class _Calculator:
                         "complete" if week["complete"] else "incomplete"
                     ),
                     "release_status": release_status,
+                    "calculation_disposition": calculation_disposition,
+                    "governance_state": "unreviewed",
+                    "review_label": CURRENT_UNREVIEWED_LABEL,
+                    "publication_state": "not_authorized",
+                    "publication_eligible": False,
                     "basket_unit_cost": week["representative_profile_cost"],
                     "basket_60_cost": week["basket_cost"],
                     "index_level": week["index"],
@@ -1652,7 +1670,14 @@ class _Calculator:
             elif self.evidence_mode == "research":
                 release_status = "research_only"
             else:
-                release_status = "publishable"
+                release_status = "eligible_for_governance_review"
+            calculation_disposition = (
+                "eligible"
+                if release_status == "eligible_for_governance_review"
+                else "incomplete"
+                if release_status == "withheld_incomplete"
+                else "withheld"
+            )
             week_over_week = (
                 _HUNDRED * (week["representative_profile_cost"] / previous_week["representative_profile_cost"] - Decimal(1))
                 if previous_comparable and previous_week["representative_profile_cost"] != 0
@@ -1680,6 +1705,11 @@ class _Calculator:
                     "cutoff_at": week["cutoff_at"],
                     "calculation_status": "complete" if week["complete"] else "incomplete",
                     "release_status": release_status,
+                    "calculation_disposition": calculation_disposition,
+                    "governance_state": "unreviewed",
+                    "review_label": CURRENT_UNREVIEWED_LABEL,
+                    "publication_state": "not_authorized",
+                    "publication_eligible": False,
                     "basket_unit_cost": week["representative_profile_cost"],
                     "basket_60_cost": week["basket_cost"],
                     "index_level": week["index"],
@@ -1737,6 +1767,11 @@ class _Calculator:
             "weights": weights,
             "basket_profile_count": self.total_profile_count,
             "status": overall_status,
+            "calculation_disposition": public_weeks[-1]["calculation_disposition"],
+            "governance_state": "unreviewed",
+            "review_label": CURRENT_UNREVIEWED_LABEL,
+            "publication_state": "not_authorized",
+            "publication_eligible": False,
             "base_period": public_base,
             "weeks": public_weeks,
             "sensitivities": sensitivity_results,
@@ -1758,6 +1793,100 @@ def calculate_index(
     states in the returned dictionary.  ``CalculationError`` is reserved for
     malformed or contradictory input contracts that cannot be interpreted
     deterministically.
+    """
+
+    forward_contract = requires_forward_governance_contract(bundle, methodology)
+    if not forward_contract:
+        raise CalculationError(
+            "the active calculation entry point accepts only the exact v0.3.0 "
+            "bundle/methodology pair; v0.2.x artifacts are read-only and must "
+            "be reproduced from their pinned historical code vintage"
+        )
+
+    if forward_contract:
+        if (
+            methodology.get("version") != "0.3.0"
+            or bundle.get("schema_version") != "kapi-bundle-v0.3.0"
+        ):
+            raise CalculationError(
+                "forward-governance inputs require the exact v0.3.0 "
+                "bundle/methodology pair"
+            )
+        expected_binding = {
+            "config_path": "kapi/config/methodology-v0.3.0.json",
+            "config_sha256": sha256_bytes(canonical_json_bytes(methodology)),
+            "id": methodology.get("methodology_id"),
+            "version": "0.3.0",
+        }
+        if "expected_result" in bundle or "generation" in bundle:
+            raise CalculationError(
+                "v0.3.0 calculation rejects caller oracle and spend-success metadata"
+            )
+        if bundle.get("methodology") != expected_binding:
+            raise CalculationError(
+                "bundle methodology binding does not match supplied v0.3.0 document"
+            )
+        scalar_violations = find_forward_bundle_scalar_grammar_violations(bundle)
+        if scalar_violations:
+            raise CalculationError(
+                "v0.3.0 bundle values violate the closed public scalar grammar/"
+                "type contract: "
+                + ", ".join(scalar_violations[:3])
+            )
+        if (
+            sha256_bytes(canonical_json_bytes(bundle))
+            != FORWARD_BOUNDED_FIXTURE_SHA256
+        ):
+            raise CalculationError(
+                "v0.3.0 calculation accepts only the canonical bounded forward "
+                "fixture; dynamic or observed inputs require a new schema vintage"
+            )
+        required_id_prefixes = {
+            "weeks": "week-",
+            "providers": "provider-",
+            "creators": "creator-",
+            "models": "model-",
+            "endpoints": "endpoint-",
+            "source_artifacts": "source-",
+            "capability_evidence": "capability-",
+            "token_counts": "tokens-",
+            "price_observations": "price-",
+            "corrections": "correction-",
+        }
+        for collection, prefix in required_id_prefixes.items():
+            records = bundle.get(collection)
+            if not isinstance(records, list) or any(
+                not isinstance(record, Mapping)
+                or not isinstance(record.get("id"), str)
+                or not record["id"].startswith(prefix)
+                for record in records
+            ):
+                raise CalculationError(
+                    f"v0.3.0 {collection} IDs must start with {prefix}"
+                )
+
+    return _calculate_index_unchecked(
+        bundle,
+        methodology,
+        evidence_mode=evidence_mode,
+        capability_threshold=capability_threshold,
+        weights=weights,
+    )
+
+
+def _calculate_index_unchecked(
+    bundle: Mapping[str, Any],
+    methodology: Mapping[str, Any],
+    *,
+    evidence_mode: str = "official",
+    capability_threshold: Any = None,
+    weights: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Exercise the pure arithmetic engine without the active release boundary.
+
+    This internal function exists for algorithm unit tests and historical
+    compatibility simulations only. Release, CLI, and reproduction paths must
+    call :func:`calculate_index`, which admits only the pinned current fixture.
     """
 
     with localcontext() as context:

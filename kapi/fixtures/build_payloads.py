@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build deterministic KAPI synthetic payloads without requiring local assets.
 
-Portable generation uses a frozen manifest containing only the 12 approved
+Portable generation uses a frozen manifest containing only the 12 pinned
 construction chunks and ranks. Full proof against the hashed ``o200k_base``
 asset is a separate, explicitly requested operation. Neither mode verifies a
 model tokenizer mapping, provider request count, or billing equivalence.
@@ -20,7 +20,7 @@ from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONSTRUCTION_MANIFEST_PATH = (
-    REPO_ROOT / "kapi/fixtures/o200k-construction-manifest-v1.json"
+    REPO_ROOT / "kapi/fixtures/o200k-construction-manifest-v2.json"
 )
 O200K_ASSET_ENV = "KAPI_O200K_ASSET_PATH"
 O200K_ASSET_SHA256 = (
@@ -117,7 +117,7 @@ def build_construction_manifest(ranks: Mapping[bytes, int]) -> dict[str, Any]:
             "algorithm": (
                 "verify the complete source asset SHA-256, parse each non-empty "
                 "line as base64 token bytes plus decimal rank, and select the exact "
-                "UTF-8 bytes of the 12 approved construction chunks"
+                "UTF-8 bytes of the 12 pinned construction chunks"
             ),
             "full_source_asset_required_for_derivation_and_proof": True,
             "portable_payload_generation_requires_full_source_asset": False,
@@ -125,7 +125,7 @@ def build_construction_manifest(ranks: Mapping[bytes, int]) -> dict[str, Any]:
         },
         "entries": entries,
         "manifest_id": "kapi-o200k-construction-chunks",
-        "manifest_version": "1",
+        "manifest_version": "2",
         "nonclaims": NONCLAIMS,
         "reference_encoding": "o200k_base",
         "tiktoken_package_version": TIKTOKEN_VERSION,
@@ -145,7 +145,7 @@ def load_frozen_manifest(
         raise ValueError("construction manifest is not canonical JSON")
     if document.get("manifest_id") != "kapi-o200k-construction-chunks":
         raise ValueError("unexpected construction manifest id")
-    if document.get("manifest_version") != "1":
+    if document.get("manifest_version") != "2":
         raise ValueError("unexpected construction manifest version")
     if document.get("reference_encoding") != "o200k_base":
         raise ValueError("unexpected construction manifest encoding")
@@ -336,7 +336,14 @@ def main() -> int:
     try:
         if args.verify_source_asset:
             digest = verify_source_asset(_resolve_asset_path(args.asset_path))
-            print(json.dumps({"construction_manifest_sha256": digest, "verified": True}))
+            print(
+                json.dumps(
+                    {
+                        "construction_manifest_sha256": digest,
+                        "source_asset_manifest_match": True,
+                    }
+                )
+            )
             return 0
         if args.asset_path:
             parser.error("--asset-path is valid only with --verify-source-asset")

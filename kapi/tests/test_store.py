@@ -6,6 +6,7 @@ import copy
 import sqlite3
 import unittest
 
+from kapi.governance import CURRENT_UNREVIEWED_LABEL
 from kapi.store import (
     APPEND_ONLY_TABLES,
     StoreError,
@@ -13,6 +14,7 @@ from kapi.store import (
     ingest_bundle,
     init_database,
 )
+from kapi.util import canonical_json_text
 
 
 HASH_A = "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
@@ -24,15 +26,9 @@ def sample_bundle() -> dict:
         "schema_version": "kapi-bundle-v0.1.0",
         "dataset_id": "synthetic-store-test-v1",
         "dataset_kind": "synthetic",
-        "weeks": [
-            {"id": "week-2026-07-03", "cutoff_at": "2026-07-03T16:00:00Z"}
-        ],
-        "providers": [
-            {"id": "provider-a", "name": "Provider A", "synthetic": True}
-        ],
-        "creators": [
-            {"id": "creator-a", "name": "Creator A", "synthetic": True}
-        ],
+        "weeks": [{"id": "week-2026-07-03", "cutoff_at": "2026-07-03T16:00:00Z"}],
+        "providers": [{"id": "provider-a", "name": "Provider A", "synthetic": True}],
+        "creators": [{"id": "creator-a", "name": "Creator A", "synthetic": True}],
         "models": [
             {
                 "id": "model-a-v1",
@@ -201,7 +197,9 @@ class StoreTests(unittest.TestCase):
             )
         self.connection.rollback()
         with self.assertRaisesRegex(sqlite3.IntegrityError, "append-only"):
-            self.connection.execute("DELETE FROM source_artifacts WHERE id = 'source-a'")
+            self.connection.execute(
+                "DELETE FROM source_artifacts WHERE id = 'source-a'"
+            )
         self.connection.rollback()
         with self.assertRaisesRegex(sqlite3.IntegrityError, "append-only"):
             self.connection.execute("DELETE FROM datasets")
@@ -295,9 +293,7 @@ class StoreTests(unittest.TestCase):
 
     def test_embedded_source_content_hash_is_enforced_by_store_api(self) -> None:
         bundle = sample_bundle()
-        bundle["source_artifacts"][0]["synthetic_content"] = {
-            "changed": True
-        }
+        bundle["source_artifacts"][0]["synthetic_content"] = {"changed": True}
 
         with self.assertRaisesRegex(StoreError, "embedded snapshot bytes"):
             ingest_bundle(self.connection, bundle)
@@ -343,39 +339,85 @@ class StoreTests(unittest.TestCase):
 
         orphan_correction = sample_bundle()
         orphan_correction["corrections"] = [{"id": "orphan-correction"}]
-        with self.assertRaisesRegex(
-            StoreError, "superseded_observation_id"
-        ):
+        with self.assertRaisesRegex(StoreError, "superseded_observation_id"):
             ingest_bundle(self.connection, orphan_correction)
 
-    def test_calculation_and_release_lineage_is_foreign_keyed_and_append_only(self) -> None:
+    def test_calculation_and_release_lineage_is_foreign_keyed_and_append_only(
+        self,
+    ) -> None:
         ingest_bundle(self.connection, sample_bundle())
         self.connection.execute(
             "INSERT INTO methodology_versions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                "method-v1", "1.0", "claim", "scope", "{}", "{}", "{}", "{}",
-                "{}", "2026-01-01T00:00:00Z", None,
+                "method-v1",
+                "1.0",
+                "claim",
+                "scope",
+                "{}",
+                "{}",
+                "{}",
+                "{}",
+                "{}",
+                "2026-01-01T00:00:00Z",
+                None,
             ),
         )
         self.connection.execute(
             "INSERT INTO weekly_snapshots VALUES(?, ?, ?, ?, ?, ?)",
             (
-                "snapshot-v1", "synthetic-store-test-v1", "week-2026-07-03",
-                "2026-07-03T16:00:00Z", "2026-07-03T16:05:00Z", HASH_A,
+                "snapshot-v1",
+                "synthetic-store-test-v1",
+                "week-2026-07-03",
+                "2026-07-03T16:00:00Z",
+                "2026-07-03T16:05:00Z",
+                HASH_A,
             ),
         )
         self.connection.execute(
             "INSERT INTO calculations VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                "calculation-v1", "snapshot-v1", "method-v1", "1.0", "abc123",
-                HASH_B, "2026-07-03T16:10:00Z", "complete", "100.0", "1.25", "{}",
+                "calculation-v1",
+                "snapshot-v1",
+                "method-v1",
+                "1.0",
+                "abc123",
+                HASH_B,
+                "2026-07-03T16:10:00Z",
+                "complete",
+                "100.0",
+                "1.25",
+                canonical_json_text(
+                    {
+                        "base_week_states": [],
+                        "calculation_disposition": "eligible",
+                        "governance_state": "unreviewed",
+                        "publication_eligible": False,
+                        "publication_state": "not_authorized",
+                        "release_kind": "provisional_base",
+                        "review_label": CURRENT_UNREVIEWED_LABEL,
+                        "secondary_recalculation": {
+                            "human_external_review": False,
+                            "lifecycle_handling": (
+                                "no secondary recalculation report accepted by "
+                                "policy v1.0.0"
+                            ),
+                            "status": "not_supplied",
+                        },
+                    }
+                ).rstrip("\n"),
             ),
         )
         self.connection.execute(
             "INSERT INTO releases VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                "release-v1", "calculation-v1", "week-2026-07-03", "v1",
-                "provisional", "2026-07-06T15:00:00Z", "/kapi/releases/v1", None,
+                "release-v1",
+                "calculation-v1",
+                "week-2026-07-03",
+                "v1",
+                "provisional",
+                "2026-07-06T15:00:00Z",
+                "/kapi/releases/v1",
+                None,
             ),
         )
         self.connection.commit()

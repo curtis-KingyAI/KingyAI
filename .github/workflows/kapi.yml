@@ -41,13 +41,13 @@ jobs:
         run: python -m unittest discover -s kapi/tests -v
 
       - name: Validate methodology
-        run: python -m kapi validate-method --method kapi/config/methodology-v0.2.2.json
+        run: python -m kapi validate-method --method kapi/config/methodology-v0.3.0.json
 
       - name: Validate synthetic bundle
         run: >-
           python -m kapi validate
-          --bundle kapi/fixtures/synthetic-hand-example-v1.json
-          --method kapi/config/methodology-v0.2.2.json
+          --bundle kapi/fixtures/synthetic-forward-governance-v0.3.0.json
+          --method kapi/config/methodology-v0.3.0.json
 
       - name: Verify portable payload reproduction
         run: env -u KAPI_O200K_ASSET_PATH python kapi/fixtures/build_payloads.py --check-frozen-manifest
@@ -55,8 +55,13 @@ jobs:
       - name: Verify deterministic fixture
         run: python kapi/fixtures/build_synthetic.py --check
 
+      - name: Verify forward v0.3 bundle projection
+        run: python kapi/fixtures/build_forward_bundle.py --check
+
       - name: Reproduce sample release
-        run: python -m kapi reproduce --release-dir kapi/outputs/sample-release-v0.2.2
+        run: >-
+          python -m kapi reproduce
+          --release-dir kapi/outputs/sample-release-governance-v1.0.0
 
       - name: Confirm checks did not mutate tracked files
         run: |
