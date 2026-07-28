@@ -72,10 +72,15 @@ EXPECTED_TRUSTED_SPARSE_PATHS = frozenset(
 )
 LEGACY_BOOTSTRAP_CHECK_NAME = "verify"
 PR4_BOOTSTRAP_BASE_SHA = "6070f10c9ab5611c0966056a43eb24ae6beda7ce"
-PROTECTED_GOVERNANCE_PATHS = (
-    POLICY_PATH,
-    GOVERNANCE_README_PATH,
-    CODEOWNERS_PATH,
+# Governance files, split by kind.
+#
+# The anti-self-blessing rule -- a change must not be judged by logic derived from
+# that same change -- applies to code that defines the check. It does not apply to
+# a declarative document that the *trusted base* validator can judge, because the
+# evaluating code is unchanged in that case. Applying the executable rule to
+# declarative documents made the policy unchangeable by any path, including the
+# policy-only pull request the README's own step 9 requires.
+EXECUTABLE_GOVERNANCE_PATHS = (
     pathlib.PurePosixPath(".github/scripts/kapi_governance.py"),
     pathlib.PurePosixPath(".github/scripts/kapi_ready_guard.py"),
     pathlib.PurePosixPath(".github/scripts/kapi_ready_reconcile.py"),
@@ -83,6 +88,39 @@ PROTECTED_GOVERNANCE_PATHS = (
     LEGACY_BOOTSTRAP_WORKFLOW,
     REQUIRED_WORKFLOW,
     GUARD_WORKFLOW,
+)
+
+# Declarative, but not machine-validatable. CODEOWNERS routes review privilege;
+# the README is the normative procedure operators act on. Nothing can check either
+# for truthfulness, so a false claim added to them is exactly the threat, and they
+# stay under the strict rule. They ride along in the same operator-reviewed change
+# as the code they describe, which is where they belong anyway.
+NORMATIVE_GOVERNANCE_PATHS = (CODEOWNERS_PATH, GOVERNANCE_README_PATH)
+
+# Declarative AND machine-validatable. Policy.load, running from the trusted base,
+# already refuses every dangerous shape of this document, so the safety property
+# does not depend on blocking the file -- it depends on validating it.
+VALIDATED_GOVERNANCE_PATHS = (POLICY_PATH,)
+
+# The manifest hashes this set sorted by path, so regrouping does not change it.
+PROTECTED_GOVERNANCE_PATHS = (
+    EXECUTABLE_GOVERNANCE_PATHS + NORMATIVE_GOVERNANCE_PATHS + VALIDATED_GOVERNANCE_PATHS
+)
+
+STRICT_GOVERNANCE_PATHS = frozenset(EXECUTABLE_GOVERNANCE_PATHS + NORMATIVE_GOVERNANCE_PATHS)
+
+# The only policy fields a declarative change may alter. Everything else --
+# repository_id, audit_actor_id, allowed_ready_actor_ids, automation_actor_ids,
+# draft_restoration_mode, the TTLs -- defines who may act rather than what has been
+# attested, and stays under the strict rule.
+MUTABLE_POLICY_FIELDS = frozenset(
+    {
+        "human_authorizer_actor_ids",
+        "dedicated_verifier_integration_id",
+        "credential_separation_attested",
+        "dedicated_verifier_attested",
+        "activation_state",
+    }
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 NONCE_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -867,6 +905,71 @@ def _trusted_sparse_checkout_entries(
     return blocks
 
 
+def validate_policy_change(
+    root_path: pathlib.Path,
+    trusted_path: pathlib.Path,
+    changed: list[pathlib.PurePosixPath],
+) -> list[str]:
+    """Judge a policy-only governance change.
+
+    Safe because the judging code is the trusted base, unchanged by the pull
+    request, and because ``Policy.load`` already refuses a policy that would
+    loosen the gate: ``active`` requires a separate human authorizer, both
+    attestations, and a verifier integration distinct from GitHub Actions.
+
+    Every failure path here is closed. Unreadable, unparseable, ambiguous, or
+    outside the permitted field set all produce an error.
+    """
+    errors: list[str] = []
+    if POLICY_PATH not in changed:
+        return errors  # documentation-only change
+
+    candidate_policy = root_path / POLICY_PATH
+    trusted_policy = trusted_path / POLICY_PATH
+
+    try:
+        Policy.load(candidate_policy)
+    except (GovernanceError, OSError, json.JSONDecodeError) as exc:
+        errors.append(
+            f"candidate {POLICY_PATH} fails the trusted validator: {exc}; "
+            "the validator is unchanged by this pull request, so this is an "
+            "invariant violation rather than a disagreement about rules"
+        )
+        return errors
+
+    try:
+        candidate = json.loads(candidate_policy.read_text(encoding="utf-8"))
+        trusted = json.loads(trusted_policy.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        errors.append(f"could not compare {POLICY_PATH} against the trusted base: {exc}")
+        return errors
+
+    if not isinstance(candidate, dict) or not isinstance(trusted, dict):
+        errors.append(f"{POLICY_PATH} must be a JSON object on both sides")
+        return errors
+
+    changed_fields = sorted(
+        key
+        for key in set(candidate) | set(trusted)
+        if candidate.get(key) != trusted.get(key)
+    )
+    if not changed_fields:
+        errors.append(
+            f"{POLICY_PATH} differs from the trusted base but no field value changed; "
+            "reformatting a protected governance file is not a permitted change"
+        )
+        return errors
+
+    forbidden = [key for key in changed_fields if key not in MUTABLE_POLICY_FIELDS]
+    if forbidden:
+        permitted = ", ".join(sorted(MUTABLE_POLICY_FIELDS))
+        errors.append(
+            f"candidate {POLICY_PATH} changes fields that a policy-only pull request "
+            f"may not change: {', '.join(forbidden)}; permitted fields are {permitted}"
+        )
+    return errors
+
+
 def scan_workflows(
     root: pathlib.Path | str,
     trusted_root: pathlib.Path | str | None = None,
@@ -879,6 +982,7 @@ def scan_workflows(
 
     if trusted_root is not None:
         trusted_path = pathlib.Path(trusted_root)
+        changed: list[pathlib.PurePosixPath] = []
         for relative in PROTECTED_GOVERNANCE_PATHS:
             trusted_file = trusted_path / relative
             candidate_file = root_path / relative
@@ -889,14 +993,32 @@ def scan_workflows(
                 errors.append(f"candidate removes protected governance file {relative}")
                 continue
             if candidate_file.read_bytes() != trusted_file.read_bytes():
-                errors.append(
-                    f"candidate changes protected governance file {relative}; "
-                    "protected governance files cannot be changed by an ordinary pull "
-                    "request. See .github/kapi-governance/README.md: executable "
-                    "governance (scripts, tests, workflows) requires a new version "
-                    "evaluated by the external verifier, and policy changes are step 9 "
-                    "of the numbered sequence there"
-                )
+                changed.append(relative)
+
+        strict_changed = [r for r in changed if r in STRICT_GOVERNANCE_PATHS]
+        validated_changed = [r for r in changed if r not in STRICT_GOVERNANCE_PATHS]
+
+        for relative in strict_changed:
+            errors.append(
+                f"candidate changes protected governance file {relative}; "
+                "executable and normative governance cannot be changed by an "
+                "ordinary pull request. See .github/kapi-governance/README.md: it "
+                "requires a new version evaluated by the external verifier"
+            )
+
+        if validated_changed and strict_changed:
+            # Isolation. This is what preserves the anti-self-blessing property: a
+            # change may touch declarative governance or executable governance, never
+            # both, so declarative changes are always judged by unchanged code.
+            errors.append(
+                "candidate changes the policy and other protected governance in the "
+                "same pull request; split them so the policy change is judged by "
+                "unchanged code"
+            )
+        elif validated_changed:
+            errors.extend(
+                validate_policy_change(root_path, trusted_path, validated_changed)
+            )
 
     files = sorted(
         path

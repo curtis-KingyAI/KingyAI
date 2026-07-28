@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import json
 import os
 import pathlib
 import shutil
@@ -18,6 +19,9 @@ sys.path.insert(0, str(SCRIPTS))
 from kapi_governance import (  # noqa: E402
     AUTH_MARKER,
     AUTH_SCHEMA,
+    EXECUTABLE_GOVERNANCE_PATHS,
+    NORMATIVE_GOVERNANCE_PATHS,
+    VALIDATED_GOVERNANCE_PATHS,
     Comment,
     GovernanceError,
     Policy,
@@ -1190,12 +1194,16 @@ class WorkflowScannerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errors = scan_workflows(candidate, trusted)
+        # Still rejected -- and for a stronger reason than before. The scanner no
+        # longer refuses every policy diff on sight; the trusted-base validator
+        # refuses an active policy that lacks its prerequisites. The blunt rule made
+        # the policy unchangeable by any path, including step 9's own policy-only PR.
         self.assertTrue(
-            any(
-                "candidate changes protected governance file .github/kapi-governance/policy-v1.json"
-                in error
-                for error in errors
-            )
+            any("fails the trusted validator" in error for error in errors), errors
+        )
+        self.assertTrue(
+            any("requires a separate human authorizer" in error for error in errors),
+            errors,
         )
 
     def test_trusted_scanner_rejects_candidate_codeowners_tampering(self) -> None:
@@ -1278,3 +1286,143 @@ class EnvironmentParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PolicyChangeLaneTests(unittest.TestCase):
+    """The tier split: policy may change, but only in ways the trusted validator allows.
+
+    Every case here is judged by the *base* implementation. A pull request can never
+    supply the code that judges it, which is the property the blunt rule was
+    protecting and this lane preserves.
+    """
+
+    def _copy_github(self, root: pathlib.Path) -> None:
+        shutil.copytree(ROOT / ".github", root / ".github")
+
+    def _scan(self, mutate):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            trusted = root / "trusted"
+            candidate = root / "candidate"
+            self._copy_github(trusted)
+            self._copy_github(candidate)
+            mutate(candidate)
+            return scan_workflows(candidate, trusted)
+
+    @staticmethod
+    def _edit_policy(**changes):
+        def mutate(candidate: pathlib.Path) -> None:
+            path = candidate / ".github" / "kapi-governance" / "policy-v1.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            document.update(changes)
+            path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+        return mutate
+
+    # -- permitted ---------------------------------------------------------
+
+    def test_recording_the_human_authorizer_is_permitted(self):
+        self.assertEqual(self._scan(self._edit_policy(human_authorizer_actor_ids=[302366674])), [])
+
+    def test_recording_the_verifier_and_attestations_is_permitted(self):
+        self.assertEqual(
+            self._scan(
+                self._edit_policy(
+                    human_authorizer_actor_ids=[302366674],
+                    dedicated_verifier_integration_id=987654,
+                    credential_separation_attested=True,
+                    dedicated_verifier_attested=True,
+                    activation_state="active",
+                )
+            ),
+            [],
+        )
+
+    # -- refused by the validator -----------------------------------------
+
+    def test_activation_without_attestations_is_refused(self):
+        errors = self._scan(
+            self._edit_policy(activation_state="active", human_authorizer_actor_ids=[302366674])
+        )
+        self.assertTrue(any("fails the trusted validator" in e for e in errors), errors)
+
+    def test_actions_app_as_dedicated_verifier_is_refused(self):
+        errors = self._scan(
+            self._edit_policy(
+                human_authorizer_actor_ids=[302366674],
+                dedicated_verifier_integration_id=15368,
+                credential_separation_attested=True,
+                dedicated_verifier_attested=True,
+                activation_state="active",
+            )
+        )
+        self.assertTrue(errors)
+
+    def test_authorizer_overlapping_automation_is_refused(self):
+        errors = self._scan(self._edit_policy(human_authorizer_actor_ids=[227671038]))
+        self.assertTrue(any("fails the trusted validator" in e for e in errors), errors)
+
+    # -- refused by the field allowlist -----------------------------------
+
+    def test_changing_who_may_act_is_refused(self):
+        for field, value in (
+            ("allowed_ready_actor_ids", [999999]),
+            ("automation_actor_ids", [999999]),
+            ("repository_id", 7),
+            ("audit_actor_id", 7),
+            ("authorization_ttl_seconds", 599),
+        ):
+            with self.subTest(field=field):
+                errors = self._scan(self._edit_policy(**{field: value}))
+                self.assertTrue(
+                    any("may not change" in e or "fails the trusted validator" in e for e in errors),
+                    (field, errors),
+                )
+
+    def test_reformatting_without_a_field_change_is_refused(self):
+        def mutate(candidate: pathlib.Path) -> None:
+            path = candidate / ".github" / "kapi-governance" / "policy-v1.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            path.write_text(json.dumps(document, indent=4) + "\n", encoding="utf-8")
+
+        errors = self._scan(mutate)
+        self.assertTrue(any("no field value changed" in e for e in errors), errors)
+
+    # -- isolation ---------------------------------------------------------
+
+    def test_policy_plus_executable_in_one_pull_request_is_refused(self):
+        def mutate(candidate: pathlib.Path) -> None:
+            self._edit_policy(human_authorizer_actor_ids=[302366674])(candidate)
+            script = candidate / ".github" / "scripts" / "kapi_ready_guard.py"
+            script.write_text(script.read_text(encoding="utf-8") + "\n# rider\n", encoding="utf-8")
+
+        errors = self._scan(mutate)
+        self.assertTrue(any("same pull request" in e for e in errors), errors)
+        self.assertTrue(any("kapi_ready_guard.py" in e for e in errors), errors)
+
+    # -- the original rule still holds for everything else -----------------
+
+    def test_executable_change_alone_is_still_refused(self):
+        def mutate(candidate: pathlib.Path) -> None:
+            script = candidate / ".github" / "scripts" / "kapi_governance.py"
+            script.write_text(script.read_text(encoding="utf-8") + "\n# rider\n", encoding="utf-8")
+
+        errors = self._scan(mutate)
+        self.assertTrue(any("cannot be changed by an ordinary pull request" in e for e in errors), errors)
+
+    def test_readme_change_alone_is_still_refused(self):
+        def mutate(candidate: pathlib.Path) -> None:
+            readme = candidate / ".github" / "kapi-governance" / "README.md"
+            readme.write_text(readme.read_text(encoding="utf-8") + "\nUnsupported claim.\n", encoding="utf-8")
+
+        errors = self._scan(mutate)
+        self.assertTrue(errors, "the normative procedure document must stay strict")
+
+    def test_protected_manifest_membership_is_unchanged_by_the_split(self):
+        self.assertEqual(
+            set(PROTECTED_GOVERNANCE_PATHS),
+            set(EXECUTABLE_GOVERNANCE_PATHS)
+            | set(NORMATIVE_GOVERNANCE_PATHS)
+            | set(VALIDATED_GOVERNANCE_PATHS),
+        )
+        self.assertEqual(len(PROTECTED_GOVERNANCE_PATHS), 10)
