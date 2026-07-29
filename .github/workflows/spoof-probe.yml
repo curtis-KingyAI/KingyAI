@@ -1,0 +1,48 @@
+# ⚠️ PILOT ARTEFACT — belongs on a THROWAWAY branch, never on main.
+#
+# This is RUNBOOK §6, the test that decides whether the whole exercise worked.
+#
+# It emits a check run with the SAME NAME as the dedicated verifier's, from
+# GitHub Actions. Because every Actions job shares App integration 15368, this is
+# exactly what an attacker's pull request could do.
+#
+#   Required check STILL unsatisfied  -> binding is by App identity.  ← THE PASS
+#   Required check satisfied          -> binding is by name only.     ← STOP
+#
+# A green check from the real verifier proves only that it can write a check run.
+# It says nothing about what the ruleset actually requires. This does.
+#
+# Usage:
+#   git switch -c pilot/spoof-probe origin/main
+#   mkdir -p .github/workflows
+#   cp pilot/negative-test-workflow.yml .github/workflows/spoof-probe.yml
+#   git add -A && git commit -m "pilot: negative test for verifier binding"
+#   git push -u origin pilot/spoof-probe
+#   gh pr create --draft --title "pilot: spoof probe (DO NOT MERGE)" --body "RUNBOOK §6. Delete after."
+#
+# Then read the merge box. Afterwards:
+#   gh pr close <n> && git push origin --delete pilot/spoof-probe
+#
+# Expect scan_workflows() to reject this branch too -- that is the second layer
+# working, and it is a pass, not a problem.
+
+name: spoof-probe
+
+on:
+  pull_request:
+
+permissions:
+  checks: write
+
+jobs:
+  kapi-governance-external-v1:
+    name: kapi-governance-external-v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Emit a same-named check from Actions
+        run: |
+          echo "Emitted as '${{ github.job }}' from GitHub Actions App 15368."
+          echo "If this satisfies the main ruleset, the required-check binding is"
+          echo "by context name rather than App identity, and the dedicated"
+          echo "verifier provides no boundary at all. Fix the ruleset source."
