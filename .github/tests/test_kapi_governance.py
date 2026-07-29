@@ -129,6 +129,21 @@ class GovernanceFixture(unittest.TestCase):
         self.live_policy = Policy.load(
             ROOT / ".github" / "kapi-governance" / "policy-v1.json"
         )
+        # A policy pinned to the blocked state.
+        #
+        # Tests asserting "the guard denies when governance is not activated" must say
+        # which policy they mean. Three asserted against `live_policy`, so activating
+        # the deployed policy on 2026-07-29 falsified them and broke the required
+        # `verify` check on every pull request. The behaviour is still worth checking;
+        # it must simply not depend on what happens to be deployed today.
+        self.blocked_policy = dataclasses.replace(
+            self.live_policy,
+            activation_state="blocked_pending_external_verifier_and_human_authorizer",
+            human_authorizer_actor_ids=frozenset(),
+            credential_separation_attested=False,
+            dedicated_verifier_attested=False,
+            dedicated_verifier_integration_id=None,
+        )
         self.policy = dataclasses.replace(
             self.live_policy,
             activation_state="active",
@@ -255,8 +270,8 @@ class GovernanceFixture(unittest.TestCase):
 
 class ReadyGuardTests(GovernanceFixture):
     def test_live_policy_refuses_activation_without_separate_human_authorizer(self) -> None:
-        api = FakeApi(self.snapshot(), [], self.live_policy, self.now)
-        result = execute_guard(api, self.event(), self.live_policy, self.now)
+        api = FakeApi(self.snapshot(), [], self.blocked_policy, self.now)
+        result = execute_guard(api, self.event(), self.blocked_policy, self.now)
         self.assertEqual("denied", result.status)
         self.assertEqual("governance_policy_not_activated", result.reason)
         self.assertEqual("manual_operator_required", result.restoration)
@@ -282,8 +297,8 @@ class ReadyGuardTests(GovernanceFixture):
                 str(ROOT / ".github" / "kapi-governance" / "policy-v1.json")
             )
 
-        api = FakeApi(self.snapshot(), [], self.live_policy, self.now)
-        result = execute_guard(api, event, self.live_policy, self.now)
+        api = FakeApi(self.snapshot(), [], self.blocked_policy, self.now)
+        result = execute_guard(api, event, self.blocked_policy, self.now)
 
         self.assertEqual("denied", result.status)
         self.assertEqual("governance_policy_not_activated", result.reason)
@@ -1187,14 +1202,15 @@ class WorkflowScannerTests(unittest.TestCase):
             self._copy_github(trusted)
             self._copy_github(candidate)
             policy = candidate / ".github" / "kapi-governance" / "policy-v1.json"
-            policy.write_text(
-                policy.read_text(encoding="utf-8").replace(
-                    '"activation_state": "blocked_pending_external_verifier_and_human_authorizer"',
-                    '"activation_state": "active"',
-                    1,
-                ),
-                encoding="utf-8",
-            )
+            # Tamper by parsing, not by replacing an assumed literal. The previous
+            # version searched for a specific activation_state string; once that value
+            # changed in the deployed policy the replace matched nothing and the test
+            # silently asserted on an untampered candidate.
+            document = json.loads(policy.read_text(encoding="utf-8"))
+            document["activation_state"] = "active"
+            document["human_authorizer_actor_ids"] = []
+            document["credential_separation_attested"] = False
+            policy.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
             errors = scan_workflows(candidate, trusted)
         # Still rejected -- and for a stronger reason than before. The scanner no
         # longer refuses every policy diff on sight; the trusted-base validator
