@@ -126,6 +126,12 @@ MUTABLE_POLICY_FIELDS = frozenset(
         "credential_separation_attested",
         "dedicated_verifier_attested",
         "activation_state",
+        # review_positioning is deliberately NOT here. Policy.load hard-requires it to
+        # equal "Operator-reviewed" exactly, so listing it would imply a change the
+        # validator rejects. That pin is a claim-drift guard, the same family as
+        # stronger_review_claims_allowed: false. The fuller positioning prose lives in
+        # kapi-governance/README.md, where it can be stated without becoming a value
+        # any lane could quietly widen.
     }
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")

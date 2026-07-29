@@ -193,14 +193,43 @@ class GitHubApi:
 
 
 def _audit_body(action: str, reason: str, marker: str) -> str:
+    """Human-readable prose for an audit record.
+
+    Every action is handled explicitly and an unknown one raises. This function
+    previously had two branches -- "consumed" and an `else` that said "denied" --
+    so when the "permitted" action was added for the operator-reviewed state, a
+    *permitted* transition was announced to humans as **denied**, with an
+    instruction to restore draft. The machine-readable marker was correct
+    throughout; only the prose lied, which is the harder kind of wrong to notice.
+
+    A silent default is what caused that, so there is no default here.
+    """
     if action == "consumed":
         summary = "KAPI governance consumed a one-use ready authorization."
         recovery = ""
-    else:
+    elif action == "permitted":
+        summary = (
+            "KAPI governance **permitted** this ready-for-review transition: "
+            f"`{reason}`."
+        )
+        recovery = (
+            "\n\nNo human authorization is required or claimed in the "
+            "operator-reviewed activation state, and every integrity check passed: "
+            "repository identity, base and head SHA agreement, trusted-governance "
+            "SHA, open state, allowed ready actor, policy and protected-file hashes."
+            "\n\nNo action is required. The merge boundary is the external required "
+            "check bound to the dedicated verifier, not this guard."
+        )
+    elif action == "denied":
         summary = f"KAPI governance denied ready-for-review transition: `{reason}`."
         recovery = (
             "\n\nAutomatic draft restoration is not an available control. "
             "A human operator must return this pull request to draft if it remains ready."
+        )
+    else:
+        raise GovernanceError(
+            f"no audit prose defined for action {action!r}; add a branch rather than "
+            "letting it fall through to denial language"
         )
     return f"{summary}{recovery}\n\n{marker}"
 

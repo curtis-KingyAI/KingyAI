@@ -18,6 +18,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from kapi_governance import (  # noqa: E402
     ACTIVE_OPERATOR_REVIEWED,
+    MUTABLE_POLICY_FIELDS,
     AUTH_MARKER,
     AUTH_SCHEMA,
     decide_transition,
@@ -42,6 +43,7 @@ from kapi_governance import (  # noqa: E402
 )
 from kapi_ready_guard import (  # noqa: E402
     ApiError,
+    _audit_body,
     GitHubApi,
     event_from_environment,
     execute_guard,
@@ -1594,3 +1596,123 @@ class OperatorReviewedModelTests(GovernanceFixture):
         )
         decision = decide_transition(self.event(), self.snapshot(), [], blocked, self.now)
         self.assertEqual(decision.reason, "governance_policy_not_activated")
+
+
+class AuditProseMatchesTheAction(GovernanceFixture):
+    """The prose a human reads must agree with the machine-readable action.
+
+    A permitted transition was announced as "denied" with an instruction to restore
+    draft, because `_audit_body` had two branches and a third action was added. The
+    marker was correct; only the prose lied.
+    """
+
+    def _body(self, action: str) -> str:
+        marker = make_audit_record(action, self.event(), "some_reason", self.now, None)
+        return _audit_body(action, "some_reason", marker)
+
+    def test_permitted_prose_does_not_say_denied(self):
+        body = self._body("permitted")
+        self.assertIn("permitted", body.lower())
+        self.assertNotIn("denied", body.lower())
+
+    def test_permitted_prose_does_not_demand_draft_restoration(self):
+        self.assertNotIn("return this pull request to draft", self._body("permitted"))
+        self.assertIn("No action is required", self._body("permitted"))
+
+    def test_denied_prose_still_says_denied_and_asks_for_restoration(self):
+        body = self._body("denied")
+        self.assertIn("denied", body.lower())
+        self.assertIn("return this pull request to draft", body)
+
+    def test_consumed_prose_unchanged(self):
+        self.assertIn("consumed a one-use ready authorization", self._body("consumed"))
+
+    def test_an_unknown_action_raises_rather_than_defaulting_to_denial(self):
+        """The silent default is what caused the original bug."""
+        with self.assertRaises(GovernanceError):
+            _audit_body("some_future_action", "r", "marker")
+
+
+class EveryActivationStateIsConsidered(GovernanceFixture):
+    """Encodes the lesson from breaking `verify` on 2026-07-29.
+
+    Activating the policy falsified three tests that asserted against deployed
+    config. "The suite passes" was true of the old state and said nothing about the
+    new one. This asserts the guard's behaviour in *every* valid state, so a future
+    activation change cannot pass review without someone having considered it.
+    """
+
+    def _result(self, **overrides):
+        policy = dataclasses.replace(self.policy, **overrides)
+        api = FakeApi(self.snapshot(), [], policy, self.now)
+        return execute_guard(api, self.event(), policy, self.now)
+
+    def test_blocked_state_denies(self):
+        r = self._result(
+            activation_state="blocked_pending_external_verifier_and_human_authorizer")
+        self.assertEqual("denied", r.status)
+        self.assertEqual("governance_policy_not_activated", r.reason)
+
+    def test_operator_reviewed_state_permits_without_authorization(self):
+        r = self._result(
+            activation_state=ACTIVE_OPERATOR_REVIEWED,
+            human_authorizer_actor_ids=frozenset(),
+            credential_separation_attested=False,
+        )
+        self.assertEqual("authorized", r.status)
+        self.assertEqual("operator_reviewed_no_authorization_required", r.reason)
+
+    def test_operator_reviewed_still_needs_a_non_actions_verifier(self):
+        for bad in (None, 15368):
+            with self.subTest(verifier=bad):
+                r = self._result(activation_state=ACTIVE_OPERATOR_REVIEWED,
+                                 dedicated_verifier_integration_id=bad)
+                self.assertEqual("denied", r.status)
+
+    def test_active_state_still_requires_authorization_evidence(self):
+        r = self._result(activation_state="active")
+        self.assertEqual("denied", r.status)
+
+    def test_policy_load_accepts_exactly_three_states(self):
+        """Behavioural, not source-scraping.
+
+        The first version of this test grepped `Policy.load`'s source for the literal
+        "active_operator_reviewed" and failed, because the source references the
+        ACTIVE_OPERATOR_REVIEWED constant instead. Asserting on source text tests how
+        code is written rather than what it does.
+        """
+        accepted, rejected = [], []
+        for state in ("active", ACTIVE_OPERATOR_REVIEWED,
+                      "blocked_pending_external_verifier_and_human_authorizer",
+                      "active_no_checks", "", "ACTIVE"):
+            with tempfile.TemporaryDirectory() as tmp:
+                path = pathlib.Path(tmp) / "policy-v1.json"
+                document = json.loads(
+                    (ROOT / ".github" / "kapi-governance" / "policy-v1.json").read_text())
+                document["activation_state"] = state
+                document["dedicated_verifier_attested"] = True
+                document["dedicated_verifier_integration_id"] = 987654
+                document["human_authorizer_actor_ids"] = [HUMAN_AUTHORIZER_ID]
+                document["credential_separation_attested"] = True
+                path.write_text(json.dumps(document, indent=2))
+                try:
+                    Policy.load(path); accepted.append(state)
+                except GovernanceError:
+                    rejected.append(state)
+        self.assertEqual(sorted(accepted), sorted([
+            "active", ACTIVE_OPERATOR_REVIEWED,
+            "blocked_pending_external_verifier_and_human_authorizer"]), accepted)
+        self.assertEqual(len(rejected), 3, rejected)
+
+    def test_review_positioning_is_pinned_by_the_validator(self):
+        """Documents why review_positioning is not in MUTABLE_POLICY_FIELDS."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "policy-v1.json"
+            document = json.loads(
+                (ROOT / ".github" / "kapi-governance" / "policy-v1.json").read_text())
+            document["review_positioning"] = (
+                "Operator-reviewed with independent mechanical verification")
+            path.write_text(json.dumps(document, indent=2))
+            with self.assertRaises(GovernanceError):
+                Policy.load(path)
+        self.assertNotIn("review_positioning", MUTABLE_POLICY_FIELDS)
