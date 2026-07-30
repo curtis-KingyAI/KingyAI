@@ -2094,6 +2094,7 @@ function kingy_ali_replit_beginner_schema() {
 function kingy_ali_shortcode_hub() {
     kingy_ali_enqueue_assets();
     $filters = kingy_ali_request_filters();
+    $filters['page'] = kingy_ali_launch_archive_current_page($filters['page']);
     if (is_tax('kingy_launch_category') && empty($filters['category'])) {
         $term = get_queried_object();
         if ($term && !is_wp_error($term)) {

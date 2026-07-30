@@ -55,6 +55,20 @@ function kingy_ali_sanitize_launch_page($page) {
     return min(10000, max(1, absint($page)));
 }
 
+function kingy_ali_launch_archive_current_page($request_page = 1) {
+    $request_page = kingy_ali_sanitize_launch_page($request_page);
+    if (!is_tax('kingy_launch_category')) {
+        return $request_page;
+    }
+
+    $core_page = absint(get_query_var('paged'));
+    if (!$core_page) {
+        $core_page = absint(get_query_var('page'));
+    }
+
+    return $core_page ? kingy_ali_sanitize_launch_page($core_page) : $request_page;
+}
+
 function kingy_ali_sanitize_launch_boolean($value) {
     if (is_bool($value)) {
         return $value;

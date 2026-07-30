@@ -4,7 +4,8 @@ An additive WordPress plugin that upgrades the existing `kingy_ai_model` custom 
 
 ## Surface ownership
 
-- `/ai-models/`: canonical curated directory and decision hub.
+- `/ai-models/`: KALI's exhaustive canonical model directory.
+- `/open-models/`: the additive Open Model Ledger for curated and review-pending open-weight records.
 - `/ai-models/{model}/`: canonical release record. The ledger template activates only after a record is explicitly marked `curated`; legacy records retain the existing template.
 - `/ai-launches/open-weight-models/`: chronological release/change feed. The new event template fails closed until at least one ledger event exists and the existing feed page has a featured image.
 - `/model-fit/`: calculator page. Activation creates it as a **draft** when absent; it is never auto-published.
