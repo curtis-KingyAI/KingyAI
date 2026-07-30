@@ -6,6 +6,18 @@ if (!defined('ABSPATH')) {
 
 add_action('admin_post_kingy_ali_generate_article', 'kingy_ali_handle_generate_article');
 
+function kingy_ali_generated_article_category_ids() {
+    $ids = array();
+    foreach (array('ai-launch-tracker', 'news') as $slug) {
+        $term = get_category_by_slug($slug);
+        if ($term && !is_wp_error($term)) {
+            $ids[] = absint($term->term_id);
+        }
+    }
+
+    return array_values(array_unique(array_filter($ids)));
+}
+
 function kingy_ali_render_article_generator_page() {
     if (!current_user_can('edit_posts')) {
         return;
@@ -114,39 +126,93 @@ function kingy_ali_handle_generate_article() {
         wp_die(esc_html__('No launch records matched that article period.', 'kingy-ai-launch-intelligence'));
     }
 
-    $title = kingy_ali_article_title($period, $article_date);
-    $content = kingy_ali_build_article_content($launches, $period, $article_date);
+    $source_gate_failures = kingy_ali_article_source_gate_failures($launches);
+    if ($source_gate_failures) {
+        wp_die(esc_html(sprintf(__('KALI generation blocked by source-record evidence gates: %s', 'kingy-ai-launch-intelligence'), implode('; ', $source_gate_failures))));
+    }
 
-    $post_id = wp_insert_post(
-        array(
-            'post_type' => 'post',
-            'post_status' => 'draft',
-            'post_title' => $title,
-            'post_content' => $content,
-            'post_excerpt' => sprintf(
-                _n(
-                    'Kingy AI Launch Radar draft generated from %d structured launch record.',
-                    'Kingy AI Launch Radar draft generated from %d structured launch records.',
-                    count($launches),
-                    'kingy-ai-launch-intelligence'
-                ),
-                count($launches)
-            ),
-            'meta_input' => array(
-                kingy_ali_meta_key('generated_article') => '1',
-                kingy_ali_meta_key('generated_article_period') => $period,
-                kingy_ali_meta_key('generated_article_date') => $article_date,
-                kingy_ali_meta_key('source_launch_ids') => implode(',', wp_list_pluck($launches, 'ID')),
-            ),
-        ),
-        true
+    $source_launch_ids = implode(',', wp_list_pluck($launches, 'ID'));
+    $template_variant = kingy_ali_article_template_variant($period, $article_date, $source_launch_ids);
+    $title = kingy_ali_article_title($period, $article_date);
+    $article_fingerprint = kingy_ali_article_fingerprint($period, $article_date);
+    $batch_id = 'article-' . substr($article_fingerprint, 0, 12);
+    $batch_lock = function_exists('kingy_ali_quality_claim_generation_batch')
+        ? kingy_ali_quality_claim_generation_batch(
+            $batch_id,
+            array(
+                'type' => 'article_generation',
+                'period' => $period,
+                'date' => $article_date,
+                'source_launch_ids' => $source_launch_ids,
+            )
+        )
+        : array('claimed' => true);
+    if (empty($batch_lock['claimed'])) {
+        wp_die(esc_html(sprintf(__('KALI generation is blocked because another batch is in flight: %s', 'kingy-ai-launch-intelligence'), isset($batch_lock['blocker']) ? $batch_lock['blocker'] : 'batch_in_flight')));
+    }
+
+    $content = kingy_ali_build_article_content($launches, $period, $article_date, $template_variant);
+    $existing_article = kingy_ali_find_generated_article($period, $article_date, $title, $article_fingerprint);
+    $article_meta = array(
+        kingy_ali_meta_key('generated_article') => '1',
+        kingy_ali_meta_key('generated_article_period') => $period,
+        kingy_ali_meta_key('generated_article_date') => $article_date,
+        kingy_ali_meta_key('generated_article_fingerprint') => $article_fingerprint,
+        kingy_ali_meta_key('source_launch_ids') => $source_launch_ids,
+        kingy_ali_meta_key('generation_batch_id') => $batch_id,
+        kingy_ali_meta_key('kali_batch_id') => $batch_id,
+        kingy_ali_meta_key('kali_state') => 'awaiting_verdict',
+        kingy_ali_meta_key('requires_human_verdict') => '1',
+        kingy_ali_meta_key('template_variant') => $template_variant,
+        kingy_ali_meta_key('reverse_link_queue') => $source_launch_ids,
+        kingy_ali_meta_key('reverse_link_queue_status') => 'pending_verification',
     );
 
+    $post_args = array(
+        'post_type' => 'post',
+        'post_status' => 'draft',
+        'post_name' => sanitize_title($title),
+        'post_title' => $title,
+        'post_content' => $content,
+        'post_excerpt' => sprintf(
+            _n(
+                'Kingy AI Launch Radar draft generated from %d structured launch record.',
+                'Kingy AI Launch Radar draft generated from %d structured launch records.',
+                count($launches),
+                'kingy-ai-launch-intelligence'
+            ),
+            count($launches)
+        ),
+        'post_category' => kingy_ali_generated_article_category_ids(),
+        'meta_input' => $article_meta,
+    );
+
+    if ($existing_article) {
+        $post_id = (int) $existing_article->ID;
+        $existing_status = get_post_status($post_id);
+        foreach ($article_meta as $meta_key => $meta_value) {
+            update_post_meta($post_id, $meta_key, $meta_value);
+        }
+
+        if (!in_array($existing_status, array('publish', 'future'), true)) {
+            $post_args['ID'] = $post_id;
+            $post_id = wp_update_post($post_args, true);
+        }
+    } else {
+        $post_id = wp_insert_post($post_args, true);
+    }
+
     if (is_wp_error($post_id)) {
+        if (function_exists('kingy_ali_quality_release_generation_batch')) {
+            kingy_ali_quality_release_generation_batch($batch_id);
+        }
         wp_die(esc_html($post_id->get_error_message()));
     }
 
     kingy_ali_link_generated_article_to_launches($post_id, $launches);
+    if (function_exists('kingy_ali_quality_persist_architecture_verification')) {
+        kingy_ali_quality_persist_architecture_verification($post_id);
+    }
 
     kingy_ali_track_event(
         'article_draft_generated',
@@ -158,9 +224,14 @@ function kingy_ali_handle_generate_article() {
                 'period' => $period,
                 'date' => $article_date,
                 'selected_launch_ids' => $selected_launch_ids ? implode(',', $selected_launch_ids) : '',
+                'idempotency' => $existing_article ? 'reused_existing_article' : 'created_new_article',
             ),
         )
     );
+
+    if (function_exists('kingy_ali_quality_release_generation_batch')) {
+        kingy_ali_quality_release_generation_batch($batch_id);
+    }
 
     wp_safe_redirect(admin_url('post.php?post=' . $post_id . '&action=edit'));
     exit;
@@ -196,6 +267,77 @@ function kingy_ali_article_post_array($key) {
 
 function kingy_ali_article_post_values() {
     return is_array($_POST) ? $_POST : array();
+}
+
+function kingy_ali_article_fingerprint($period, $article_date) {
+    $period = kingy_ali_sanitize_article_period($period);
+    $article_date = kingy_ali_sanitize_article_date($article_date);
+    if (function_exists('kingy_ali_quality_fingerprint')) {
+        return kingy_ali_quality_fingerprint(array('generated-article', $period, $article_date));
+    }
+
+    return hash('sha256', 'generated-article|' . $period . '|' . $article_date);
+}
+
+function kingy_ali_find_generated_article($period, $article_date, $title = '', $fingerprint = '') {
+    $period = kingy_ali_sanitize_article_period($period);
+    $article_date = kingy_ali_sanitize_article_date($article_date);
+    $fingerprint = is_scalar($fingerprint) ? trim((string) $fingerprint) : '';
+
+    if ($fingerprint !== '') {
+        $posts = get_posts(
+            array(
+                'post_type' => 'post',
+                'post_status' => array('publish', 'future', 'pending', 'draft', 'private'),
+                'posts_per_page' => 1,
+                'meta_key' => kingy_ali_meta_key('generated_article_fingerprint'),
+                'meta_value' => $fingerprint,
+                'orderby' => 'ID',
+                'order' => 'ASC',
+                'no_found_rows' => true,
+            )
+        );
+        if ($posts) {
+            return $posts[0];
+        }
+    }
+
+    $posts = get_posts(
+        array(
+            'post_type' => 'post',
+            'post_status' => array('publish', 'future', 'pending', 'draft', 'private'),
+            'posts_per_page' => 5,
+            'orderby' => 'ID',
+            'order' => 'ASC',
+            'meta_query' => array(
+                'relation' => 'AND',
+                array(
+                    'key' => kingy_ali_meta_key('generated_article_period'),
+                    'value' => $period,
+                    'compare' => '=',
+                ),
+                array(
+                    'key' => kingy_ali_meta_key('generated_article_date'),
+                    'value' => $article_date,
+                    'compare' => '=',
+                ),
+            ),
+            'no_found_rows' => true,
+        )
+    );
+    if ($posts) {
+        return $posts[0];
+    }
+
+    $slug = sanitize_title($title);
+    if ($slug !== '') {
+        $post = get_page_by_path($slug, OBJECT, 'post');
+        if ($post) {
+            return $post;
+        }
+    }
+
+    return null;
 }
 
 function kingy_ali_article_text_value($value, $default = '') {
@@ -339,6 +481,38 @@ function kingy_ali_article_public_ready_only($post_statuses) {
     return $post_statuses === array('publish');
 }
 
+function kingy_ali_article_source_gate_failures($launches) {
+    $failures = array();
+    foreach ((array) $launches as $launch) {
+        $post_id = is_object($launch) && isset($launch->ID) ? absint($launch->ID) : absint($launch);
+        if (!$post_id || get_post_type($post_id) !== 'kingy_ai_launch') {
+            $failures[] = 'invalid_source_launch:' . $post_id;
+            continue;
+        }
+
+        if (function_exists('kingy_ali_quality_kali_data_floor_result')) {
+            $floor_result = kingy_ali_quality_kali_data_floor_result($post_id);
+            if (empty($floor_result['pass'])) {
+                foreach ((array) $floor_result['blockers'] as $blocker) {
+                    $failures[] = $blocker . ':' . $post_id;
+                }
+            }
+        }
+
+        if (function_exists('kingy_ali_quality_launch_has_sources') && !kingy_ali_quality_launch_has_sources($post_id)) {
+            $failures[] = 'missing_source_links:' . $post_id;
+        }
+        if (function_exists('kingy_ali_quality_has_verification_date') && !kingy_ali_quality_has_verification_date($post_id)) {
+            $failures[] = 'missing_verification_date:' . $post_id;
+        }
+        if (function_exists('kingy_ali_quality_pricing_has_required_source') && !kingy_ali_quality_pricing_has_required_source($post_id)) {
+            $failures[] = 'missing_pricing_source:' . $post_id;
+        }
+    }
+
+    return array_values(array_unique($failures));
+}
+
 function kingy_ali_filter_article_public_ready_launches($launches, $limit = 0) {
     $filtered = array();
     foreach ((array) $launches as $launch) {
@@ -405,14 +579,18 @@ function kingy_ali_article_title($period, $article_date) {
     return sprintf(__('AI Launch Radar: %s', 'kingy-ai-launch-intelligence'), $formatted);
 }
 
-function kingy_ali_build_article_content($launches, $period, $article_date) {
+function kingy_ali_article_template_variant($period, $article_date, $source_launch_ids = '') {
+    $seed = sanitize_key((string) $period) . '|' . sanitize_text_field((string) $article_date) . '|' . sanitize_text_field((string) $source_launch_ids);
+    $variants = array('evidence-first', 'buyer-risk', 'change-log');
+    $index = abs(crc32($seed)) % count($variants);
+    return $variants[$index];
+}
+
+function kingy_ali_build_article_content($launches, $period, $article_date, $template_variant = '') {
     $content = array();
-    $intro = $period === 'week'
-        ? __('This weekly AI Launch Tracker draft is generated from structured Kingy AI Launch Intelligence records. Review, tighten, and add editorial context before publishing.', 'kingy-ai-launch-intelligence')
-        : __('Today\'s AI Launch Radar is generated from structured Kingy AI Launch Intelligence records. Review, tighten, and add editorial context before publishing.', 'kingy-ai-launch-intelligence');
-    $records_heading = $period === 'week'
-        ? __('This week\'s launch database records', 'kingy-ai-launch-intelligence')
-        : __('Today\'s launch database records', 'kingy-ai-launch-intelligence');
+    $template_variant = in_array($template_variant, array('evidence-first', 'buyer-risk', 'change-log'), true) ? $template_variant : kingy_ali_article_template_variant($period, $article_date);
+    $intro = kingy_ali_article_intro_for_variant($period, $template_variant);
+    $records_heading = kingy_ali_article_records_heading_for_variant($period, $template_variant);
 
     $content[] = '<!-- wp:paragraph --><p>' . esc_html($intro) . '</p><!-- /wp:paragraph -->';
     $content[] = '<!-- wp:heading --><h2>' . esc_html($records_heading) . '</h2><!-- /wp:heading -->';
@@ -427,6 +605,34 @@ function kingy_ali_build_article_content($launches, $period, $article_date) {
     $content[] = '<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="' . esc_url(home_url('/ai-launches/submit/')) . '">' . esc_html__('Submit your launch', 'kingy-ai-launch-intelligence') . '</a></div><!-- /wp:button --><!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="' . esc_url(home_url('/ai-launches/launch-visibility-score/')) . '">' . esc_html__('Get a Launch Visibility Score', 'kingy-ai-launch-intelligence') . '</a></div><!-- /wp:button --></div><!-- /wp:buttons -->';
 
     return implode("\n\n", $content);
+}
+
+function kingy_ali_article_intro_for_variant($period, $template_variant) {
+    $weekly = $period === 'week';
+    $variants = array(
+        'evidence-first' => $weekly
+            ? __('This weekly KALI draft starts from source-checked launch records, pricing notes, and verification status. Add the human Kingy Verdict before publication.', 'kingy-ai-launch-intelligence')
+            : __('This KALI draft starts from source-checked launch records, pricing notes, and verification status. Add the human Kingy Verdict before publication.', 'kingy-ai-launch-intelligence'),
+        'buyer-risk' => $weekly
+            ? __('This weekly draft is organized for buyer review: what changed, what can be verified, and what still needs caution before teams act on the launch.', 'kingy-ai-launch-intelligence')
+            : __('This draft is organized for buyer review: what changed, what can be verified, and what still needs caution before teams act on the launch.', 'kingy-ai-launch-intelligence'),
+        'change-log' => $weekly
+            ? __('This weekly Launch Tracker draft renders KALI change signals into an editorial review queue. Keep source dates, pricing caveats, and limitations visible.', 'kingy-ai-launch-intelligence')
+            : __('This Launch Radar draft renders KALI change signals into an editorial review queue. Keep source dates, pricing caveats, and limitations visible.', 'kingy-ai-launch-intelligence'),
+    );
+
+    return isset($variants[$template_variant]) ? $variants[$template_variant] : reset($variants);
+}
+
+function kingy_ali_article_records_heading_for_variant($period, $template_variant) {
+    $weekly = $period === 'week';
+    $variants = array(
+        'evidence-first' => $weekly ? __('This week\'s source-backed KALI records', 'kingy-ai-launch-intelligence') : __('Today\'s source-backed KALI records', 'kingy-ai-launch-intelligence'),
+        'buyer-risk' => $weekly ? __('This week\'s buyer-relevant launch evidence', 'kingy-ai-launch-intelligence') : __('Today\'s buyer-relevant launch evidence', 'kingy-ai-launch-intelligence'),
+        'change-log' => $weekly ? __('This week\'s verified launch changes', 'kingy-ai-launch-intelligence') : __('Today\'s verified launch changes', 'kingy-ai-launch-intelligence'),
+    );
+
+    return isset($variants[$template_variant]) ? $variants[$template_variant] : reset($variants);
 }
 
 function kingy_ali_article_records_list($launches) {
@@ -530,28 +736,40 @@ function kingy_ali_article_launch_section($launch) {
         __('Last verified', 'kingy-ai-launch-intelligence') => kingy_ali_article_last_verified($post_id),
         __('Source checks', 'kingy-ai-launch-intelligence') => kingy_ali_article_source_checks($post_id),
         __('Traction signals', 'kingy-ai-launch-intelligence') => kingy_ali_article_traction_signals($post_id),
-        __('Kingy Launch Score', 'kingy-ai-launch-intelligence') => kingy_ali_format_score(kingy_ali_article_meta_text($post_id, 'kingy_launch_score')),
-        __('YouTube Potential', 'kingy-ai-launch-intelligence') => kingy_ali_score_band(kingy_ali_article_meta_text($post_id, 'youtube_score')),
+        __('Kingy Launch Score', 'kingy-ai-launch-intelligence') => function_exists('kingy_ali_quality_public_score_label') ? kingy_ali_quality_public_score_label($post_id, 'kingy_launch_score') : kingy_ali_format_score(kingy_ali_article_meta_text($post_id, 'kingy_launch_score')),
+        __('YouTube Potential', 'kingy-ai-launch-intelligence') => function_exists('kingy_ali_quality_public_score_band') ? kingy_ali_quality_public_score_band($post_id, 'youtube_score') : kingy_ali_score_band(kingy_ali_article_meta_text($post_id, 'youtube_score')),
     );
 
     $html = array();
     $html[] = '<!-- wp:heading --><h2>' . esc_html(get_the_title($post_id)) . '</h2><!-- /wp:heading -->';
-    $html[] = '<!-- wp:list --><ul>' . kingy_ali_article_fact_items($facts) . '</ul><!-- /wp:list -->';
+    $fact_items = kingy_ali_article_fact_items($facts);
+    if ($fact_items !== '') {
+        $html[] = '<!-- wp:list --><ul>' . $fact_items . '</ul><!-- /wp:list -->';
+    }
 
     $take = kingy_ali_article_meta_text($post_id, 'kingy_verdict');
-    $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('Kingy AI take', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
-    $html[] = '<!-- wp:paragraph --><p>' . esc_html(kingy_ali_article_editorial_value($take)) . '</p><!-- /wp:paragraph -->';
+    if (!kingy_ali_article_value_is_empty($take)) {
+        $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('Kingy AI take', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
+        $html[] = '<!-- wp:paragraph --><p>' . esc_html(kingy_ali_article_editorial_value($take)) . '</p><!-- /wp:paragraph -->';
+    }
 
     $promising = kingy_ali_article_meta_text($post_id, 'what_feels_promising');
-    $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('What feels promising', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
-    $html[] = '<!-- wp:paragraph --><p>' . esc_html(kingy_ali_article_editorial_value($promising)) . '</p><!-- /wp:paragraph -->';
+    if (!kingy_ali_article_value_is_empty($promising)) {
+        $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('What feels promising', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
+        $html[] = '<!-- wp:paragraph --><p>' . esc_html(kingy_ali_article_editorial_value($promising)) . '</p><!-- /wp:paragraph -->';
+    }
 
     $unproven = kingy_ali_article_meta_text($post_id, 'what_feels_unproven');
-    $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('What feels unproven', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
-    $html[] = '<!-- wp:paragraph --><p>' . esc_html(kingy_ali_article_editorial_value(wp_trim_words($unproven, 70))) . '</p><!-- /wp:paragraph -->';
+    if (!kingy_ali_article_value_is_empty($unproven)) {
+        $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('What feels unproven', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
+        $html[] = '<!-- wp:paragraph --><p>' . esc_html(kingy_ali_article_editorial_value(wp_trim_words($unproven, 70))) . '</p><!-- /wp:paragraph -->';
+    }
 
-    $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('Best next link', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
-    $html[] = '<!-- wp:paragraph --><p>' . kingy_ali_article_value_html(kingy_ali_article_best_next_link($post_id)) . '</p><!-- /wp:paragraph -->';
+    $best_next_link = kingy_ali_article_best_next_link($post_id);
+    if (!kingy_ali_article_value_is_empty($best_next_link)) {
+        $html[] = '<!-- wp:heading {"level":3} --><h3>' . esc_html__('Best next link', 'kingy-ai-launch-intelligence') . '</h3><!-- /wp:heading -->';
+        $html[] = '<!-- wp:paragraph --><p>' . kingy_ali_article_value_html($best_next_link) . '</p><!-- /wp:paragraph -->';
+    }
 
     return implode("\n", $html);
 }
@@ -559,10 +777,32 @@ function kingy_ali_article_launch_section($launch) {
 function kingy_ali_article_fact_items($facts) {
     $items = '';
     foreach ($facts as $label => $value) {
+        if (kingy_ali_article_value_is_empty($value)) {
+            continue;
+        }
         $items .= '<li><strong>' . esc_html($label) . ':</strong> ' . kingy_ali_article_value_html($value) . '</li>';
     }
 
     return $items;
+}
+
+function kingy_ali_article_value_is_empty($value) {
+    if (is_array($value)) {
+        if (isset($value['url'])) {
+            return kingy_ali_article_sanitize_link_url($value['url']) === '';
+        }
+
+        return empty(array_filter($value, function ($item) {
+            return !kingy_ali_article_value_is_empty($item);
+        }));
+    }
+
+    if (!is_scalar($value)) {
+        return true;
+    }
+
+    $value = trim(wp_strip_all_tags((string) $value));
+    return $value === '' || strtolower($value) === 'needs editorial review';
 }
 
 function kingy_ali_article_value_html($value) {
@@ -771,10 +1011,23 @@ function kingy_ali_link_generated_article_to_launches($article_post_id, $launche
     foreach ($launches as $launch) {
         $launch_id = isset($launch->ID) ? absint($launch->ID) : 0;
         $existing_article_url = $launch_id ? kingy_ali_article_sanitize_link_url(kingy_ali_article_meta_text($launch_id, 'related_article_url')) : '';
-        if (!$launch_id || $existing_article_url !== '') {
+        if (!$launch_id) {
             continue;
         }
 
-        update_post_meta($launch_id, kingy_ali_meta_key('related_article_url'), $article_url);
+        if ($existing_article_url === '') {
+            update_post_meta($launch_id, kingy_ali_meta_key('related_article_url'), $article_url);
+        }
+
+        $editorial_meta_key = function_exists('kingy_ali_related_editorial_url_meta_key')
+            ? kingy_ali_related_editorial_url_meta_key()
+            : kingy_ali_meta_key('related_editorial_url');
+        $editorial_urls = array_map(
+            'kingy_ali_article_sanitize_link_url',
+            get_post_meta($launch_id, $editorial_meta_key, false)
+        );
+        if (!in_array($article_url, $editorial_urls, true)) {
+            add_post_meta($launch_id, $editorial_meta_key, $article_url, false);
+        }
     }
 }

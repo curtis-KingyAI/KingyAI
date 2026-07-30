@@ -35,7 +35,19 @@ add_filter('the_content', 'kingy_ali_maybe_replace_vibe_coding_beginner_hub', 20
 add_filter('the_content', 'kingy_ali_maybe_replace_replit_beginner_guide', 20);
 add_filter('the_content', 'kingy_ali_maybe_clean_daily_launch_radar_content', 12);
 add_filter('the_content', 'kingy_ali_maybe_append_launches_of_week_ctas', 24);
+add_filter('the_content', 'kingy_ali_maybe_append_launch_coverage_path', 28);
 add_filter('the_content', 'kingy_ali_maybe_clean_sponsorship_roi_content_h1', 12);
+add_action('init', 'kingy_ali_register_launch_coverage_rewrite_rules', 8);
+add_filter('query_vars', 'kingy_ali_register_launch_coverage_query_vars');
+add_action('template_redirect', 'kingy_ali_render_launch_coverage_sitemap', 1);
+add_action('template_redirect', 'kingy_ali_redirect_legacy_launch_coverage_archive', 2);
+add_filter('category_link', 'kingy_ali_filter_launch_coverage_category_link', 10, 2);
+add_filter('get_pagenum_link', 'kingy_ali_filter_launch_coverage_pagenum_link', 10, 2);
+add_filter('wpseo_sitemap_index', 'kingy_ali_append_launch_coverage_sitemap_index');
+add_filter('wpseo_prev_rel_link', 'kingy_ali_filter_launch_coverage_adjacent_rel_link');
+add_filter('wpseo_next_rel_link', 'kingy_ali_filter_launch_coverage_adjacent_rel_link');
+add_action('pre_get_posts', 'kingy_ali_stabilize_launch_coverage_archive_query');
+add_action('loop_start', 'kingy_ali_render_launch_coverage_archive_intro');
 add_filter('wpseo_title', 'kingy_ali_ai_lead_magnet_seo_title');
 add_filter('wpseo_metadesc', 'kingy_ali_ai_lead_magnet_seo_description');
 add_filter('wpseo_title', 'kingy_ali_ai_landing_page_seo_title');
@@ -59,6 +71,359 @@ add_action('wp_head', 'kingy_ali_replit_beginner_schema');
 
 function kingy_ali_content_has_shortcode($content, $tag) {
     return is_string($content) && function_exists('has_shortcode') && has_shortcode($content, $tag);
+}
+
+function kingy_ali_launch_coverage_archive_url() {
+    return home_url('/ai-launches/coverage/');
+}
+
+function kingy_ali_related_editorial_url_meta_key() {
+    return kingy_ali_meta_key('related_editorial_url');
+}
+
+function kingy_ali_related_editorial_urls_for_launch($launch_id) {
+    $launch_id = absint($launch_id);
+    if (!$launch_id || get_post_type($launch_id) !== 'kingy_ai_launch') {
+        return array();
+    }
+
+    $values = get_post_meta($launch_id, kingy_ali_related_editorial_url_meta_key(), false);
+
+    $urls = array();
+    foreach ((array) $values as $value) {
+        if (!is_scalar($value)) {
+            continue;
+        }
+        $url = esc_url_raw(trim((string) $value), array('http', 'https'));
+        $article_id = $url ? url_to_postid($url) : 0;
+        if (
+            !$article_id
+            || get_post_type($article_id) !== 'post'
+            || get_post_status($article_id) !== 'publish'
+            || !has_category('ai-launch-tracker', $article_id)
+        ) {
+            continue;
+        }
+        $canonical = get_permalink($article_id);
+        if ($canonical) {
+            $urls[$canonical] = $article_id;
+        }
+    }
+
+    return $urls;
+}
+
+function kingy_ali_register_launch_coverage_rewrite_rules() {
+    add_rewrite_rule(
+        '^ai-launches/coverage/sitemap\.xml$',
+        'index.php?kingy_ali_launch_coverage_sitemap=1',
+        'top'
+    );
+    add_rewrite_rule(
+        '^ai-launches/coverage/page/([0-9]+)/?$',
+        'index.php?category_name=ai-launch-tracker&paged=$matches[1]',
+        'top'
+    );
+    add_rewrite_rule(
+        '^ai-launches/coverage/feed/(feed|rdf|rss|rss2|atom)/?$',
+        'index.php?category_name=ai-launch-tracker&feed=$matches[1]',
+        'top'
+    );
+    add_rewrite_rule(
+        '^ai-launches/coverage/feed/?$',
+        'index.php?category_name=ai-launch-tracker&feed=rss2',
+        'top'
+    );
+    add_rewrite_rule(
+        '^ai-launches/coverage/?$',
+        'index.php?category_name=ai-launch-tracker',
+        'top'
+    );
+}
+
+function kingy_ali_register_launch_coverage_query_vars($vars) {
+    $vars[] = 'kingy_ali_launch_coverage_sitemap';
+    return array_values(array_unique($vars));
+}
+
+function kingy_ali_launch_coverage_latest_modified_gmt() {
+    $posts = get_posts(array(
+        'post_type' => 'post',
+        'post_status' => 'publish',
+        'category_name' => 'ai-launch-tracker',
+        'posts_per_page' => 1,
+        'orderby' => array('modified' => 'DESC', 'ID' => 'DESC'),
+        'ignore_sticky_posts' => true,
+        'no_found_rows' => true,
+    ));
+    if (!$posts) {
+        return '';
+    }
+
+    return (string) get_post_field('post_modified_gmt', $posts[0]);
+}
+
+function kingy_ali_launch_coverage_max_pages() {
+    $category = get_category_by_slug('ai-launch-tracker');
+    return $category && !is_wp_error($category)
+        ? max(1, (int) ceil((int) $category->count / 10))
+        : 0;
+}
+
+function kingy_ali_launch_coverage_sitemap_url() {
+    return home_url('/ai-launches/coverage/sitemap.xml');
+}
+
+function kingy_ali_append_launch_coverage_sitemap_index($index) {
+    $sitemap_url = kingy_ali_launch_coverage_sitemap_url();
+    if (!$sitemap_url || strpos((string) $index, $sitemap_url) !== false) {
+        return $index;
+    }
+
+    $lastmod_gmt = kingy_ali_launch_coverage_latest_modified_gmt();
+    $lastmod = $lastmod_gmt ? mysql2date(DATE_W3C, $lastmod_gmt, false) : '';
+    $entry = "\n\t<sitemap>\n\t\t<loc>" . esc_url($sitemap_url) . "</loc>";
+    if ($lastmod) {
+        $entry .= "\n\t\t<lastmod>" . esc_html($lastmod) . "</lastmod>";
+    }
+    $entry .= "\n\t</sitemap>\n";
+
+    return (string) $index . $entry;
+}
+
+function kingy_ali_render_launch_coverage_sitemap() {
+    if (!get_query_var('kingy_ali_launch_coverage_sitemap')) {
+        return;
+    }
+
+    $max_pages = kingy_ali_launch_coverage_max_pages();
+    if ($max_pages < 1) {
+        status_header(404);
+        exit;
+    }
+
+    $lastmod_gmt = kingy_ali_launch_coverage_latest_modified_gmt();
+    $lastmod = $lastmod_gmt ? mysql2date(DATE_W3C, $lastmod_gmt, false) : '';
+    status_header(200);
+    header('Content-Type: application/xml; charset=' . get_option('blog_charset'));
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+    $url = kingy_ali_launch_coverage_archive_url();
+    echo "\t<url>\n\t\t<loc>" . htmlspecialchars($url, ENT_QUOTES | ENT_XML1, 'UTF-8') . "</loc>";
+    if ($lastmod) {
+        echo "\n\t\t<lastmod>" . htmlspecialchars($lastmod, ENT_QUOTES | ENT_XML1, 'UTF-8') . "</lastmod>";
+    }
+    echo "\n\t</url>\n";
+    echo '</urlset>' . "\n";
+    exit;
+}
+
+function kingy_ali_filter_launch_coverage_category_link($url, $term_id) {
+    $term = get_term(absint($term_id), 'category');
+    if ($term && !is_wp_error($term) && $term->slug === 'ai-launch-tracker') {
+        return kingy_ali_launch_coverage_archive_url();
+    }
+
+    return $url;
+}
+
+function kingy_ali_filter_launch_coverage_pagenum_link($url, $page) {
+    if (!is_category('ai-launch-tracker')) {
+        return $url;
+    }
+
+    $page = max(1, absint($page));
+    return $page > 1
+        ? trailingslashit(kingy_ali_launch_coverage_archive_url()) . 'page/' . $page . '/'
+        : kingy_ali_launch_coverage_archive_url();
+}
+
+function kingy_ali_filter_launch_coverage_adjacent_rel_link($output) {
+    if (!is_category('ai-launch-tracker') || !is_string($output) || $output === '') {
+        return $output;
+    }
+
+    return str_replace(
+        home_url('/category/ai-launch-tracker/'),
+        kingy_ali_launch_coverage_archive_url(),
+        $output
+    );
+}
+
+function kingy_ali_launch_coverage_request_path() {
+    if (empty($_SERVER['REQUEST_URI'])) {
+        return '';
+    }
+
+    $path = wp_parse_url(wp_unslash((string) $_SERVER['REQUEST_URI']), PHP_URL_PATH);
+    return is_string($path) ? '/' . ltrim($path, '/') : '';
+}
+
+function kingy_ali_legacy_launch_coverage_request_page($path) {
+    if (preg_match('#^/category/ai-launch-tracker/page/([0-9]+)/?$#', (string) $path, $matches)) {
+        return max(1, absint($matches[1]));
+    }
+
+    return 1;
+}
+
+function kingy_ali_legacy_launch_coverage_request_feed_type($path) {
+    if (preg_match('#/feed/(feed|rdf|rss|rss2|atom)/?$#', (string) $path, $matches)) {
+        return sanitize_key($matches[1]);
+    }
+
+    return '';
+}
+
+function kingy_ali_redirect_legacy_launch_coverage_archive() {
+    if (is_admin()) {
+        return;
+    }
+
+    $path = kingy_ali_launch_coverage_request_path();
+    if (!preg_match('#^/category/ai-launch-tracker(?:/page/[0-9]+|/feed(?:/(?:feed|rdf|rss|rss2|atom))?)?/?$#', $path)) {
+        return;
+    }
+
+    $target = kingy_ali_launch_coverage_archive_url();
+    if (is_feed() || preg_match('#/feed(?:/(?:feed|rdf|rss|rss2|atom))?/?$#', $path)) {
+        $target = trailingslashit($target) . 'feed/';
+        $feed_type = kingy_ali_legacy_launch_coverage_request_feed_type($path);
+        if ($feed_type) {
+            $target .= $feed_type . '/';
+        }
+    } else {
+        $page = kingy_ali_legacy_launch_coverage_request_page($path);
+        if ($page > 1) {
+            $target = trailingslashit($target) . 'page/' . $page . '/';
+        }
+    }
+
+    wp_safe_redirect($target, 301, 'Kingy AI Launch Coverage');
+    exit;
+}
+
+function kingy_ali_stabilize_launch_coverage_archive_query($query) {
+    if (
+        is_admin()
+        || !$query instanceof WP_Query
+        || !$query->is_main_query()
+        || !$query->is_category('ai-launch-tracker')
+    ) {
+        return;
+    }
+
+    $query->set('posts_per_page', 10);
+    $query->set('ignore_sticky_posts', true);
+    // Date alone is not deterministic when several launch posts share the
+    // same publication timestamp. ID provides a stable boundary between
+    // paginated result sets so records cannot repeat or disappear.
+    $query->set('orderby', array('date' => 'DESC', 'ID' => 'DESC'));
+}
+
+function kingy_ali_maybe_append_launch_coverage_path($content) {
+    if (
+        is_admin()
+        || !is_singular('post')
+        || !in_the_loop()
+        || !is_main_query()
+        || !has_category('ai-launch-tracker', get_queried_object_id())
+        || strpos((string) $content, 'data-kingy-launch-coverage-path=') !== false
+    ) {
+        return $content;
+    }
+
+    $archive_url = kingy_ali_launch_coverage_archive_url();
+    $hub_url = home_url('/ai-launches/');
+    $content .= kingy_ali_render_related_launch_records_for_article(get_queried_object_id(), $content);
+    $path = sprintf(
+        '<aside class="kingy-launch-coverage-path" data-kingy-launch-coverage-path="1" aria-label="%1$s"><p><strong>%2$s</strong> %3$s <a href="%4$s">%5$s</a> %6$s <a href="%7$s">%8$s</a>.</p></aside>',
+        esc_attr__('AI launch coverage navigation', 'kingy-ai-launch-intelligence'),
+        esc_html__('Keep exploring:', 'kingy-ai-launch-intelligence'),
+        esc_html__('browse all', 'kingy-ai-launch-intelligence'),
+        esc_url($archive_url),
+        esc_html__('AI Launch Tracker editorial coverage', 'kingy-ai-launch-intelligence'),
+        esc_html__('or search the complete', 'kingy-ai-launch-intelligence'),
+        esc_url($hub_url),
+        esc_html__('AI launch database', 'kingy-ai-launch-intelligence')
+    );
+
+    return $content . $path;
+}
+
+function kingy_ali_render_related_launch_records_for_article($post_id, $content = '') {
+    $post_id = absint($post_id);
+    $article_url = $post_id ? get_permalink($post_id) : '';
+    if (!$article_url) {
+        return '';
+    }
+
+    $query_args = array(
+        'post_type' => 'kingy_ai_launch',
+        'post_status' => 'publish',
+        'posts_per_page' => 24,
+        'orderby' => array('date' => 'DESC', 'ID' => 'DESC'),
+        'no_found_rows' => true,
+        'meta_value' => esc_url_raw($article_url),
+    );
+    $legacy_records = get_posts(
+        array_merge($query_args, array('meta_key' => kingy_ali_meta_key('related_article_url')))
+    );
+    $editorial_records = get_posts(
+        array_merge($query_args, array('meta_key' => kingy_ali_related_editorial_url_meta_key()))
+    );
+    $record_ids = array();
+    foreach (array_merge($legacy_records, $editorial_records) as $record) {
+        $record_ids[$record->ID] = $record->ID;
+    }
+    if (!$record_ids) {
+        return '';
+    }
+
+    $records = get_posts(
+        array(
+            'post_type' => 'kingy_ai_launch',
+            'post_status' => 'publish',
+            'post__in' => array_values($record_ids),
+            'posts_per_page' => count($record_ids),
+            'orderby' => array('date' => 'DESC', 'ID' => 'DESC'),
+            'no_found_rows' => true,
+        )
+    );
+
+    $links = array();
+    foreach ($records as $record) {
+        $record_url = get_permalink($record);
+        $record_path = $record_url ? wp_parse_url($record_url, PHP_URL_PATH) : '';
+        if (!$record_url || ($record_path && strpos((string) $content, $record_path) !== false)) {
+            continue;
+        }
+        $links[] = '<li><a href="' . esc_url($record_url) . '">' . esc_html(get_the_title($record)) . '</a></li>';
+    }
+    if (!$links) {
+        return '';
+    }
+
+    return '<aside class="kingy-launch-record-links" data-kingy-launch-record-links="1" aria-label="' . esc_attr__('Related AI launch records', 'kingy-ai-launch-intelligence') . '"><p><strong>' . esc_html__('Related source-backed launch records', 'kingy-ai-launch-intelligence') . '</strong></p><ul>' . implode('', $links) . '</ul></aside>';
+}
+
+function kingy_ali_render_launch_coverage_archive_intro($query) {
+    static $rendered = false;
+    if (
+        $rendered
+        || is_admin()
+        || !$query instanceof WP_Query
+        || !$query->is_main_query()
+        || !is_category('ai-launch-tracker')
+    ) {
+        return;
+    }
+
+    $rendered = true;
+    echo '<section class="kingy-launch-coverage-intro" data-kingy-launch-coverage-intro="1">';
+    echo '<p>' . esc_html__('Analysis, explainers, and daily launch reporting from Kingy AI. For the complete source-backed directory,', 'kingy-ai-launch-intelligence') . ' ';
+    echo '<a href="' . esc_url(home_url('/ai-launches/')) . '">' . esc_html__('browse all AI launch records', 'kingy-ai-launch-intelligence') . '</a>.</p>';
+    echo '</section>';
 }
 
 function kingy_ali_maybe_output_vibe_coding_schema() {
@@ -433,7 +798,8 @@ function kingy_ali_post_date_label($post_id) {
 
 function kingy_ali_daily_launch_radar_posts($limit = 5) {
     $limit = max(1, absint($limit));
-    $cache_key = 'kingy_ali_daily_radar_posts_v3_' . $limit;
+    $cache_generation = function_exists('kingy_ali_launch_collection_cache_generation') ? kingy_ali_launch_collection_cache_generation() : '1';
+    $cache_key = 'kingy_ali_daily_radar_posts_v3_' . $limit . '_' . $cache_generation;
     $cached = get_transient($cache_key);
     if (is_array($cached)) {
         return array_map('absint', $cached);
@@ -553,7 +919,8 @@ function kingy_ali_latest_launches_of_week_edition_cta() {
         return $fallback;
     }
 
-    $cache_key = 'kingy_ali_latest_launches_of_week_edition_cta_v2';
+    $cache_generation = function_exists('kingy_ali_launch_collection_cache_generation') ? kingy_ali_launch_collection_cache_generation() : '1';
+    $cache_key = 'kingy_ali_latest_launches_of_week_edition_cta_v2_' . $cache_generation;
     $cached = get_transient($cache_key);
     if (is_array($cached) && !empty($cached['url']) && !empty($cached['label'])) {
         return array_merge($fallback, $cached);
@@ -655,7 +1022,8 @@ function kingy_ali_inject_homepage_launches_of_week_card($content) {
 }
 function kingy_ali_homepage_latest_launch_items($limit = 6) {
     $limit = max(4, min(6, absint($limit)));
-    $cache_key = 'kingy_ali_homepage_latest_launch_items_v3_' . $limit . '_' . current_time('Ymd');
+    $cache_generation = function_exists('kingy_ali_launch_collection_cache_generation') ? kingy_ali_launch_collection_cache_generation() : '1';
+    $cache_key = 'kingy_ali_homepage_latest_launch_items_v3_' . $limit . '_' . current_time('Ymd') . '_' . $cache_generation;
     $cached = get_transient($cache_key);
     if (is_array($cached)) {
         return $cached;
@@ -885,16 +1253,16 @@ function kingy_ali_render_today_briefing_status($args = array()) {
     $radar_title = $latest_radar ? get_the_title($latest_radar) : '';
     $today_status = $has_today_launches
         ? sprintf(
-            _n('%d source-verified launch published today.', '%d source-verified launches published today.', $today_count, 'kingy-ai-launch-intelligence'),
+            _n('%d published launch record for today.', '%d published launch records for today.', $today_count, 'kingy-ai-launch-intelligence'),
             $today_count
         )
-        : __('No source-verified launches published yet today.', 'kingy-ai-launch-intelligence');
+        : __('0 published launch records for today.', 'kingy-ai-launch-intelligence');
     $shown_label = $shown_count > 0
         ? sprintf(
-            _n('%d verified record shown', '%d verified records shown', $shown_count, 'kingy-ai-launch-intelligence'),
+            _n('%d latest published record shown', '%d latest published records shown', $shown_count, 'kingy-ai-launch-intelligence'),
             $shown_count
         )
-        : __('No verified records shown yet', 'kingy-ai-launch-intelligence');
+        : __('0 latest published records shown', 'kingy-ai-launch-intelligence');
     $category_text = $category_labels ? implode(', ', $category_labels) : __('Watching for fresh categories', 'kingy-ai-launch-intelligence');
 
     ob_start();
@@ -936,8 +1304,8 @@ function kingy_ali_render_today_briefing_status($args = array()) {
             <?php
             echo esc_html(
                 $has_today_launches
-                    ? __('Today has source-verified launch records, so the newest public cards are shown before the broader guide.', 'kingy-ai-launch-intelligence')
-                    : __('No source-verified launch records have been published for today yet. Kingy AI treats that as a normal source-backed state and shows the latest verified launch intelligence instead.', 'kingy-ai-launch-intelligence')
+                    ? __('Today has published launch records, so the newest public cards are shown before the broader guide. Each card keeps its own verification state.', 'kingy-ai-launch-intelligence')
+                    : __('No launch records have been published for today yet. Kingy AI treats that as a normal zero-count state and shows the latest published launch records instead.', 'kingy-ai-launch-intelligence')
             );
             ?>
         </p>
@@ -953,19 +1321,144 @@ function kingy_ali_render_today_briefing_status($args = array()) {
     return ob_get_clean();
 }
 
+/**
+ * Split public, index-ready launch records into current and future date sets.
+ *
+ * Current/latest surfaces must not be led by a future operational date. Future
+ * records remain public, but are surfaced separately as upcoming deadlines.
+ */
+function kingy_ali_public_launch_date_partitions($current_limit = 0, $upcoming_limit = 0) {
+    $current_limit = absint($current_limit);
+    $upcoming_limit = absint($upcoming_limit);
+    $today = current_time('Y-m-d');
+    $published_ids = function_exists('kingy_ali_launch_index_published_ids')
+        ? kingy_ali_launch_index_published_ids()
+        : get_posts(
+            array(
+                'post_type' => 'kingy_ai_launch',
+                'post_status' => 'publish',
+                'posts_per_page' => -1,
+                'fields' => 'ids',
+                'no_found_rows' => true,
+            )
+        );
+    $current = array();
+    $upcoming = array();
+
+    foreach ((array) $published_ids as $post_id) {
+        $post_id = absint($post_id);
+        if (!$post_id) {
+            continue;
+        }
+
+        $launch_date = kingy_ali_public_profile_meta_text($post_id, 'launch_date');
+        $has_explicit_launch_date = false;
+        if (is_string($launch_date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $launch_date)) {
+            $effective_date = $launch_date;
+            $has_explicit_launch_date = true;
+        } elseif (is_string($launch_date) && preg_match('/^\d{4}-\d{2}$/', $launch_date)) {
+            $effective_date = $launch_date . '-01';
+            $has_explicit_launch_date = true;
+        } elseif (is_string($launch_date) && preg_match('/^\d{4}$/', $launch_date)) {
+            $effective_date = $launch_date . '-01-01';
+            $has_explicit_launch_date = true;
+        } else {
+            $effective_date = get_post_time('Y-m-d', false, $post_id);
+        }
+        $row = array(
+            'id' => $post_id,
+            'date' => $effective_date,
+        );
+
+        if ($has_explicit_launch_date && $effective_date > $today) {
+            $upcoming[] = $row;
+        } else {
+            $current[] = $row;
+        }
+    }
+
+    usort($current, static function ($left, $right) {
+        $date_order = strcmp((string) $right['date'], (string) $left['date']);
+        return $date_order !== 0 ? $date_order : ((int) $right['id'] <=> (int) $left['id']);
+    });
+    usort($upcoming, static function ($left, $right) {
+        $date_order = strcmp((string) $left['date'], (string) $right['date']);
+        return $date_order !== 0 ? $date_order : ((int) $left['id'] <=> (int) $right['id']);
+    });
+
+    $current_ids = array_column($current, 'id');
+    $upcoming_ids = array_column($upcoming, 'id');
+
+    return array(
+        'current' => $current_limit > 0 ? array_slice($current_ids, 0, $current_limit) : $current_ids,
+        'upcoming' => $upcoming_limit > 0 ? array_slice($upcoming_ids, 0, $upcoming_limit) : $upcoming_ids,
+    );
+}
+
+function kingy_ali_public_launch_query_for_ordered_ids($post_ids) {
+    $post_ids = array_values(array_unique(array_filter(array_map('absint', (array) $post_ids))));
+
+    return new WP_Query(
+        array(
+            'post_type' => 'kingy_ai_launch',
+            'post_status' => 'publish',
+            'post__in' => $post_ids ? $post_ids : array(0),
+            'posts_per_page' => $post_ids ? count($post_ids) : 1,
+            'orderby' => 'post__in',
+            'ignore_sticky_posts' => true,
+            'no_found_rows' => true,
+        )
+    );
+}
+
+function kingy_ali_render_upcoming_deadlines_section($surface = 'launch_collection', $limit = 3) {
+    $surface = sanitize_key((string) $surface);
+    $partitions = kingy_ali_public_launch_date_partitions(0, max(1, absint($limit)));
+    $upcoming_ids = $partitions['upcoming'];
+    if (!$upcoming_ids) {
+        return '';
+    }
+
+    ob_start();
+    ?>
+    <section id="kingy-ai-upcoming-deadlines" class="kingy-ali-content-band kingy-ali-upcoming-deadlines" aria-labelledby="kingy-ai-upcoming-deadlines-title">
+        <div class="kingy-ali-section-heading">
+            <p class="kingy-ali-kicker"><?php esc_html_e('Plan ahead', 'kingy-ai-launch-intelligence'); ?></p>
+            <h2 id="kingy-ai-upcoming-deadlines-title"><?php esc_html_e('Upcoming Deadlines', 'kingy-ai-launch-intelligence'); ?></h2>
+            <p><?php esc_html_e('Future-dated migration, shutdown, and retirement records are separated from today\'s launches and latest-record lists. These dates are upcoming operational events, not launches that have already happened.', 'kingy-ai-launch-intelligence'); ?></p>
+        </div>
+        <?php if ($surface === 'command_center') : ?>
+            <div class="kingy-ali-command-launch-grid">
+                <?php foreach ($upcoming_ids as $post_id) : ?>
+                    <?php echo kingy_ali_render_command_center_launch_card($post_id); ?>
+                <?php endforeach; ?>
+            </div>
+        <?php else : ?>
+            <?php echo kingy_ali_render_launch_grid(kingy_ali_public_launch_query_for_ordered_ids($upcoming_ids)); ?>
+        <?php endif; ?>
+    </section>
+    <?php
+    return ob_get_clean();
+}
+
 function kingy_ali_render_today_launch_fallback() {
     $latest_radar = kingy_ali_latest_daily_launch_radar_post_id();
     $latest_query = new WP_Query();
     try {
-        $latest_query = kingy_ali_query_launches(array('limit' => 5));
+        $partitions = kingy_ali_public_launch_date_partitions(5, 3);
+        $latest_query = kingy_ali_public_launch_query_for_ordered_ids($partitions['current']);
     } catch (Throwable $throwable) {
         kingy_ali_log_launch_grid_fallback('today_fallback_latest_query_failed', $throwable);
     }
 
     $latest_count = is_object($latest_query) && isset($latest_query->post_count) ? absint($latest_query->post_count) : 0;
     $category_labels = kingy_ali_today_briefing_category_labels($latest_query);
+    $freshness = function_exists('kingy_ali_render_launch_freshness_once')
+        ? kingy_ali_render_launch_freshness_once('today_empty_fallback')
+        : '';
 
     ob_start();
+    echo $freshness;
     echo kingy_ali_render_today_briefing_status(
         array(
             'has_today_launches' => false,
@@ -979,13 +1472,14 @@ function kingy_ali_render_today_launch_fallback() {
     <?php if ($latest_query->have_posts()) : ?>
         <section class="kingy-ali-content-band kingy-ali-today-records">
             <div class="kingy-ali-section-heading">
-                <p class="kingy-ali-kicker"><?php esc_html_e('Latest source-backed records', 'kingy-ai-launch-intelligence'); ?></p>
-                <h2><?php esc_html_e('Latest verified launch intelligence', 'kingy-ai-launch-intelligence'); ?></h2>
-                <p><?php esc_html_e('These are the newest public, index-ready launch records available while today waits for verified entries.', 'kingy-ai-launch-intelligence'); ?></p>
+                <p class="kingy-ali-kicker"><?php esc_html_e('Latest published records', 'kingy-ai-launch-intelligence'); ?></p>
+                <h2><?php esc_html_e('Latest published launch records', 'kingy-ai-launch-intelligence'); ?></h2>
+                <p><?php esc_html_e('These are the newest published launch records available while today remains at zero. Each card shows its own source and verification context.', 'kingy-ai-launch-intelligence'); ?></p>
             </div>
             <?php echo kingy_ali_render_launch_grid($latest_query); ?>
         </section>
     <?php endif; ?>
+    <?php echo kingy_ali_render_upcoming_deadlines_section('today_fallback'); ?>
     <?php
     return ob_get_clean();
 }
@@ -998,12 +1492,17 @@ function kingy_ali_render_week_launch_fallback() {
     } catch (Throwable $throwable) {
         kingy_ali_log_launch_grid_fallback('week_fallback_latest_query_failed', $throwable);
     }
+    $freshness = function_exists('kingy_ali_render_launch_freshness_once')
+        ? kingy_ali_render_launch_freshness_once('week_empty_fallback')
+        : '';
 
     ob_start();
+    echo $freshness;
     ?>
     <section class="kingy-ali-empty kingy-ali-week-fallback">
         <h3><?php esc_html_e('No AI launch records are available for this week yet.', 'kingy-ai-launch-intelligence'); ?></h3>
-        <p><?php esc_html_e('Kingy AI is showing the latest verified launch intelligence while this week\'s records refresh.', 'kingy-ai-launch-intelligence'); ?></p>
+        <p><strong><?php esc_html_e('0 launch records published for this weekly window.', 'kingy-ai-launch-intelligence'); ?></strong></p>
+        <p><?php esc_html_e('Kingy AI is showing the latest published launch records while this weekly window remains empty. Each record retains its own verification state.', 'kingy-ai-launch-intelligence'); ?></p>
         <?php if ($latest_radar) : ?>
             <p><strong><?php esc_html_e('Latest Radar:', 'kingy-ai-launch-intelligence'); ?></strong> <a href="<?php echo esc_url(get_permalink($latest_radar)); ?>"><?php echo esc_html(get_the_title($latest_radar)); ?></a><?php if (kingy_ali_post_date_label($latest_radar)) : ?> <span><?php echo esc_html('(' . kingy_ali_post_date_label($latest_radar) . ')'); ?></span><?php endif; ?></p>
         <?php endif; ?>
@@ -1024,7 +1523,7 @@ function kingy_ali_render_week_launch_fallback() {
             <div class="kingy-ali-section-heading">
                 <p class="kingy-ali-kicker"><?php esc_html_e('Latest available records', 'kingy-ai-launch-intelligence'); ?></p>
                 <h2><?php esc_html_e('Recent AI launch records', 'kingy-ai-launch-intelligence'); ?></h2>
-                <p><?php esc_html_e('These are the newest public, index-ready launch records available while the weekly view waits for verified entries.', 'kingy-ai-launch-intelligence'); ?></p>
+                <p><?php esc_html_e('These are the newest published launch records available while the weekly view remains at zero. Each card shows its own source and verification context.', 'kingy-ai-launch-intelligence'); ?></p>
             </div>
             <?php echo kingy_ali_render_launch_grid($latest_query); ?>
         </section>
@@ -1111,10 +1610,14 @@ function kingy_ali_render_launch_basic_safe_fallback($period = '') {
         ? __('No AI launch records have been published for today yet.', 'kingy-ai-launch-intelligence')
         : __('AI Launch Intelligence is refreshing.', 'kingy-ai-launch-intelligence');
     $copy = $is_today
-        ? __('Kingy AI is showing the latest verified launch intelligence instead. Check back after the next Launch Radar update or browse this week\'s AI launches.', 'kingy-ai-launch-intelligence')
-        : __('Kingy AI is showing the latest verified launch intelligence while this collection refreshes.', 'kingy-ai-launch-intelligence');
+        ? __('The count for today is 0. Browse the latest published launch records instead or check this week\'s AI launches.', 'kingy-ai-launch-intelligence')
+        : __('This period currently has 0 published launch records. Browse the latest published records while the collection updates.', 'kingy-ai-launch-intelligence');
+    $freshness = function_exists('kingy_ali_render_launch_freshness_once')
+        ? kingy_ali_render_launch_freshness_once($is_today ? 'today_basic_fallback' : 'week_basic_fallback')
+        : '';
 
     ob_start();
+    echo $freshness;
     ?>
     <section class="kingy-ali-empty kingy-ali-emergency-safe">
         <h3><?php echo esc_html($heading); ?></h3>
@@ -1613,6 +2116,7 @@ function kingy_ali_shortcode_hub() {
     <section class="kingy-ali-hub kingy-ali-command-center">
         <?php echo kingy_ali_render_command_center_hero(is_singular('page') ? 'h2' : 'h1'); ?>
         <?php echo kingy_ali_render_command_center_today(); ?>
+        <?php echo kingy_ali_render_launch_brief_inline_signup(); ?>
         <?php echo kingy_ali_render_command_center_weekly_awards(); ?>
         <?php echo kingy_ali_render_command_center_category_navigation(); ?>
         <section id="kingy-ai-launch-tracker" class="kingy-ali-content-band kingy-ali-tracker-section">
@@ -1622,7 +2126,7 @@ function kingy_ali_shortcode_hub() {
                 <p><?php esc_html_e('Search source-backed launch records, then use common filters first and advanced filters only when you need a narrower view.', 'kingy-ai-launch-intelligence'); ?></p>
             </div>
             <?php echo kingy_ali_render_launch_search($filters); ?>
-            <?php echo kingy_ali_render_launch_grid($query); ?>
+            <?php echo kingy_ali_render_launch_collection($query, $filters); ?>
         </section>
         <?php echo kingy_ali_render_hub_methodology(); ?>
         <?php echo kingy_ali_render_founder_submission_path('launch_command_center'); ?>
@@ -1637,11 +2141,12 @@ function kingy_ali_shortcode_search() {
     $filters = kingy_ali_request_filters();
     $query = kingy_ali_query_launches(array_merge($filters, array('limit' => 24, 'track_search' => kingy_ali_launch_has_filters($filters))));
 
-    return kingy_ali_render_launch_search($filters) . kingy_ali_render_launch_grid($query);
+    return kingy_ali_render_launch_search($filters) . kingy_ali_render_launch_collection($query, $filters);
 }
 
 function kingy_ali_shortcode_grid($atts) {
     kingy_ali_enqueue_assets();
+    $request_filters = kingy_ali_request_filters();
     $atts = shortcode_atts(
         array(
             'period' => '',
@@ -1655,6 +2160,22 @@ function kingy_ali_shortcode_grid($atts) {
         $atts,
         'kingy_launch_grid'
     );
+
+    // The existing managed search/research page contains two legacy grids.
+    // Normalize the first to the composite taxonomy alias and suppress the
+    // second so the route has one query, result count, and paginator without a
+    // live content mutation.
+    $managed_path = function_exists('kingy_ali_current_launch_collection_page_path')
+        ? kingy_ali_current_launch_collection_page_path()
+        : '';
+    if ($managed_path === 'ai-launches/ai-search-research-tools') {
+        $legacy_category = sanitize_title((string) $atts['category']);
+        if ($legacy_category === 'ai-search-tools') {
+            $atts['category'] = 'ai-search-research-tools';
+        } elseif ($legacy_category === 'ai-research-tools') {
+            return '';
+        }
+    }
 
     $period = sanitize_key($atts['period']);
     if (!in_array($period, array('', 'today', 'week'), true)) {
@@ -1672,7 +2193,16 @@ function kingy_ali_shortcode_grid($atts) {
         'attribute' => sanitize_title($atts['attribute']),
         'limit' => $limit,
         'youtube_worthy' => in_array(strtolower((string) $atts['youtube_worthy']), array('1', 'true', 'yes'), true),
+        'page' => $request_filters['page'],
+        'sort' => $request_filters['sort'],
     );
+    $collection_filters = array_merge($request_filters, array_filter(array(
+        'period' => $query_args['period'],
+        'category' => $query_args['category'],
+        'launch_type' => $query_args['launch_type'],
+        'audience' => $query_args['audience'],
+        'attribute' => $query_args['attribute'],
+    )));
 
     try {
         $query = kingy_ali_query_launches($query_args);
@@ -1694,7 +2224,7 @@ function kingy_ali_shortcode_grid($atts) {
 
     if ($query_args['period'] === 'today') {
         try {
-            $grid = kingy_ali_render_launch_grid($query);
+            $grid = kingy_ali_render_launch_collection($query, $collection_filters);
         } catch (Throwable $throwable) {
             return kingy_ali_render_launch_grid_fail_open_fallback($query_args, 'grid_render_exception', $throwable);
         }
@@ -1707,11 +2237,11 @@ function kingy_ali_shortcode_grid($atts) {
                 'category_labels' => kingy_ali_today_briefing_category_labels($query),
                 'latest_radar' => kingy_ali_latest_daily_launch_radar_post_id(),
             )
-        ) . $grid . kingy_ali_render_launch_collection_intro_safely($query_args, false) . kingy_ali_render_company_visibility_path('today_launch_grid');
+        ) . $grid . kingy_ali_render_upcoming_deadlines_section('today_launch_grid') . kingy_ali_render_launch_collection_intro_safely($query_args, false) . kingy_ali_render_company_visibility_path('today_launch_grid');
     }
 
     try {
-        $grid = kingy_ali_render_launch_grid($query);
+        $grid = kingy_ali_render_launch_collection($query, $collection_filters);
     } catch (Throwable $throwable) {
         return kingy_ali_render_launch_grid_fail_open_fallback($query_args, 'grid_render_exception', $throwable);
     }
@@ -1952,10 +2482,23 @@ function kingy_ali_shortcode_trending_launches($atts) {
 }
 
 function kingy_ali_shortcode_youtube_worthy_launches($atts) {
+    kingy_ali_enqueue_assets();
     $atts = shortcode_atts(array('limit' => 12), $atts, 'kingy_youtube_worthy_launches');
-    $query = kingy_ali_query_launches(array('limit' => absint($atts['limit']), 'youtube_worthy' => true));
+    $filters = kingy_ali_request_filters();
+    $limit = absint($atts['limit']);
+    $limit = $limit > 0 ? min($limit, 48) : 12;
+    $query = kingy_ali_query_launches(
+        array_merge(
+            $filters,
+            array(
+                'limit' => $limit,
+                'youtube_worthy' => true,
+                'track_search' => kingy_ali_launch_has_filters($filters),
+            )
+        )
+    );
 
-    return kingy_ali_render_launch_grid($query);
+    return kingy_ali_render_launch_collection($query, $filters);
 }
 
 function kingy_ali_shortcode_creator_coverage_launches($atts) {
@@ -1963,11 +2506,13 @@ function kingy_ali_shortcode_creator_coverage_launches($atts) {
     $atts = shortcode_atts(array('limit' => 12, 'heading' => 'yes'), $atts, 'kingy_creator_coverage_launches');
     $filters = kingy_ali_request_filters();
     $has_filter = kingy_ali_launch_has_filters($filters);
+    $limit = absint($atts['limit']);
+    $limit = $limit > 0 ? min($limit, 48) : 12;
     $query = kingy_ali_query_launches(
         array_merge(
             $filters,
             array(
-                'limit' => absint($atts['limit']),
+                'limit' => $limit,
                 'creator_coverage' => true,
                 'track_search' => $has_filter,
             )
@@ -1999,7 +2544,7 @@ function kingy_ali_shortcode_creator_coverage_launches($atts) {
         </section>
         <?php
     }
-    echo kingy_ali_render_launch_grid($query);
+    echo kingy_ali_render_launch_collection($query, $filters);
 
     return ob_get_clean();
 }
@@ -2042,14 +2587,14 @@ function kingy_ali_render_command_center_hero($heading_tag = 'h1') {
     ob_start();
     ?>
     <div class="kingy-ali-hero kingy-ali-command-hero">
-        <p class="kingy-ali-kicker"><?php esc_html_e('Kingy AI Launch Intelligence', 'kingy-ai-launch-intelligence'); ?></p>
-        <<?php echo tag_escape($heading_tag); ?>><?php esc_html_e('AI Launch Command Center', 'kingy-ai-launch-intelligence'); ?></<?php echo tag_escape($heading_tag); ?>>
-        <p><?php esc_html_e('Kingy AI tracks new AI tools, agents, models, startups, funding, coding tools, video tools, open-weight models, and product launches.', 'kingy-ai-launch-intelligence'); ?></p>
-        <div class="kingy-ali-cta-row">
-            <a data-kingy-ali-track="clicked_category_path" data-event-label="<?php esc_attr_e('See Today\'s AI Launches', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="<?php echo esc_url(home_url('/ai-launches/today/')); ?>"><?php esc_html_e('See Today\'s AI Launches', 'kingy-ai-launch-intelligence'); ?></a>
-            <a data-kingy-ali-track="clicked_category_path" data-event-label="<?php esc_attr_e('Browse the AI Launch Tracker', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="#kingy-ai-launch-tracker"><?php esc_html_e('Browse the AI Launch Tracker', 'kingy-ai-launch-intelligence'); ?></a>
-            <a data-kingy-ali-track="clicked_submit_cta" data-event-label="<?php esc_attr_e('Submit an AI Launch', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="<?php echo esc_url(home_url('/ai-launches/submit/')); ?>"><?php esc_html_e('Submit an AI Launch', 'kingy-ai-launch-intelligence'); ?></a>
-            <a data-kingy-ali-track="clicked_contact_cta" data-event-label="<?php esc_attr_e('Sponsor Kingy AI', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="<?php echo esc_url(home_url('/sponsor-kingy-ai/')); ?>"><?php esc_html_e('Sponsor Kingy AI', 'kingy-ai-launch-intelligence'); ?></a>
+        <p class="kingy-ali-kicker"><?php esc_html_e('Verified AI Launch Intelligence', 'kingy-ai-launch-intelligence'); ?></p>
+        <<?php echo tag_escape($heading_tag); ?>><?php esc_html_e('See what launched, what changed, and what it costs.', 'kingy-ai-launch-intelligence'); ?></<?php echo tag_escape($heading_tag); ?>>
+        <p><?php esc_html_e('Track AI product launches, model updates, pricing changes and tested workflows. Each record separates official sources, company claims, Kingy testing and third-party evidence so you can see what is known and what remains unverified.', 'kingy-ai-launch-intelligence'); ?></p>
+        <div class="kingy-ali-cta-row kingy-ali-command-hero-actions">
+            <a class="kingy-ali-command-hero-primary" data-kingy-ali-track="clicked_category_path" data-event-label="<?php esc_attr_e('See today\'s launches', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="<?php echo esc_url(home_url('/ai-launches/today/')); ?>"><?php esc_html_e('See today\'s launches', 'kingy-ai-launch-intelligence'); ?></a>
+            <a class="kingy-ali-command-hero-secondary" data-kingy-ali-track="clicked_category_path" data-event-label="<?php esc_attr_e('Browse launch records', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="#kingy-ai-launch-tracker"><?php esc_html_e('Browse launch records', 'kingy-ai-launch-intelligence'); ?></a>
+            <a class="kingy-ali-command-hero-secondary" data-kingy-ali-track="clicked_submit_cta" data-event-label="<?php esc_attr_e('Submit a product launch', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="<?php echo esc_url(home_url('/ai-launches/submit/')); ?>"><?php esc_html_e('Submit a product launch', 'kingy-ai-launch-intelligence'); ?></a>
+            <a class="kingy-ali-command-hero-secondary" data-kingy-ali-track="clicked_contact_cta" data-event-label="<?php esc_attr_e('Distribute your launch', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_hero" href="<?php echo esc_url(home_url('/sponsor-fit-review/')); ?>"><?php esc_html_e('Distribute your launch', 'kingy-ai-launch-intelligence'); ?></a>
         </div>
     </div>
     <?php
@@ -2078,13 +2623,22 @@ function kingy_ali_render_command_center_today() {
     $fallback_note = '';
 
     try {
-        $today_query = kingy_ali_query_launches(array('period' => 'today', 'limit' => 5));
+        $partitions = kingy_ali_public_launch_date_partitions(6, 3);
+        $today_query = kingy_ali_query_launches(array('period' => 'today', 'limit' => 6));
         $launch_ids = kingy_ali_command_center_launch_ids($today_query);
-        if (!$launch_ids) {
-            $latest_query = kingy_ali_query_launches(array('limit' => 5));
-            $launch_ids = kingy_ali_command_center_launch_ids($latest_query);
-            if ($launch_ids) {
+        if (count($launch_ids) < 6) {
+            foreach ($partitions['current'] as $latest_post_id) {
+                if (count($launch_ids) >= 6) {
+                    break;
+                }
+                if (!in_array($latest_post_id, $launch_ids, true)) {
+                    $launch_ids[] = $latest_post_id;
+                }
+            }
+            if ($launch_ids && !$today_query->post_count) {
                 $fallback_note = __('No source-ready records are tagged for today yet, so this section is showing the latest public launch records available in the tracker.', 'kingy-ai-launch-intelligence');
+            } elseif (count($launch_ids) > $today_query->post_count) {
+                $fallback_note = __('Today has fewer than six source-ready records, so the remaining cards show the latest public launch records available in the tracker.', 'kingy-ai-launch-intelligence');
             }
         }
     } catch (Throwable $throwable) {
@@ -2093,11 +2647,11 @@ function kingy_ali_render_command_center_today() {
 
     ob_start();
     ?>
-    <section class="kingy-ali-content-band kingy-ali-command-today">
+    <section id="kingy-ai-launches-today" class="kingy-ali-content-band kingy-ali-command-today">
         <div class="kingy-ali-section-heading">
             <p class="kingy-ali-kicker"><?php esc_html_e('Daily radar', 'kingy-ai-launch-intelligence'); ?></p>
             <h2><?php esc_html_e('Today\'s AI Launches', 'kingy-ai-launch-intelligence'); ?></h2>
-            <p><?php esc_html_e('Start with the newest Daily AI Launch Radar and the freshest public launch records available in the tracker.', 'kingy-ai-launch-intelligence'); ?></p>
+            <p><?php esc_html_e('A Radar edition publishes only when the day has enough source-ready signal; the tracker continues to show the newest verified records.', 'kingy-ai-launch-intelligence'); ?></p>
         </div>
         <?php if ($latest_radar_id) : ?>
             <article class="kingy-ali-radar-card">
@@ -2129,6 +2683,7 @@ function kingy_ali_render_command_center_today() {
             </div>
         <?php endif; ?>
     </section>
+    <?php echo kingy_ali_render_upcoming_deadlines_section('command_center'); ?>
     <?php
     return ob_get_clean();
 }
@@ -2183,8 +2738,43 @@ function kingy_ali_command_center_source_status($post_id) {
 }
 
 function kingy_ali_command_center_launch_cta_url($post_id) {
-    $related_article_url = kingy_ali_sanitize_public_cta_url(kingy_ali_get_meta($post_id, 'related_article_url'));
-    return $related_article_url ? $related_article_url : get_permalink($post_id);
+    return get_permalink($post_id);
+}
+
+function kingy_ali_command_center_related_coverage_url($post_id) {
+    $post_id = absint($post_id);
+    $canonical_url = $post_id ? get_permalink($post_id) : '';
+    if (!$canonical_url) {
+        return '';
+    }
+
+    $candidates = array();
+    $legacy_url = kingy_ali_sanitize_public_cta_url(kingy_ali_get_meta($post_id, 'related_article_url'));
+    if ($legacy_url) {
+        $candidates[] = $legacy_url;
+    }
+    $candidates = array_merge($candidates, array_keys(kingy_ali_related_editorial_urls_for_launch($post_id)));
+
+    foreach (array_unique($candidates) as $candidate_url) {
+        $article_id = url_to_postid($candidate_url);
+        if (
+            !$article_id
+            || get_post_type($article_id) !== 'post'
+            || get_post_status($article_id) !== 'publish'
+        ) {
+            continue;
+        }
+
+        $coverage_url = get_permalink($article_id);
+        if (
+            $coverage_url
+            && untrailingslashit($coverage_url) !== untrailingslashit($canonical_url)
+        ) {
+            return $coverage_url;
+        }
+    }
+
+    return '';
 }
 
 function kingy_ali_render_command_center_launch_card($post_id) {
@@ -2196,6 +2786,8 @@ function kingy_ali_render_command_center_launch_card($post_id) {
     if ($why === '') {
         $why = __('Worth reviewing when the source record, demo, category, and pricing context are clearer.', 'kingy-ai-launch-intelligence');
     }
+    $title = get_the_title($post_id);
+    $related_coverage_url = kingy_ali_command_center_related_coverage_url($post_id);
 
     ob_start();
     ?>
@@ -2207,7 +2799,7 @@ function kingy_ali_render_command_center_launch_card($post_id) {
                 <time><?php echo esc_html($launch_date_label); ?></time>
             <?php endif; ?>
         </div>
-        <h3><?php echo esc_html(get_the_title($post_id)); ?></h3>
+        <h3><?php echo esc_html($title); ?></h3>
         <?php if ($summary) : ?>
             <p><strong><?php esc_html_e('Summary:', 'kingy-ai-launch-intelligence'); ?></strong> <?php echo esc_html(wp_trim_words($summary, 26)); ?></p>
         <?php endif; ?>
@@ -2217,7 +2809,10 @@ function kingy_ali_render_command_center_launch_card($post_id) {
             <div><dt><?php esc_html_e('Verification', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html(kingy_ali_command_center_source_status($post_id)); ?></dd></div>
         </dl>
         <div class="kingy-ali-card__actions">
-            <a data-kingy-ali-track="clicked_launch" data-object-id="<?php echo esc_attr($post_id); ?>" data-event-surface="command_center_today" href="<?php echo esc_url(kingy_ali_command_center_launch_cta_url($post_id)); ?>"><?php esc_html_e('Open full record', 'kingy-ai-launch-intelligence'); ?></a>
+            <a aria-label="<?php echo esc_attr(sprintf(__('Open full record: %s', 'kingy-ai-launch-intelligence'), $title)); ?>" data-kingy-ali-track="clicked_launch" data-object-id="<?php echo esc_attr($post_id); ?>" data-event-surface="command_center_today" href="<?php echo esc_url(kingy_ali_command_center_launch_cta_url($post_id)); ?>"><?php esc_html_e('Open full record', 'kingy-ai-launch-intelligence'); ?></a>
+            <?php if ($related_coverage_url) : ?>
+                <a aria-label="<?php echo esc_attr(sprintf(__('Read related coverage: %s', 'kingy-ai-launch-intelligence'), $title)); ?>" data-kingy-ali-track="clicked_category_path" data-event-label="<?php esc_attr_e('Read related coverage', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="command_center_today" href="<?php echo esc_url($related_coverage_url); ?>"><?php esc_html_e('Read related coverage', 'kingy-ai-launch-intelligence'); ?></a>
+            <?php endif; ?>
         </div>
     </article>
     <?php
@@ -2268,6 +2863,7 @@ function kingy_ali_render_command_center_weekly_awards() {
 function kingy_ali_command_center_categories() {
     $hub = home_url('/ai-launches/');
     return array(
+        array('label' => __('Editorial Launch Coverage', 'kingy-ai-launch-intelligence'), 'url' => kingy_ali_launch_coverage_archive_url(), 'description' => __('Daily launch reporting, explainers, analysis, and launch roundups from Kingy AI.', 'kingy-ai-launch-intelligence')),
         array('label' => __('AI Agents', 'kingy-ai-launch-intelligence'), 'url' => home_url('/ai-launches/ai-agents/'), 'description' => __('Agent platforms, workflow agents, browser agents, and task automation launches.', 'kingy-ai-launch-intelligence')),
         array('label' => __('AI Coding Tools', 'kingy-ai-launch-intelligence'), 'url' => home_url('/ai-launches/ai-coding-tools/'), 'description' => __('Code agents, IDE assistants, repo tools, and developer workflow launches.', 'kingy-ai-launch-intelligence')),
         array('label' => __('AI Video Tools', 'kingy-ai-launch-intelligence'), 'url' => home_url('/ai-launches/ai-video-tools/'), 'description' => __('Video generation, editing, avatars, demos, and creator workflow launches.', 'kingy-ai-launch-intelligence')),
@@ -2305,15 +2901,22 @@ function kingy_ali_render_command_center_category_navigation() {
 
 function kingy_ali_newsletter_segments() {
     return array(
-        __('Daily Radar', 'kingy-ai-launch-intelligence'),
-        __('Weekly Digest', 'kingy-ai-launch-intelligence'),
-        __('Agents', 'kingy-ai-launch-intelligence'),
-        __('Coding Tools', 'kingy-ai-launch-intelligence'),
-        __('Video Tools', 'kingy-ai-launch-intelligence'),
-        __('Funding', 'kingy-ai-launch-intelligence'),
-        __('Model Releases', 'kingy-ai-launch-intelligence'),
-        __('All Updates', 'kingy-ai-launch-intelligence'),
+        __('Models', 'kingy-ai-launch-intelligence'),
+        __('Agents & harnesses', 'kingy-ai-launch-intelligence'),
+        __('Developer infrastructure', 'kingy-ai-launch-intelligence'),
+        __('Products', 'kingy-ai-launch-intelligence'),
+        __('Funding & company moves', 'kingy-ai-launch-intelligence'),
+        __('Pricing watch', 'kingy-ai-launch-intelligence'),
+        __('Under the radar', 'kingy-ai-launch-intelligence'),
     );
+}
+
+function kingy_ali_render_launch_brief_inline_signup() {
+    if (!function_exists('kingy_brief_signup_markup') || !empty($GLOBALS['kingy_brief_signup_rendered'])) {
+        return '';
+    }
+
+    return kingy_brief_signup_markup('compact', 'launches_inline');
 }
 
 function kingy_ali_render_launch_intelligence_newsletter_module($surface = 'launch_command_center') {
@@ -2325,16 +2928,16 @@ function kingy_ali_render_launch_intelligence_newsletter_module($surface = 'laun
     <section class="kingy-ali-content-band kingy-ali-newsletter-module">
         <div class="kingy-ali-section-heading">
             <p class="kingy-ali-kicker"><?php esc_html_e('Newsletter', 'kingy-ai-launch-intelligence'); ?></p>
-            <h2><?php esc_html_e('Get the AI launches worth knowing', 'kingy-ai-launch-intelligence'); ?></h2>
-            <p><?php esc_html_e('Choose the Launch Intelligence stream that matches what you track: daily radar, weekly digest, agents, coding tools, video tools, funding, model releases, or every update.', 'kingy-ai-launch-intelligence'); ?></p>
+            <h2><?php esc_html_e('Inside The Kingy Launch Brief', 'kingy-ai-launch-intelligence'); ?></h2>
+            <p><?php esc_html_e('One concise Friday newsletter covering verified models, agents and harnesses, developer infrastructure, products, funding and company moves, pricing changes, and one under-the-radar launch.', 'kingy-ai-launch-intelligence'); ?></p>
         </div>
-        <div class="kingy-ali-segment-list" aria-label="<?php esc_attr_e('Launch Intelligence newsletter segments', 'kingy-ai-launch-intelligence'); ?>">
+        <div class="kingy-ali-segment-list" aria-label="<?php esc_attr_e('Coverage inside The Kingy Launch Brief', 'kingy-ai-launch-intelligence'); ?>">
             <?php foreach (kingy_ali_newsletter_segments() as $segment) : ?>
                 <span><?php echo esc_html($segment); ?></span>
             <?php endforeach; ?>
         </div>
         <div class="kingy-ali-cta-row">
-            <a data-kingy-ali-track="clicked_newsletter_cta" data-event-label="<?php esc_attr_e('Subscribe to Launch Intelligence', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="<?php echo esc_attr($surface); ?>" href="<?php echo esc_url(home_url('/subscribe/')); ?>"><?php esc_html_e('Subscribe to Launch Intelligence', 'kingy-ai-launch-intelligence'); ?></a>
+            <a data-kingy-ali-track="clicked_newsletter_cta" data-event-label="<?php esc_attr_e('Get The Kingy Launch Brief', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="<?php echo esc_attr($surface); ?>" href="<?php echo esc_url(home_url('/subscribe/')); ?>"><?php esc_html_e('Get The Kingy Launch Brief', 'kingy-ai-launch-intelligence'); ?></a>
             <a data-kingy-ali-track="clicked_category_path" data-event-label="<?php esc_attr_e('Browse launch archive from newsletter module', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="<?php echo esc_attr($surface); ?>" href="<?php echo esc_url(home_url('/ai-launches/')); ?>"><?php esc_html_e('Browse launch archive', 'kingy-ai-launch-intelligence'); ?></a>
         </div>
     </section>

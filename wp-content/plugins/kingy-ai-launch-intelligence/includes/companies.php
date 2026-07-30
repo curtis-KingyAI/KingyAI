@@ -11,26 +11,12 @@ function kingy_ali_find_or_create_company($company_name, $args = array()) {
     }
 
     $company_summary = isset($args['company_summary']) ? kingy_ali_company_text_value($args['company_summary']) : '';
-    $existing = get_page_by_path(sanitize_title($company_name), OBJECT, 'kingy_ai_company');
+    $existing = kingy_ali_find_existing_company_post($company_name);
     if ($existing) {
-        kingy_ali_update_company_from_args($existing->ID, $args);
+        if (!empty($args['sync_existing_profile'])) {
+            kingy_ali_update_company_from_args($existing->ID, $args);
+        }
         return (int) $existing->ID;
-    }
-
-    $existing_by_title = get_posts(
-        array(
-            'post_type' => 'kingy_ai_company',
-            'post_status' => 'any',
-            'title' => $company_name,
-            'fields' => 'ids',
-            'posts_per_page' => 1,
-            'no_found_rows' => true,
-            'suppress_filters' => true,
-        )
-    );
-    if (!empty($existing_by_title)) {
-        kingy_ali_update_company_from_args((int) $existing_by_title[0], $args);
-        return (int) $existing_by_title[0];
     }
 
     $post_id = wp_insert_post(
@@ -51,6 +37,36 @@ function kingy_ali_find_or_create_company($company_name, $args = array()) {
 
     kingy_ali_update_company_from_args($post_id, $args);
     return (int) $post_id;
+}
+
+function kingy_ali_find_existing_company_post($company_name) {
+    $company_name = sanitize_text_field(kingy_ali_company_text_value($company_name));
+    if ($company_name === '') {
+        return null;
+    }
+
+    $existing = get_page_by_path(sanitize_title($company_name), OBJECT, 'kingy_ai_company');
+    if ($existing) {
+        return $existing;
+    }
+
+    $existing_by_title = get_posts(
+        array(
+            'post_type' => 'kingy_ai_company',
+            'post_status' => 'any',
+            'title' => $company_name,
+            'fields' => 'ids',
+            'posts_per_page' => 1,
+            'no_found_rows' => true,
+            'suppress_filters' => true,
+        )
+    );
+    if (!empty($existing_by_title)) {
+        $company_id = is_object($existing_by_title[0]) ? (int) $existing_by_title[0]->ID : (int) $existing_by_title[0];
+        return $company_id ? get_post($company_id) : null;
+    }
+
+    return null;
 }
 
 function kingy_ali_update_company_from_args($company_id, $args) {
@@ -557,19 +573,23 @@ function kingy_ali_link_tool_to_company($tool_id, $company_id) {
     }
 }
 
-function kingy_ali_sync_company_from_launch($launch_id) {
+function kingy_ali_sync_company_from_launch($launch_id, $args = array()) {
     $launch_id = absint($launch_id);
     $company_name = kingy_ali_company_meta_text($launch_id, 'company');
     if (!$launch_id || $company_name === '') {
         return 0;
     }
 
+    $args = is_array($args) ? $args : array();
+    $existing_company = kingy_ali_find_existing_company_post($company_name);
+    $sync_existing_profile = !empty($args['sync_existing_profile']);
     $category_terms = get_the_terms($launch_id, 'kingy_launch_category');
     $audience_terms = get_the_terms($launch_id, 'kingy_audience');
 
     $company_id = kingy_ali_find_or_create_company(
         $company_name,
         array(
+            'sync_existing_profile' => $sync_existing_profile,
             'post_status' => get_post_status($launch_id) === 'publish' ? 'publish' : 'draft',
             'official_url' => kingy_ali_company_meta_text($launch_id, 'official_url'),
             'company_summary' => kingy_ali_company_meta_text($launch_id, 'what_launched'),
@@ -601,25 +621,31 @@ function kingy_ali_sync_company_from_launch($launch_id) {
 
     if ($company_id) {
         kingy_ali_link_launch_to_company($launch_id, $company_id);
-        kingy_ali_sync_derived_attributes($company_id);
+        if (!$existing_company || $sync_existing_profile) {
+            kingy_ali_sync_derived_attributes($company_id);
+        }
     }
 
     return $company_id;
 }
 
-function kingy_ali_sync_company_from_tool($tool_id) {
+function kingy_ali_sync_company_from_tool($tool_id, $args = array()) {
     $tool_id = absint($tool_id);
     $company_name = kingy_ali_company_meta_text($tool_id, 'company');
     if (!$tool_id || $company_name === '') {
         return 0;
     }
 
+    $args = is_array($args) ? $args : array();
+    $existing_company = kingy_ali_find_existing_company_post($company_name);
+    $sync_existing_profile = !empty($args['sync_existing_profile']);
     $category_terms = get_the_terms($tool_id, 'kingy_launch_category');
     $audience_terms = get_the_terms($tool_id, 'kingy_audience');
 
     $company_id = kingy_ali_find_or_create_company(
         $company_name,
         array(
+            'sync_existing_profile' => $sync_existing_profile,
             'post_status' => get_post_status($tool_id) === 'publish' ? 'publish' : 'draft',
             'official_url' => kingy_ali_company_meta_text($tool_id, 'official_url'),
             'company_summary' => kingy_ali_company_meta_text($tool_id, 'what_it_does'),
@@ -645,13 +671,20 @@ function kingy_ali_sync_company_from_tool($tool_id) {
 
     if ($company_id) {
         kingy_ali_link_tool_to_company($tool_id, $company_id);
-        kingy_ali_sync_derived_attributes($company_id);
+        if (!$existing_company || $sync_existing_profile) {
+            kingy_ali_sync_derived_attributes($company_id);
+        }
     }
 
     return $company_id;
 }
 
 function kingy_ali_set_company_terms($company_id, $terms, $taxonomy) {
+    if (function_exists('kingy_ali_quality_ensure_terms')) {
+        kingy_ali_quality_ensure_terms($company_id, $terms, $taxonomy);
+        return;
+    }
+
     if (!is_array($terms)) {
         $terms = array_filter(array_map('trim', explode(',', (string) $terms)));
     }

@@ -234,6 +234,11 @@ function kingy_ali_admin_column_date($post_id, $key) {
         return __('—', 'kingy-ai-launch-intelligence');
     }
 
+    if (function_exists('kingy_ali_public_profile_date_label')) {
+        $label = kingy_ali_public_profile_date_label($value);
+        return $label !== '' ? $label : $value;
+    }
+
     $timestamp = strtotime($value);
     return $timestamp ? date_i18n(get_option('date_format'), $timestamp) : $value;
 }
@@ -359,7 +364,9 @@ function kingy_ali_admin_columns_orderby($query) {
     $orderby = $query->get('orderby');
     $map = array(
         'kingy_company' => array('company', 'CHAR'),
-        'kingy_launch_date' => array('launch_date', 'DATE'),
+        // ISO month values (YYYY-MM) and exact dates (YYYY-MM-DD) are both
+        // lexicographically sortable, while a DATE cast would coerce month-only data.
+        'kingy_launch_date' => array('launch_date', 'CHAR'),
         'kingy_launch_score' => array('kingy_launch_score', 'NUMERIC'),
         'kingy_youtube_score' => array('youtube_score', 'NUMERIC'),
         'kingy_verification' => array('verification_status', 'CHAR'),

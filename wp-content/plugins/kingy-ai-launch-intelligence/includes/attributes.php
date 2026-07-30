@@ -4,6 +4,38 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+add_action('set_object_terms', 'kingy_ali_reconcile_funding_attribute_after_launch_type_change', 20, 6);
+add_action('deleted_term_relationships', 'kingy_ali_reconcile_funding_attribute_after_relationship_delete', 20, 3);
+
+/**
+ * The reviewed P0 rollback must be able to restore the exact captured before
+ * state, including the seven historical Funding launches that did not yet
+ * carry the derived attribute. Keep this suspension private, reference-counted,
+ * and scoped by the migration's try/finally block so ordinary writes always
+ * enforce the invariant.
+ */
+function kingy_ali_suspend_funding_attribute_invariant() {
+    $depth = isset($GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth'])
+        ? absint($GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth'])
+        : 0;
+    $GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth'] = $depth + 1;
+}
+
+function kingy_ali_resume_funding_attribute_invariant() {
+    $depth = isset($GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth'])
+        ? absint($GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth'])
+        : 0;
+    if ($depth <= 1) {
+        unset($GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth']);
+        return;
+    }
+    $GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth'] = $depth - 1;
+}
+
+function kingy_ali_funding_attribute_invariant_is_suspended() {
+    return !empty($GLOBALS['kingy_ali_funding_attribute_invariant_suspension_depth']);
+}
+
 function kingy_ali_derived_attribute_terms() {
     return array(
         'Free Plan' => 'free-plan',
@@ -34,6 +66,10 @@ function kingy_ali_derived_attribute_slugs() {
 }
 
 function kingy_ali_sync_derived_attributes($post_id) {
+    if (kingy_ali_funding_attribute_invariant_is_suspended()) {
+        return;
+    }
+
     $post_id = absint($post_id);
     if (!$post_id || !in_array(get_post_type($post_id), array('kingy_ai_launch', 'kingy_ai_tool', 'kingy_ai_company'), true)) {
         return;
@@ -88,11 +124,11 @@ function kingy_ali_calculate_derived_attribute_slugs($post_id) {
         $slugs[] = 'video-demo-available';
     }
 
-    if (kingy_ali_attribute_meta_number($post_id, 'demo_quality_score') >= 7) {
+    if (kingy_ali_attribute_score_meets($post_id, 'demo', 'demo_quality_score', 7)) {
         $slugs[] = 'strong-demo';
     }
 
-    if (kingy_ali_has_any_meta($post_id, array('funding'))) {
+    if (kingy_ali_launch_has_confirmed_funding($post_id)) {
         $slugs[] = 'funding-announced';
     }
 
@@ -116,7 +152,7 @@ function kingy_ali_calculate_derived_attribute_slugs($post_id) {
         $slugs[] = 'github-traction';
     }
 
-    if (kingy_ali_attribute_meta_number($post_id, 'youtube_score') >= 7) {
+    if (kingy_ali_attribute_score_meets($post_id, 'youtube', 'youtube_score', 7)) {
         $slugs[] = 'high-youtube-potential';
     }
 
@@ -136,7 +172,7 @@ function kingy_ali_calculate_derived_attribute_slugs($post_id) {
         $slugs[] = 'developer-friendly';
     }
 
-    if (kingy_ali_attribute_meta_text($post_id, 'creator_coverage_interest') === 'yes' || kingy_ali_attribute_meta_number($post_id, 'youtube_score') >= 7) {
+    if (kingy_ali_attribute_meta_text($post_id, 'creator_coverage_interest') === 'yes' || kingy_ali_attribute_score_meets($post_id, 'youtube', 'youtube_score', 7)) {
         $slugs[] = 'creator-coverage-candidate';
     }
 
@@ -145,6 +181,70 @@ function kingy_ali_calculate_derived_attribute_slugs($post_id) {
     }
 
     return array_values(array_unique(array_filter($slugs)));
+}
+
+function kingy_ali_launch_has_confirmed_funding($post_id) {
+    $post_id = absint($post_id);
+    return $post_id > 0
+        && get_post_type($post_id) === 'kingy_ai_launch'
+        && kingy_ali_has_term_slug($post_id, 'kingy_launch_type', 'funding');
+}
+
+function kingy_ali_reconcile_funding_attribute_after_launch_type_change($object_id, $terms, $tt_ids, $taxonomy, $append, $old_tt_ids) {
+    unset($terms, $tt_ids, $append, $old_tt_ids);
+    if (kingy_ali_funding_attribute_invariant_is_suspended()) {
+        return;
+    }
+
+    $post_type = get_post_type($object_id);
+    $is_launch_type_change = $taxonomy === 'kingy_launch_type' && $post_type === 'kingy_ai_launch';
+    $is_attribute_change = $taxonomy === 'kingy_tool_attribute'
+        && in_array($post_type, array('kingy_ai_launch', 'kingy_ai_tool', 'kingy_ai_company'), true);
+    if (!$is_launch_type_change && !$is_attribute_change) {
+        return;
+    }
+
+    // A direct taxonomy assignment must not bypass the canonical predicate.
+    // Only reconcile an attribute mutation when its funding state is actually
+    // wrong; this avoids a second write after an ordinary derived-term sync.
+    if ($is_attribute_change) {
+        $has_attribute = kingy_ali_has_term_slug($object_id, 'kingy_tool_attribute', 'funding-announced');
+        $should_have_attribute = kingy_ali_launch_has_confirmed_funding($object_id);
+        if ($has_attribute === $should_have_attribute) {
+            return;
+        }
+    }
+
+    static $syncing = array();
+    $object_id = absint($object_id);
+    if (!$object_id || !empty($syncing[$object_id])) {
+        return;
+    }
+
+    $syncing[$object_id] = true;
+    kingy_ali_sync_derived_attributes($object_id);
+    unset($syncing[$object_id]);
+}
+
+/**
+ * wp_remove_object_terms() bypasses set_object_terms. Re-run the same narrow
+ * invariant after a direct relationship deletion so a genuine Funding launch
+ * cannot silently lose its derived Funding Announced attribute.
+ */
+function kingy_ali_reconcile_funding_attribute_after_relationship_delete($object_id, $tt_ids, $taxonomy) {
+    unset($tt_ids);
+    if (!in_array($taxonomy, array('kingy_tool_attribute', 'kingy_launch_type'), true)) {
+        return;
+    }
+
+    kingy_ali_reconcile_funding_attribute_after_launch_type_change(
+        $object_id,
+        array(),
+        array(),
+        $taxonomy,
+        false,
+        array()
+    );
 }
 
 function kingy_ali_attribute_meta_text($post_id, $key, $default = '') {
@@ -175,6 +275,21 @@ function kingy_ali_attribute_meta_number($post_id, $key) {
     }
 
     return is_scalar($value) ? (float) $value : 0.0;
+}
+
+/**
+ * Launch score-derived attributes share the canonical public score boundary.
+ * Tool/company metadata has no launch trust snapshot and retains its existing
+ * numeric behavior; launch records fail closed if the canonical helper is not
+ * available.
+ */
+function kingy_ali_attribute_score_meets($post_id, $kind, $meta_key, $threshold) {
+    if (get_post_type($post_id) === 'kingy_ai_launch') {
+        return function_exists('kingy_ali_public_launch_score_meets')
+            && kingy_ali_public_launch_score_meets($post_id, $kind, $threshold);
+    }
+
+    return kingy_ali_attribute_meta_number($post_id, $meta_key) >= (float) $threshold;
 }
 
 function kingy_ali_has_any_meta($post_id, $keys) {
@@ -252,25 +367,26 @@ function kingy_ali_has_any_term_slug($post_id, $taxonomy, $slugs) {
 }
 
 function kingy_ali_is_creator_friendly($post_id) {
-    return kingy_ali_has_any_term_slug($post_id, 'kingy_audience', array('creators', 'youtubers', 'designers'))
-        || kingy_ali_has_any_term_slug($post_id, 'kingy_launch_category', array('ai-video-tools', 'ai-image-tools', 'ai-voice-audio-tools', 'ai-writing-tools'));
+    // Audience-fit terms must come from reviewed audience evidence. A broad
+    // media category alone does not prove that a launch is creator-friendly.
+    return kingy_ali_has_any_term_slug($post_id, 'kingy_audience', array('creators', 'youtubers', 'designers'));
 }
 
 function kingy_ali_is_beginner_friendly($post_id) {
+    // Preserve reviewed audience and concrete ease-of-use signals, but do not
+    // infer beginner fit from a free plan plus a broad product category.
     return kingy_ali_has_any_term_slug($post_id, 'kingy_audience', array('students', 'small-business-owners', 'founders', 'creators'))
-        || kingy_ali_has_any_term_slug($post_id, 'kingy_tool_attribute', array('no-code', 'local-first', 'mobile-app', 'browser-extension'))
-        || (
-            kingy_ali_attribute_meta_text($post_id, 'free_plan') === 'yes'
-            && kingy_ali_has_any_term_slug($post_id, 'kingy_launch_category', array('ai-productivity-tools', 'ai-writing-tools', 'ai-image-tools', 'ai-video-tools'))
-        );
+        || kingy_ali_has_any_term_slug($post_id, 'kingy_tool_attribute', array('no-code', 'local-first', 'mobile-app', 'browser-extension'));
 }
 
 function kingy_ali_is_business_friendly($post_id) {
-    return kingy_ali_has_any_term_slug($post_id, 'kingy_audience', array('founders', 'marketers', 'small-business-owners', 'agencies', 'enterprises', 'sales-teams', 'operators'))
-        || kingy_ali_has_any_term_slug($post_id, 'kingy_launch_category', array('ai-agents', 'ai-marketing-tools', 'ai-productivity-tools'));
+    // Category is a discovery facet, not reviewed evidence of business fit.
+    return kingy_ali_has_any_term_slug($post_id, 'kingy_audience', array('founders', 'marketers', 'small-business-owners', 'agencies', 'enterprises', 'sales-teams', 'operators'));
 }
 
 function kingy_ali_is_developer_friendly($post_id) {
+    // Require a reviewed developer audience or an explicit developer-first
+    // product attribute. Do not infer fit from category membership alone.
     return kingy_ali_has_any_term_slug($post_id, 'kingy_audience', array('developers'))
-        || kingy_ali_has_any_term_slug($post_id, 'kingy_launch_category', array('ai-coding-tools', 'ai-infrastructure', 'open-weight-models'));
+        || kingy_ali_has_any_term_slug($post_id, 'kingy_tool_attribute', array('developer-first'));
 }

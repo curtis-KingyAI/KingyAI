@@ -184,8 +184,9 @@ get_header();
         $audience_text = kingy_ali_company_terms_to_string(get_the_terms($post_id, 'kingy_audience'));
         $display_summary = $company_summary;
         $ai_evidence = kingy_ali_public_profile_meta_text($post_id, 'ai_evidence');
-        $buyer_notes = kingy_ali_public_profile_meta_text($post_id, 'buyer_notes');
-        $source_notes = kingy_ali_public_profile_meta_text($post_id, 'source_notes');
+        // Internal editorial notes never belong on the public company profile.
+        $buyer_notes = '';
+        $source_notes = '';
         $verification_status = function_exists('kingy_ali_profile_verification_label') ? kingy_ali_profile_verification_label($post_id, 'company') : '';
         $source_links = function_exists('kingy_ali_public_source_links') ? kingy_ali_public_source_links($post_id) : array();
         $source_count = count($source_links);
@@ -211,6 +212,8 @@ get_header();
                 <h1><?php the_title(); ?></h1>
                 <p><?php echo esc_html($display_summary); ?></p>
             </header>
+
+            <?php echo kingy_ali_render_profile_featured_image($post_id); ?>
 
             <section class="kingy-ali-facts">
                 <?php kingy_ali_company_fact(__('Primary category', 'kingy-ai-launch-intelligence'), $category_text); ?>

@@ -128,7 +128,7 @@ function kingy_ali_recommended_pages() {
         'ai_search_research_tools' => array(
             'path' => 'ai-launches/ai-search-research-tools',
             'title' => __('AI Search and Research Tool Launches', 'kingy-ai-launch-intelligence'),
-            'content' => kingy_ali_shortcode_block('[kingy_launch_grid category="ai-search-tools" limit="12"]') . "\n\n" . kingy_ali_shortcode_block('[kingy_launch_grid category="ai-research-tools" limit="12"]'),
+            'content' => kingy_ali_shortcode_block('[kingy_launch_grid category="ai-search-research-tools" limit="12"]'),
         ),
         'ai_app_builders' => array(
             'path' => 'ai-launches/ai-app-builders',

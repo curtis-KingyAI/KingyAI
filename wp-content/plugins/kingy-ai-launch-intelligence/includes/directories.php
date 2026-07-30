@@ -9,33 +9,264 @@ add_shortcode('kingy_company_directory', 'kingy_ali_shortcode_company_directory'
 
 function kingy_ali_shortcode_tool_directory($atts = array()) {
     kingy_ali_enqueue_assets();
-    $atts = shortcode_atts(array('limit' => 24, 'heading' => 'yes'), $atts, 'kingy_tool_directory');
-    $per_page = kingy_ali_tool_directory_per_page($atts['limit']);
-    $paged = kingy_ali_directory_current_page();
+    $atts = shortcode_atts(array('limit' => 0, 'per_page' => 24, 'heading' => 'yes'), $atts, 'kingy_tool_directory');
     $filters = kingy_ali_directory_request_filters();
+    $core_page = absint(get_query_var('paged'));
+    $legacy_page = absint(kingy_ali_request_get_value('kali_tool_page'));
+    $page = max(1, $core_page ? $core_page : $legacy_page);
     $query = kingy_ali_query_tool_directory(
         array_merge(
             $filters,
             array(
-                'limit' => $per_page,
-                'paged' => $paged,
-                'paginate' => true,
+                'limit' => absint($atts['limit']),
                 'track_search' => kingy_ali_directory_has_filters($filters),
             )
         )
     );
+    $pagination = kingy_ali_paginate_directory_query($query, $page, absint($atts['per_page']));
+    $query = $pagination['query'];
 
     ob_start();
     echo '<section class="kingy-ali-directory kingy-ali-tool-directory">';
     if ($atts['heading'] !== 'no') {
         kingy_ali_render_directory_hero(
-            __('AI Tool Directory', 'kingy-ai-launch-intelligence'),
-            __('Browse permanent AI tool profiles connected to structured launch history, categories, audiences, demos, pricing, and company records.', 'kingy-ai-launch-intelligence')
+            __('AI Product Records', 'kingy-ai-launch-intelligence'),
+            __('Search durable AI product records with launch history, pricing status, demos, target users and source notes. Each profile shows what is verified, what the company claims and what is still unknown.', 'kingy-ai-launch-intelligence'),
+            'tools'
         );
     }
     echo kingy_ali_render_directory_filters($filters, 'tools');
+    echo kingy_ali_render_tool_directory_results_summary($pagination);
     echo kingy_ali_render_tool_directory_grid($query);
-    echo kingy_ali_render_tool_directory_pagination($query, $paged, $filters);
+    echo kingy_ali_render_tool_directory_pagination($pagination, $filters);
+    echo '</section>';
+
+    return ob_get_clean();
+}
+
+function kingy_ali_render_tool_directory_results_summary($pagination) {
+    $total = isset($pagination['total']) ? absint($pagination['total']) : 0;
+    if ($total < 1) {
+        return '';
+    }
+
+    return sprintf(
+        '<p class="kingy-ali-directory-results" role="status">%s</p>',
+        esc_html(
+            sprintf(
+                __('Showing %1$s–%2$s of %3$s product records', 'kingy-ai-launch-intelligence'),
+                number_format_i18n(absint($pagination['first_result'])),
+                number_format_i18n(absint($pagination['last_result'])),
+                number_format_i18n($total)
+            )
+        )
+    );
+}
+
+function kingy_ali_tool_directory_page_url($page, $filters) {
+    $page = max(1, absint($page));
+    $url = get_pagenum_link($page);
+    $args = array();
+    $filter_map = array(
+        'kali_q' => 'q',
+        'kali_category' => 'category',
+        'kali_audience' => 'audience',
+        'kali_attribute' => 'attribute',
+        'kali_free_plan' => 'free_plan',
+        'kali_api_available' => 'api_available',
+        'kali_open_weight' => 'open_source_or_open_weight',
+        'kali_video_demo' => 'video_demo',
+    );
+
+    foreach ($filter_map as $request_key => $filter_key) {
+        if (!empty($filters[$filter_key])) {
+            $args[$request_key] = $filters[$filter_key];
+        }
+    }
+
+    return empty($args) ? $url : add_query_arg($args, $url);
+}
+
+function kingy_ali_render_tool_directory_pagination($pagination, $filters) {
+    $current_page = isset($pagination['current_page']) ? absint($pagination['current_page']) : 1;
+    $total_pages = isset($pagination['total_pages']) ? absint($pagination['total_pages']) : 1;
+    if ($total_pages < 2) {
+        return '';
+    }
+
+    $page_numbers = array(1, $total_pages);
+    for ($page = max(1, $current_page - 2); $page <= min($total_pages, $current_page + 2); $page++) {
+        $page_numbers[] = $page;
+    }
+    $page_numbers = array_values(array_unique(array_map('absint', $page_numbers)));
+    sort($page_numbers, SORT_NUMERIC);
+
+    ob_start();
+    ?>
+    <nav class="kingy-ali-pagination" aria-label="<?php esc_attr_e('Product record directory pages', 'kingy-ai-launch-intelligence'); ?>">
+        <ul class="kingy-ali-pagination__list">
+            <?php if ($current_page > 1) : ?>
+                <li><a class="kingy-ali-pagination__link kingy-ali-pagination__link--wide" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('Product records page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($current_page - 1))); ?>" data-event-surface="tool_directory_pagination" href="<?php echo esc_url(kingy_ali_tool_directory_page_url($current_page - 1, $filters)); ?>" rel="prev"><?php esc_html_e('Previous', 'kingy-ai-launch-intelligence'); ?></a></li>
+            <?php endif; ?>
+            <?php $previous_page = 0; ?>
+            <?php foreach ($page_numbers as $page_number) : ?>
+                <?php if ($previous_page && $page_number > $previous_page + 1) : ?>
+                    <li class="kingy-ali-pagination__ellipsis"><span aria-hidden="true">…</span><span class="screen-reader-text"><?php esc_html_e('More pages', 'kingy-ai-launch-intelligence'); ?></span></li>
+                <?php endif; ?>
+                <?php if ($page_number === $current_page) : ?>
+                    <li><span class="kingy-ali-pagination__link is-current" aria-current="page"><span class="screen-reader-text"><?php esc_html_e('Page', 'kingy-ai-launch-intelligence'); ?> </span><?php echo esc_html(number_format_i18n($page_number)); ?></span></li>
+                <?php else : ?>
+                    <li><a class="kingy-ali-pagination__link" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('Product records page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($page_number))); ?>" data-event-surface="tool_directory_pagination" aria-label="<?php echo esc_attr(sprintf(__('Go to product records page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($page_number))); ?>" href="<?php echo esc_url(kingy_ali_tool_directory_page_url($page_number, $filters)); ?>"><?php echo esc_html(number_format_i18n($page_number)); ?></a></li>
+                <?php endif; ?>
+                <?php $previous_page = $page_number; ?>
+            <?php endforeach; ?>
+            <?php if ($current_page < $total_pages) : ?>
+                <li><a class="kingy-ali-pagination__link kingy-ali-pagination__link--wide" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('Product records page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($current_page + 1))); ?>" data-event-surface="tool_directory_pagination" href="<?php echo esc_url(kingy_ali_tool_directory_page_url($current_page + 1, $filters)); ?>" rel="next"><?php esc_html_e('Next', 'kingy-ai-launch-intelligence'); ?></a></li>
+            <?php endif; ?>
+        </ul>
+    </nav>
+    <?php
+    return ob_get_clean();
+}
+
+function kingy_ali_render_model_directory_results_summary($pagination) {
+    $total = isset($pagination['total']) ? absint($pagination['total']) : 0;
+    if ($total < 1) {
+        return '';
+    }
+
+    return sprintf(
+        '<p class="kingy-ali-directory-results" role="status">%s</p>',
+        esc_html(
+            sprintf(
+                __('Showing %1$s–%2$s of %3$s models', 'kingy-ai-launch-intelligence'),
+                number_format_i18n(absint($pagination['first_result'])),
+                number_format_i18n(absint($pagination['last_result'])),
+                number_format_i18n($total)
+            )
+        )
+    );
+}
+
+function kingy_ali_model_directory_page_url($page, $filters) {
+    $page = max(1, absint($page));
+    $url = get_pagenum_link($page);
+    $args = array();
+    $filter_map = array(
+        'kali_q' => 'q',
+        'kali_model_provider' => 'provider',
+        'kali_model_family' => 'family',
+        'kali_model_modality' => 'modality',
+        'kali_model_use_case' => 'use_case',
+        'kali_model_access_type' => 'access_type',
+        'kali_model_license_type' => 'license_type',
+        'kali_model_status' => 'status',
+        'kali_api_available' => 'api_available',
+        'kali_open_weight' => 'open_weight',
+        'kali_local_available' => 'local_available',
+    );
+
+    foreach ($filter_map as $request_key => $filter_key) {
+        if (!empty($filters[$filter_key])) {
+            $args[$request_key] = $filters[$filter_key];
+        }
+    }
+
+    return empty($args) ? $url : add_query_arg($args, $url);
+}
+
+function kingy_ali_render_model_directory_pagination($pagination, $filters) {
+    $current_page = isset($pagination['current_page']) ? absint($pagination['current_page']) : 1;
+    $total_pages = isset($pagination['total_pages']) ? absint($pagination['total_pages']) : 1;
+    if ($total_pages < 2) {
+        return '';
+    }
+
+    $page_numbers = array(1, $total_pages);
+    for ($page = max(1, $current_page - 2); $page <= min($total_pages, $current_page + 2); $page++) {
+        $page_numbers[] = $page;
+    }
+    $page_numbers = array_values(array_unique(array_map('absint', $page_numbers)));
+    sort($page_numbers, SORT_NUMERIC);
+
+    ob_start();
+    ?>
+    <nav class="kingy-ali-pagination" aria-label="<?php esc_attr_e('AI model directory pages', 'kingy-ai-launch-intelligence'); ?>">
+        <ul class="kingy-ali-pagination__list">
+            <?php if ($current_page > 1) : ?>
+                <li><a class="kingy-ali-pagination__link kingy-ali-pagination__link--wide" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('AI models page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($current_page - 1))); ?>" data-event-surface="model_directory_pagination" href="<?php echo esc_url(kingy_ali_model_directory_page_url($current_page - 1, $filters)); ?>" rel="prev"><?php esc_html_e('Previous', 'kingy-ai-launch-intelligence'); ?></a></li>
+            <?php endif; ?>
+            <?php $previous_page = 0; ?>
+            <?php foreach ($page_numbers as $page_number) : ?>
+                <?php if ($previous_page && $page_number > $previous_page + 1) : ?>
+                    <li class="kingy-ali-pagination__ellipsis"><span aria-hidden="true">…</span><span class="screen-reader-text"><?php esc_html_e('More pages', 'kingy-ai-launch-intelligence'); ?></span></li>
+                <?php endif; ?>
+                <?php if ($page_number === $current_page) : ?>
+                    <li><span class="kingy-ali-pagination__link is-current" aria-current="page"><span class="screen-reader-text"><?php esc_html_e('Page', 'kingy-ai-launch-intelligence'); ?> </span><?php echo esc_html(number_format_i18n($page_number)); ?></span></li>
+                <?php else : ?>
+                    <li><a class="kingy-ali-pagination__link" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('AI models page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($page_number))); ?>" data-event-surface="model_directory_pagination" aria-label="<?php echo esc_attr(sprintf(__('Go to AI models page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($page_number))); ?>" href="<?php echo esc_url(kingy_ali_model_directory_page_url($page_number, $filters)); ?>"><?php echo esc_html(number_format_i18n($page_number)); ?></a></li>
+                <?php endif; ?>
+                <?php $previous_page = $page_number; ?>
+            <?php endforeach; ?>
+            <?php if ($current_page < $total_pages) : ?>
+                <li><a class="kingy-ali-pagination__link kingy-ali-pagination__link--wide" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('AI models page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($current_page + 1))); ?>" data-event-surface="model_directory_pagination" href="<?php echo esc_url(kingy_ali_model_directory_page_url($current_page + 1, $filters)); ?>" rel="next"><?php esc_html_e('Next', 'kingy-ai-launch-intelligence'); ?></a></li>
+            <?php endif; ?>
+        </ul>
+    </nav>
+    <?php
+    return ob_get_clean();
+}
+
+add_action('init', 'kingy_ali_register_paginated_model_directory_shortcode', 99);
+function kingy_ali_register_paginated_model_directory_shortcode() {
+    remove_shortcode('kingy_ai_model_directory');
+    add_shortcode('kingy_ai_model_directory', 'kingy_ali_shortcode_paginated_model_directory');
+}
+
+function kingy_ali_shortcode_paginated_model_directory($atts = array()) {
+    try {
+        return kingy_ali_shortcode_paginated_model_directory_inner($atts);
+    } catch (Throwable $throwable) {
+        return kingy_ali_render_model_emergency_safe_fallback('directory', $atts, $throwable);
+    }
+}
+
+function kingy_ali_shortcode_paginated_model_directory_inner($atts = array()) {
+    kingy_ali_enqueue_model_assets();
+    $atts = shortcode_atts(array('limit' => 0, 'per_page' => 24, 'heading' => 'yes'), $atts, 'kingy_ai_model_directory');
+    $filters = kingy_ali_model_request_filters();
+    $core_page = absint(get_query_var('paged'));
+    $legacy_page = absint(kingy_ali_request_get_value('kali_model_page'));
+    $page = max(1, $core_page ? $core_page : $legacy_page);
+    $query = kingy_ali_query_model_directory(
+        array_merge(
+            $filters,
+            array(
+                'limit' => absint($atts['limit']),
+                'track_search' => kingy_ali_model_directory_has_filters($filters),
+            )
+        )
+    );
+    $pagination = kingy_ali_paginate_directory_query($query, $page, absint($atts['per_page']));
+    $query = $pagination['query'];
+    $filter_form = kingy_ali_render_model_directory_filters($filters);
+    $filter_form = str_replace(
+        '<form class="kingy-ali-search kingy-ali-model-search" method="get">',
+        '<form class="kingy-ali-search kingy-ali-model-search" method="get" action="' . esc_url(home_url('/ai-models/')) . '">',
+        $filter_form
+    );
+
+    ob_start();
+    echo '<section class="kingy-ali-model-hub kingy-ali-model-directory">';
+    if ($atts['heading'] !== 'no') {
+        kingy_ali_render_model_hub_hero();
+    }
+    echo kingy_ali_render_model_hub_foundation_sections();
+    echo '<div class="kingy-ali-model-disclosure"><strong>' . esc_html__('Benchmark caveat', 'kingy-ai-launch-intelligence') . '</strong><span>' . esc_html(kingy_ali_model_benchmark_caveat_note()) . '</span></div>';
+    echo $filter_form;
+    echo kingy_ali_render_model_directory_results_summary($pagination);
+    echo kingy_ali_render_model_directory_grid($query);
+    echo kingy_ali_render_model_directory_pagination($pagination, $filters);
     echo '</section>';
 
     return ob_get_clean();
@@ -43,8 +274,11 @@ function kingy_ali_shortcode_tool_directory($atts = array()) {
 
 function kingy_ali_shortcode_company_directory($atts = array()) {
     kingy_ali_enqueue_assets();
-    $atts = shortcode_atts(array('limit' => 160, 'heading' => 'yes'), $atts, 'kingy_company_directory');
+    $atts = shortcode_atts(array('limit' => 0, 'per_page' => 24, 'heading' => 'yes'), $atts, 'kingy_company_directory');
     $filters = kingy_ali_directory_request_filters();
+    $core_page = absint(get_query_var('paged'));
+    $legacy_page = absint(kingy_ali_request_get_value('kali_company_page'));
+    $page = max(1, $core_page ? $core_page : $legacy_page);
     $query = kingy_ali_query_company_directory(
         array_merge(
             $filters,
@@ -54,6 +288,8 @@ function kingy_ali_shortcode_company_directory($atts = array()) {
             )
         )
     );
+    $pagination = kingy_ali_paginate_company_directory_query($query, $page, absint($atts['per_page']));
+    $query = $pagination['query'];
 
     ob_start();
     echo '<section class="kingy-ali-directory kingy-ali-company-directory">';
@@ -64,9 +300,125 @@ function kingy_ali_shortcode_company_directory($atts = array()) {
         );
     }
     echo kingy_ali_render_directory_filters($filters, 'companies');
+    echo kingy_ali_render_company_directory_results_summary($pagination);
     echo kingy_ali_render_company_directory_grid($query);
+    echo kingy_ali_render_company_directory_pagination($pagination, $filters);
     echo '</section>';
 
+    return ob_get_clean();
+}
+
+function kingy_ali_paginate_directory_query($query, $requested_page = 1, $per_page = 24) {
+    $per_page = max(1, min(48, absint($per_page)));
+    $all_posts = is_object($query) && isset($query->posts) ? array_values((array) $query->posts) : array();
+    $total = count($all_posts);
+    $total_pages = max(1, (int) ceil($total / $per_page));
+    $current_page = min(max(1, absint($requested_page)), $total_pages);
+    $offset = ($current_page - 1) * $per_page;
+    $page_posts = array_slice($all_posts, $offset, $per_page);
+
+    if (is_object($query)) {
+        $query->posts = $page_posts;
+        $query->post_count = count($page_posts);
+        $query->found_posts = $total;
+        $query->max_num_pages = $total_pages;
+        $query->current_post = -1;
+        $query->in_the_loop = false;
+    }
+
+    return array(
+        'query' => $query,
+        'current_page' => $current_page,
+        'per_page' => $per_page,
+        'total' => $total,
+        'total_pages' => $total_pages,
+        'first_result' => $total > 0 ? $offset + 1 : 0,
+        'last_result' => $total > 0 ? min($offset + $per_page, $total) : 0,
+    );
+}
+
+function kingy_ali_paginate_company_directory_query($query, $requested_page = 1, $per_page = 24) {
+    return kingy_ali_paginate_directory_query($query, $requested_page, $per_page);
+}
+
+function kingy_ali_render_company_directory_results_summary($pagination) {
+    $total = isset($pagination['total']) ? absint($pagination['total']) : 0;
+    if ($total < 1) {
+        return '';
+    }
+
+    return sprintf(
+        '<p class="kingy-ali-directory-results" role="status">%s</p>',
+        esc_html(
+            sprintf(
+                __('Showing %1$s–%2$s of %3$s companies', 'kingy-ai-launch-intelligence'),
+                number_format_i18n(absint($pagination['first_result'])),
+                number_format_i18n(absint($pagination['last_result'])),
+                number_format_i18n($total)
+            )
+        )
+    );
+}
+
+function kingy_ali_company_directory_page_url($page, $filters) {
+    $page = max(1, absint($page));
+    $url = get_pagenum_link($page);
+    $args = array();
+    $filter_map = array(
+        'kali_q' => 'q',
+        'kali_category' => 'category',
+        'kali_audience' => 'audience',
+        'kali_attribute' => 'attribute',
+    );
+
+    foreach ($filter_map as $request_key => $filter_key) {
+        if (!empty($filters[$filter_key])) {
+            $args[$request_key] = $filters[$filter_key];
+        }
+    }
+
+    return empty($args) ? $url : add_query_arg($args, $url);
+}
+
+function kingy_ali_render_company_directory_pagination($pagination, $filters) {
+    $current_page = isset($pagination['current_page']) ? absint($pagination['current_page']) : 1;
+    $total_pages = isset($pagination['total_pages']) ? absint($pagination['total_pages']) : 1;
+    if ($total_pages < 2) {
+        return '';
+    }
+
+    $page_numbers = array(1, $total_pages);
+    for ($page = max(1, $current_page - 2); $page <= min($total_pages, $current_page + 2); $page++) {
+        $page_numbers[] = $page;
+    }
+    $page_numbers = array_values(array_unique(array_map('absint', $page_numbers)));
+    sort($page_numbers, SORT_NUMERIC);
+
+    ob_start();
+    ?>
+    <nav class="kingy-ali-pagination" aria-label="<?php esc_attr_e('Company directory pages', 'kingy-ai-launch-intelligence'); ?>">
+        <ul class="kingy-ali-pagination__list">
+            <?php if ($current_page > 1) : ?>
+                <li><a class="kingy-ali-pagination__link kingy-ali-pagination__link--wide" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('Company directory page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($current_page - 1))); ?>" data-event-surface="company_directory_pagination" href="<?php echo esc_url(kingy_ali_company_directory_page_url($current_page - 1, $filters)); ?>" rel="prev"><?php esc_html_e('Previous', 'kingy-ai-launch-intelligence'); ?></a></li>
+            <?php endif; ?>
+            <?php $previous_page = 0; ?>
+            <?php foreach ($page_numbers as $page_number) : ?>
+                <?php if ($previous_page && $page_number > $previous_page + 1) : ?>
+                    <li class="kingy-ali-pagination__ellipsis"><span aria-hidden="true">…</span><span class="screen-reader-text"><?php esc_html_e('More pages', 'kingy-ai-launch-intelligence'); ?></span></li>
+                <?php endif; ?>
+                <?php if ($page_number === $current_page) : ?>
+                    <li><span class="kingy-ali-pagination__link is-current" aria-current="page"><span class="screen-reader-text"><?php esc_html_e('Page', 'kingy-ai-launch-intelligence'); ?> </span><?php echo esc_html(number_format_i18n($page_number)); ?></span></li>
+                <?php else : ?>
+                    <li><a class="kingy-ali-pagination__link" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('Company directory page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($page_number))); ?>" data-event-surface="company_directory_pagination" aria-label="<?php echo esc_attr(sprintf(__('Go to company directory page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($page_number))); ?>" href="<?php echo esc_url(kingy_ali_company_directory_page_url($page_number, $filters)); ?>"><?php echo esc_html(number_format_i18n($page_number)); ?></a></li>
+                <?php endif; ?>
+                <?php $previous_page = $page_number; ?>
+            <?php endforeach; ?>
+            <?php if ($current_page < $total_pages) : ?>
+                <li><a class="kingy-ali-pagination__link kingy-ali-pagination__link--wide" data-kingy-ali-track="clicked_filter" data-event-label="<?php echo esc_attr(sprintf(__('Company directory page %s', 'kingy-ai-launch-intelligence'), number_format_i18n($current_page + 1))); ?>" data-event-surface="company_directory_pagination" href="<?php echo esc_url(kingy_ali_company_directory_page_url($current_page + 1, $filters)); ?>" rel="next"><?php esc_html_e('Next', 'kingy-ai-launch-intelligence'); ?></a></li>
+            <?php endif; ?>
+        </ul>
+    </nav>
+    <?php
     return ob_get_clean();
 }
 
@@ -89,32 +441,9 @@ function kingy_ali_directory_has_filters($filters) {
     });
 }
 
-function kingy_ali_tool_directory_per_page($value = 24) {
-    $per_page = absint($value);
-    if (!$per_page) {
-        $per_page = 24;
-    }
-
-    return max(1, (int) apply_filters('kingy_ali_tool_directory_per_page', $per_page));
-}
-
-function kingy_ali_directory_current_page() {
-    $paged = absint(get_query_var('paged'));
-    if (!$paged) {
-        $paged = absint(get_query_var('page'));
-    }
-    if (!$paged) {
-        $paged = absint(kingy_ali_request_get_value('paged'));
-    }
-
-    return max(1, $paged);
-}
-
 function kingy_ali_query_tool_directory($args = array()) {
     $defaults = array(
         'limit' => 24,
-        'paged' => 1,
-        'paginate' => false,
         'q' => '',
         'category' => '',
         'audience' => '',
@@ -127,7 +456,6 @@ function kingy_ali_query_tool_directory($args = array()) {
     );
     $args = wp_parse_args($args, $defaults);
     $limit = absint($args['limit']);
-    $paged = max(1, absint($args['paged']));
 
     $query_args = array(
         'post_type' => 'kingy_ai_tool',
@@ -148,20 +476,17 @@ function kingy_ali_query_tool_directory($args = array()) {
     kingy_ali_apply_directory_meta_filters($query_args, $args, true);
     kingy_ali_apply_public_noindex_meta_constraint($query_args);
 
-    $predicate = function ($post) use ($args) {
-        if (!kingy_ali_public_query_accepts_index_ready_post($post)) {
-            return false;
+    $query = kingy_ali_run_public_filtered_query(
+        $query_args,
+        $limit,
+        function ($post) use ($args) {
+            if (!kingy_ali_public_query_accepts_index_ready_post($post)) {
+                return false;
+            }
+
+            return empty($args['video_demo']) || kingy_ali_public_query_accepts_valid_url_meta($post, array('demo_url'));
         }
-
-        return empty($args['video_demo']) || kingy_ali_public_query_accepts_valid_url_meta($post, array('demo_url'));
-    };
-
-    if (!empty($args['paginate'])) {
-        $query = kingy_ali_run_public_paginated_filtered_query($query_args, $limit, $paged, $predicate);
-    } else {
-        $query = kingy_ali_run_public_filtered_query($query_args, $limit, $predicate);
-    }
-
+    );
     if ($args['track_search']) {
         kingy_ali_track_directory_search('tool_directory', $args, $query);
     }
@@ -366,12 +691,21 @@ function kingy_ali_apply_directory_meta_filters(&$query_args, $args, $include_de
     }
 }
 
-function kingy_ali_render_directory_hero($title, $description) {
+function kingy_ali_render_directory_hero($title, $description, $context = '') {
+    $is_tool_directory = $context === 'tools';
     ?>
     <div class="kingy-ali-hero">
-        <p class="kingy-ali-kicker"><?php esc_html_e('Kingy AI Launch Intelligence', 'kingy-ai-launch-intelligence'); ?></p>
+        <p class="kingy-ali-kicker"><?php echo esc_html($is_tool_directory ? __('Kingy AI Product Intelligence', 'kingy-ai-launch-intelligence') : __('Kingy AI Launch Intelligence', 'kingy-ai-launch-intelligence')); ?></p>
         <h1><?php echo esc_html($title); ?></h1>
         <p><?php echo esc_html($description); ?></p>
+        <?php if ($is_tool_directory) : ?>
+            <p><?php esc_html_e('Use the filters to find a product by workflow, audience, cost, availability or evidence signal.', 'kingy-ai-launch-intelligence'); ?></p>
+            <div class="kingy-ali-cta-row">
+                <a class="kingy-ali-button kingy-ali-button--primary" data-kingy-ali-track="clicked_directory_search" data-event-surface="tool_directory_hero" href="#kingy-ali-directory-q"><?php esc_html_e('Search product records', 'kingy-ai-launch-intelligence'); ?></a>
+                <a class="kingy-ali-button" data-kingy-ali-track="clicked_launch_hub" data-event-surface="tool_directory_hero" href="<?php echo esc_url(home_url('/ai-launches/')); ?>"><?php esc_html_e('See the latest product changes', 'kingy-ai-launch-intelligence'); ?></a>
+                <a class="kingy-ali-button" data-kingy-ali-track="clicked_submit_launch_record" data-event-surface="tool_directory_hero" href="<?php echo esc_url(home_url('/ai-launches/submit/')); ?>"><?php esc_html_e('Submit a launch record', 'kingy-ai-launch-intelligence'); ?></a>
+            </div>
+        <?php endif; ?>
     </div>
     <?php
 }
@@ -388,8 +722,8 @@ function kingy_ali_render_directory_filters($filters, $context = 'tools') {
     ?>
     <form class="kingy-ali-search" method="get" action="<?php echo esc_url($reset_url); ?>">
         <div class="kingy-ali-search__bar">
-            <label class="screen-reader-text" for="kingy-ali-directory-q"><?php esc_html_e('Search directory', 'kingy-ai-launch-intelligence'); ?></label>
-            <input id="kingy-ali-directory-q" type="search" name="kali_q" value="<?php echo esc_attr($filters['q']); ?>" placeholder="<?php echo esc_attr($context === 'companies' ? __('Search companies, founders, funding, categories, and audiences...', 'kingy-ai-launch-intelligence') : __('Search tools, companies, categories, demos, pricing, and use cases...', 'kingy-ai-launch-intelligence')); ?>">
+            <label class="screen-reader-text" for="kingy-ali-directory-q"><?php echo esc_html($context === 'companies' ? __('Search company directory', 'kingy-ai-launch-intelligence') : __('Search product records', 'kingy-ai-launch-intelligence')); ?></label>
+            <input id="kingy-ali-directory-q" type="search" name="kali_q" value="<?php echo esc_attr($filters['q']); ?>" placeholder="<?php echo esc_attr($context === 'companies' ? __('Search companies, founders, funding, categories, and audiences...', 'kingy-ai-launch-intelligence') : __('Search products, companies, categories, pricing, demos, and use cases...', 'kingy-ai-launch-intelligence')); ?>">
             <button type="submit"><?php esc_html_e('Search', 'kingy-ai-launch-intelligence'); ?></button>
             <?php if ($has_filters) : ?>
                 <a class="kingy-ali-search__reset" data-kingy-ali-track="clicked_directory_reset" data-event-label="<?php esc_attr_e('Reset directory filters', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="<?php echo esc_attr($reset_surface); ?>" href="<?php echo esc_url($reset_url); ?>"><?php esc_html_e('Reset', 'kingy-ai-launch-intelligence'); ?></a>
@@ -432,72 +766,6 @@ function kingy_ali_render_tool_directory_grid($query) {
     }
 
     return ob_get_clean();
-}
-
-function kingy_ali_render_tool_directory_pagination($query, $current_page, $filters) {
-    $total_pages = isset($query->max_num_pages) ? absint($query->max_num_pages) : 0;
-    if ($total_pages <= 1) {
-        return '';
-    }
-
-    $current_page = max(1, absint($current_page));
-    $big = 999999999;
-    $filter_keys = array_values(kingy_ali_directory_filter_query_keys());
-    $base = remove_query_arg(array_merge($filter_keys, array('paged')), get_pagenum_link($big, false));
-    $filter_args = kingy_ali_directory_filter_query_args($filters);
-    $links = paginate_links(
-        array(
-            'base' => str_replace((string) $big, '%#%', $base),
-            'format' => '',
-            'current' => min($current_page, $total_pages),
-            'total' => $total_pages,
-            'prev_text' => __('Previous', 'kingy-ai-launch-intelligence'),
-            'next_text' => __('Next', 'kingy-ai-launch-intelligence'),
-            'type' => 'array',
-            'end_size' => 1,
-            'mid_size' => 1,
-            'add_args' => $filter_args,
-        )
-    );
-
-    if (!$links) {
-        return '';
-    }
-
-    $page_one_paged_url = add_query_arg($filter_args, str_replace((string) $big, '1', $base));
-    $page_one_archive_url = add_query_arg($filter_args, remove_query_arg(array_merge($filter_keys, array('paged')), get_pagenum_link(1, false)));
-    $links = array_map(
-        function ($link) use ($page_one_paged_url, $page_one_archive_url) {
-            return str_replace(esc_url($page_one_paged_url), esc_url($page_one_archive_url), $link);
-        },
-        $links
-    );
-
-    return '<nav class="kingy-ali-pagination" aria-label="' . esc_attr__('AI tools pages', 'kingy-ai-launch-intelligence') . '">' . implode('', array_map('wp_kses_post', $links)) . '</nav>';
-}
-
-function kingy_ali_directory_filter_query_keys() {
-    return array(
-        'q' => 'kali_q',
-        'category' => 'kali_category',
-        'audience' => 'kali_audience',
-        'attribute' => 'kali_attribute',
-        'free_plan' => 'kali_free_plan',
-        'api_available' => 'kali_api_available',
-        'open_source_or_open_weight' => 'kali_open_weight',
-        'video_demo' => 'kali_video_demo',
-    );
-}
-
-function kingy_ali_directory_filter_query_args($filters) {
-    $args = array();
-    foreach (kingy_ali_directory_filter_query_keys() as $filter_key => $query_key) {
-        if (!empty($filters[$filter_key])) {
-            $args[$query_key] = $filters[$filter_key];
-        }
-    }
-
-    return $args;
 }
 
 function kingy_ali_render_company_directory_grid($query) {
@@ -573,9 +841,9 @@ function kingy_ali_render_tool_directory_card($post_id) {
             <div><dt><?php esc_html_e('Pricing', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html($pricing !== '' ? $pricing : __('Not publicly confirmed', 'kingy-ai-launch-intelligence')); ?></dd></div>
         </dl>
         <div class="kingy-ali-card__actions">
-            <a data-kingy-ali-track="clicked_tool" data-object-id="<?php echo esc_attr($post_id); ?>" data-event-surface="tool_directory_card" href="<?php echo esc_url(get_permalink($post_id)); ?>"><?php esc_html_e('View tool', 'kingy-ai-launch-intelligence'); ?></a>
+            <a data-kingy-ali-track="clicked_tool" data-object-id="<?php echo esc_attr($post_id); ?>" data-event-surface="tool_directory_card" href="<?php echo esc_url(get_permalink($post_id)); ?>"><?php esc_html_e('Open product record', 'kingy-ai-launch-intelligence'); ?></a>
             <?php if ($latest_launch_id) : ?>
-                <a data-kingy-ali-track="clicked_launch" data-object-id="<?php echo esc_attr($latest_launch_id); ?>" data-event-surface="tool_directory_card" href="<?php echo esc_url(get_permalink($latest_launch_id)); ?>"><?php esc_html_e('Latest launch', 'kingy-ai-launch-intelligence'); ?></a>
+                <a data-kingy-ali-track="clicked_launch" data-object-id="<?php echo esc_attr($latest_launch_id); ?>" data-event-surface="tool_directory_card" href="<?php echo esc_url(get_permalink($latest_launch_id)); ?>"><?php esc_html_e('Latest recorded change', 'kingy-ai-launch-intelligence'); ?></a>
             <?php endif; ?>
         </div>
     </article>

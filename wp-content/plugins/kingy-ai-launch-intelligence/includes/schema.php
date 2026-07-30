@@ -6,14 +6,20 @@ if (!defined('ABSPATH')) {
 
 add_action('template_redirect', 'kingy_ali_redirect_quarantined_strategic_routes', 0);
 add_action('template_redirect', 'kingy_ali_redirect_legacy_launch_intelligence_urls', 1);
+add_action('template_redirect', 'kingy_ali_redirect_news_comments_feed', -40);
 add_action('wp_head', 'kingy_ali_output_schema');
 add_action('wp_head', 'kingy_ali_output_noindex');
 add_action('wp_head', 'kingy_ali_output_filtered_results_robots');
 add_action('wp_head', 'kingy_ali_output_launch_meta_description', 1);
+add_action('wp_head', 'kingy_ali_output_news_feed_link', 2);
+add_action('wp_head', 'kingy_ali_phase1_social_image_meta', 30);
+add_action('wp_head', 'kingy_ali_phase3a_output_june8_canonical', 0);
+add_action('wp', 'kingy_ali_prepare_home_feed_link');
 add_filter('document_title_parts', 'kingy_ali_launch_document_title');
 add_filter('wpseo_title', 'kingy_ali_launch_wpseo_title');
 add_filter('wpseo_metadesc', 'kingy_ali_launch_wpseo_meta_description');
 add_filter('wpseo_canonical', 'kingy_ali_launch_wpseo_canonical');
+add_filter('get_canonical_url', 'kingy_ali_launch_wpseo_canonical');
 add_filter('wpseo_robots', 'kingy_ali_launch_wpseo_robots');
 add_filter('wpseo_next_rel_link', 'kingy_ali_launch_wpseo_rel_link');
 add_filter('wpseo_prev_rel_link', 'kingy_ali_launch_wpseo_rel_link');
@@ -22,6 +28,14 @@ add_filter('wpseo_opengraph_desc', 'kingy_ali_launch_wpseo_meta_description');
 add_filter('wpseo_opengraph_url', 'kingy_ali_launch_wpseo_canonical');
 add_filter('wpseo_twitter_title', 'kingy_ali_launch_wpseo_title');
 add_filter('wpseo_twitter_description', 'kingy_ali_launch_wpseo_meta_description');
+add_filter('wpseo_opengraph_title', 'kingy_ali_phase1_social_title', 20);
+add_filter('wpseo_opengraph_desc', 'kingy_ali_phase1_social_description', 20);
+add_filter('wpseo_twitter_title', 'kingy_ali_phase1_social_title', 20);
+add_filter('wpseo_twitter_description', 'kingy_ali_phase1_social_description', 20);
+add_filter('wpseo_opengraph_image', 'kingy_ali_phase1_social_image', 20);
+add_filter('wpseo_twitter_image', 'kingy_ali_phase1_social_image', 20);
+add_filter('wpseo_opengraph_image_alt', 'kingy_ali_phase1_social_image_alt', 20);
+add_filter('wpseo_twitter_image_alt', 'kingy_ali_phase1_social_image_alt', 20);
 add_filter('wpseo_sitemap_exclude_taxonomy', 'kingy_ali_exclude_faceted_taxonomy_from_yoast_sitemap', 10, 2);
 add_filter('wpseo_sitemap_entry', 'kingy_ali_filter_launch_intelligence_sitemap_entry', 10, 3);
 add_filter('wpseo_sitemap_post_type_archive_link', 'kingy_ali_launch_sitemap_post_type_archive_link', 10, 2);
@@ -503,6 +517,52 @@ function kingy_ali_current_request_path() {
     return trim((string) $path, '/');
 }
 
+function kingy_ali_news_feed_url() {
+    $term = get_category_by_slug('news');
+    if ($term && !is_wp_error($term)) {
+        $feed_url = get_category_feed_link((int) $term->term_id);
+        if (is_string($feed_url) && $feed_url !== '') {
+            return $feed_url;
+        }
+    }
+
+    return home_url('/category/news/feed/');
+}
+
+function kingy_ali_redirect_news_comments_feed() {
+    if (is_admin() || wp_doing_ajax() || kingy_ali_current_request_path() !== 'news/feed') {
+        return;
+    }
+
+    wp_safe_redirect(kingy_ali_news_feed_url(), 301, 'Kingy AI News Feed');
+    exit;
+}
+
+function kingy_ali_output_news_feed_link() {
+    if (!kingy_ali_is_news_directory()) {
+        return;
+    }
+
+    echo '<link rel="alternate" type="application/rss+xml" title="' . esc_attr__('Kingy AI News feed', 'kingy-ai-launch-intelligence') . '" href="' . esc_url(kingy_ali_news_feed_url()) . '">' . "\n";
+}
+
+function kingy_ali_prepare_home_feed_link() {
+    if (!is_front_page()) {
+        return;
+    }
+
+    remove_action('wp_head', 'feed_links', 2);
+    add_action('wp_head', 'kingy_ali_output_home_feed_link', 2);
+}
+
+function kingy_ali_output_home_feed_link() {
+    if (!is_front_page()) {
+        return;
+    }
+
+    echo '<link rel="alternate" type="application/rss+xml" title="' . esc_attr__('Kingy AI feed', 'kingy-ai-launch-intelligence') . '" href="' . esc_url(get_feed_link()) . '">' . "\n";
+}
+
 function kingy_ali_launch_body_class($classes) {
     if (!is_array($classes)) {
         $classes = array();
@@ -670,8 +730,12 @@ function kingy_ali_output_schema_inner() {
         && function_exists('kingy_ali_radar_post_title_matches')
         && kingy_ali_radar_post_title_matches(get_queried_object_id())
     ) {
-        $schema = kingy_ali_daily_radar_article_schema(get_queried_object_id());
-        echo "\n<script type=\"application/ld+json\">" . wp_json_encode(kingy_ali_schema_filter($schema), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "</script>\n";
+        // Yoast already owns the Article node for standard posts. Keep this
+        // fallback only for installations where Yoast is unavailable.
+        if (!defined('WPSEO_VERSION') && !class_exists('WPSEO_Options')) {
+            $schema = kingy_ali_daily_radar_article_schema(get_queried_object_id());
+            echo "\n<script type=\"application/ld+json\">" . wp_json_encode(kingy_ali_schema_filter($schema), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "</script>\n";
+        }
         return;
     }
 
@@ -743,6 +807,10 @@ function kingy_ali_schema_text($value, $default = '') {
 }
 
 function kingy_ali_schema_meta_text($post_id, $key, $default = '') {
+    if (function_exists('kingy_ali_public_profile_meta_text')) {
+        return kingy_ali_public_profile_meta_text($post_id, $key, $default);
+    }
+
     return kingy_ali_schema_text(kingy_ali_get_meta($post_id, $key, $default), $default);
 }
 
@@ -769,27 +837,20 @@ function kingy_ali_launch_schema($post_id) {
 
     $schema = array(
         '@context' => 'https://schema.org',
-        '@type' => 'Event',
+        '@type' => 'CreativeWork',
         '@id' => kingy_ali_schema_entity_id($post_id, 'launch'),
         'name' => get_the_title($post_id),
         'description' => $description,
         'url' => get_permalink($post_id),
         'sameAs' => $official_url,
-        'startDate' => $launch_date,
-        'eventAttendanceMode' => 'https://schema.org/OnlineEventAttendanceMode',
-        'eventStatus' => 'https://schema.org/EventScheduled',
-        'location' => $official_url ? array(
-            '@type' => 'VirtualLocation',
-            'url' => $official_url,
-        ) : '',
-        'organizer' => kingy_ali_schema_launch_organizer($post_id, $company),
+        'dateCreated' => $launch_date,
+        'creator' => kingy_ali_schema_launch_organizer($post_id, $company),
         'about' => $related_tool ? kingy_ali_schema_software_application($related_tool->ID) : '',
         'keywords' => kingy_ali_schema_keywords($post_id),
         'audience' => kingy_ali_schema_audience($post_id),
         'image' => kingy_ali_schema_featured_image($post_id),
         'citation' => kingy_ali_schema_citations($post_id),
         'review' => kingy_ali_schema_kingy_review($post_id),
-        'offers' => kingy_ali_schema_offer($post_id),
         'potentialAction' => kingy_ali_schema_actions(
             array(
                 array('type' => 'ViewAction', 'name' => __('View official launch page', 'kingy-ai-launch-intelligence'), 'url' => $official_url),
@@ -928,7 +989,92 @@ function kingy_ali_meta_description_excerpt($description, $max_length = 155) {
     return rtrim($trimmed, " \t\n\r\0\x0B.,;:") . '...';
 }
 
+function kingy_ali_is_launch_coverage_archive() {
+    return !is_admin() && is_category('ai-launch-tracker');
+}
+
+function kingy_ali_is_news_directory() {
+    return !is_admin() && is_page('news');
+}
+
+function kingy_ali_public_directory_page_number() {
+    if (kingy_ali_is_launch_coverage_archive()) {
+        return max(1, absint(get_query_var('paged', 1)));
+    }
+
+    if (kingy_ali_is_news_directory()) {
+        $value = function_exists('kingy_ali_request_get_value')
+            ? kingy_ali_request_get_value('query-207101-page')
+            : (isset($_GET['query-207101-page']) ? wp_unslash($_GET['query-207101-page']) : 1);
+        return max(1, absint($value));
+    }
+
+    return 1;
+}
+
+function kingy_ali_public_directory_max_pages() {
+    $slug = kingy_ali_is_launch_coverage_archive() ? 'ai-launch-tracker' : (kingy_ali_is_news_directory() ? 'news' : '');
+    if ($slug === '') {
+        return 1;
+    }
+
+    $term = get_category_by_slug($slug);
+    if (!$term || is_wp_error($term)) {
+        return 1;
+    }
+
+    return max(1, (int) ceil(absint($term->count) / 10));
+}
+
+function kingy_ali_public_directory_page_is_valid() {
+    return kingy_ali_public_directory_page_number() <= kingy_ali_public_directory_max_pages();
+}
+
+function kingy_ali_public_directory_canonical_url() {
+    $page = kingy_ali_public_directory_page_number();
+    if (kingy_ali_is_launch_coverage_archive()) {
+        $base = function_exists('kingy_ali_launch_coverage_archive_url')
+            ? kingy_ali_launch_coverage_archive_url()
+            : home_url('/ai-launches/coverage/');
+        return $page > 1 && kingy_ali_public_directory_page_is_valid()
+            ? trailingslashit($base) . 'page/' . $page . '/'
+            : $base;
+    }
+
+    if (kingy_ali_is_news_directory()) {
+        $base = home_url('/news/');
+        return $page > 1 && kingy_ali_public_directory_page_is_valid()
+            ? add_query_arg('query-207101-page', $page, $base)
+            : $base;
+    }
+
+    return '';
+}
+
+function kingy_ali_public_directory_pagination_title() {
+    $page = kingy_ali_public_directory_page_number();
+    if (kingy_ali_is_launch_coverage_archive()) {
+        return $page > 1
+            ? sprintf(__('AI Launch Tracker Editorial Coverage — Page %d', 'kingy-ai-launch-intelligence'), $page)
+            : __('AI Launch Tracker Editorial Coverage', 'kingy-ai-launch-intelligence');
+    }
+
+    if (kingy_ali_is_news_directory()) {
+        return $page > 1
+            ? sprintf(__('AI News — Page %d', 'kingy-ai-launch-intelligence'), $page)
+            : __('AI News', 'kingy-ai-launch-intelligence');
+    }
+
+    return '';
+}
+
 function kingy_ali_launch_document_title($parts) {
+    $directory_title = kingy_ali_public_directory_pagination_title();
+    if ($directory_title !== '') {
+        $parts['title'] = $directory_title;
+        return $parts;
+    }
+
     $launch_collection_meta = kingy_ali_current_launch_collection_meta();
     if ($launch_collection_meta) {
         $parts['title'] = $launch_collection_meta['title'];
@@ -962,6 +1108,11 @@ function kingy_ali_launch_document_title($parts) {
 }
 
 function kingy_ali_launch_wpseo_title($title) {
+    $directory_title = kingy_ali_public_directory_pagination_title();
+    if ($directory_title !== '') {
+        return $directory_title;
+    }
+
     $launch_collection_meta = kingy_ali_current_launch_collection_meta();
     if ($launch_collection_meta) {
         return $launch_collection_meta['title'];
@@ -986,7 +1137,73 @@ function kingy_ali_launch_wpseo_title($title) {
     return $seo_title ? $seo_title : $title;
 }
 
+function kingy_ali_phase1_social_meta() {
+    $launch_collection_meta = kingy_ali_current_launch_collection_meta();
+    if ($launch_collection_meta && !empty($launch_collection_meta['social_title'])) {
+        return $launch_collection_meta;
+    }
+    $directory_meta = kingy_ali_current_directory_archive_meta();
+    if ($directory_meta && !empty($directory_meta['social_title'])) {
+        return $directory_meta;
+    }
+    return array();
+}
+
+function kingy_ali_phase1_social_title($title) {
+    $meta = kingy_ali_phase1_social_meta();
+    return !empty($meta['social_title']) ? $meta['social_title'] : $title;
+}
+
+function kingy_ali_phase1_social_description($description) {
+    $meta = kingy_ali_phase1_social_meta();
+    return !empty($meta['social_description']) ? $meta['social_description'] : $description;
+}
+
+function kingy_ali_phase1_social_image($image) {
+    if (kingy_ali_current_directory_archive_type() === 'tools') {
+        return 'https://kingy.ai/wp-content/uploads/2026/07/kingy-ai-product-records-social.png';
+    }
+    $meta = kingy_ali_phase1_social_meta();
+    if (!empty($meta['url']) && untrailingslashit($meta['url']) === untrailingslashit(home_url('/ai-launches/'))) {
+        return 'https://kingy.ai/wp-content/uploads/2026/07/kingy-ai-launch-command-center-editorial-2026.jpg';
+    }
+    return $image;
+}
+
+function kingy_ali_phase1_social_image_alt($alt) {
+    if (kingy_ali_current_directory_archive_type() === 'tools') {
+        return __('A technology researcher checks product documentation, release history, pricing and hands-on evidence for an AI product record.', 'kingy-ai-launch-intelligence');
+    }
+    $meta = kingy_ali_phase1_social_meta();
+    if (!empty($meta['url']) && untrailingslashit($meta['url']) === untrailingslashit(home_url('/ai-launches/'))) {
+        return __('A product evaluation team reviews AI launch evidence, workflow notes and pricing information.', 'kingy-ai-launch-intelligence');
+    }
+    return $alt;
+}
+
+function kingy_ali_phase1_social_image_meta() {
+    if (kingy_ali_current_directory_archive_type() !== 'tools') {
+        return;
+    }
+    $image = 'https://kingy.ai/wp-content/uploads/2026/07/kingy-ai-product-records-social.png';
+    $alt = __('A technology researcher checks product documentation, release history, pricing and hands-on evidence for an AI product record.', 'kingy-ai-launch-intelligence');
+    echo '<meta property="og:image" content="' . esc_url($image) . '">' . "\n";
+    echo '<meta property="og:image:secure_url" content="' . esc_url($image) . '">' . "\n";
+    echo '<meta property="og:image:type" content="image/png">' . "\n";
+    echo '<meta property="og:image:width" content="1672">' . "\n";
+    echo '<meta property="og:image:height" content="941">' . "\n";
+    echo '<meta property="og:image:alt" content="' . esc_attr($alt) . '">' . "\n";
+}
+
 function kingy_ali_launch_wpseo_meta_description($description) {
+    if (kingy_ali_is_launch_coverage_archive()) {
+        return __('Browse Kingy AI launch reporting, explainers, analysis, and daily AI Launch Radar coverage.', 'kingy-ai-launch-intelligence');
+    }
+
+    if (kingy_ali_is_news_directory()) {
+        return __('Browse the latest AI news, analysis, product updates, and industry reporting from Kingy AI.', 'kingy-ai-launch-intelligence');
+    }
+
     $launch_collection_meta = kingy_ali_current_launch_collection_meta();
     if ($launch_collection_meta) {
         return $launch_collection_meta['description'];
@@ -1026,7 +1243,33 @@ function kingy_ali_model_page_canonical_url() {
     return '';
 }
 
+function kingy_ali_phase3a_output_june8_canonical() {
+    $post_id = 913525;
+
+    if (
+        !is_singular('post')
+        || get_queried_object_id() !== $post_id
+        || '1' !== (string) get_post_meta($post_id, '_yoast_wpseo_meta-robots-noindex', true)
+    ) {
+        return;
+    }
+
+    $canonical = (string) get_post_meta($post_id, '_yoast_wpseo_canonical', true);
+    if ($canonical === '') {
+        $canonical = get_permalink($post_id);
+    }
+
+    if ($canonical !== '') {
+        echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+    }
+}
+
 function kingy_ali_launch_wpseo_canonical($url) {
+    $directory_canonical = kingy_ali_public_directory_canonical_url();
+    if ($directory_canonical !== '') {
+        return $directory_canonical;
+    }
+
     $faceted_canonical = kingy_ali_faceted_taxonomy_canonical_url();
     if ($faceted_canonical) {
         return $faceted_canonical;
@@ -1043,17 +1286,12 @@ function kingy_ali_launch_wpseo_canonical($url) {
 
     $launch_collection_meta = kingy_ali_current_launch_collection_meta();
     if ($launch_collection_meta && !empty($launch_collection_meta['url'])) {
-        return $launch_collection_meta['url'];
+        return kingy_ali_launch_collection_page_canonical_url($launch_collection_meta['url']);
     }
 
     $launch_action_page_meta = kingy_ali_current_launch_action_page_meta();
     if ($launch_action_page_meta && !empty($launch_action_page_meta['url'])) {
         return $launch_action_page_meta['url'];
-    }
-
-    $directory_archive_canonical = kingy_ali_directory_archive_canonical_url();
-    if ($directory_archive_canonical) {
-        return $directory_archive_canonical;
     }
 
     $directory_meta = kingy_ali_current_directory_archive_meta();
@@ -1067,6 +1305,13 @@ function kingy_ali_launch_wpseo_canonical($url) {
     }
 
     return $url;
+}
+
+function kingy_ali_launch_collection_page_canonical_url($base_url) {
+    $page = function_exists('kingy_ali_request_get_value')
+        ? kingy_ali_sanitize_launch_page(kingy_ali_request_get_value('kali_page'))
+        : 1;
+    return $page > 1 ? add_query_arg('kali_page', $page, $base_url) : $base_url;
 }
 
 function kingy_ali_launch_wpseo_robots($robots) {
@@ -1083,6 +1328,18 @@ function kingy_ali_launch_wpseo_robots($robots) {
 }
 
 function kingy_ali_launch_wpseo_robots_inner($robots) {
+    if (kingy_ali_is_launch_coverage_archive()) {
+        return is_404()
+            || !kingy_ali_public_directory_page_is_valid()
+            || kingy_ali_public_directory_page_number() > 1
+            ? 'noindex, follow'
+            : 'index, follow';
+    }
+
+    if (kingy_ali_is_news_directory()) {
+        return kingy_ali_public_directory_page_is_valid() ? 'index, follow' : 'noindex, follow';
+    }
+
     if (is_singular(array('kingy_ai_launch', 'kingy_ai_tool', 'kingy_ai_company', 'kingy_ai_model'))) {
         $post_id = get_queried_object_id();
         if ($post_id && kingy_ali_profile_noindex_fail_open($post_id)) {
@@ -1157,10 +1414,6 @@ function kingy_ali_filter_core_sitemap_taxonomies($taxonomies) {
 }
 
 function kingy_ali_launch_wpseo_rel_link($link) {
-    if (is_post_type_archive('kingy_ai_tool') && function_exists('kingy_ali_directory_has_filters') && !kingy_ali_directory_has_filters(kingy_ali_directory_request_filters())) {
-        return kingy_ali_tool_directory_wpseo_rel_link($link);
-    }
-
     if (!is_string($link) || !is_tax('kingy_launch_category')) {
         return $link;
     }
@@ -1174,79 +1427,6 @@ function kingy_ali_launch_wpseo_rel_link($link) {
     $current_base = home_url('/ai-launch-category/' . $term->slug . '/');
 
     return str_replace($legacy_base, $current_base, $link);
-}
-
-function kingy_ali_tool_directory_wpseo_rel_link($link) {
-    if (!function_exists('kingy_ali_query_tool_directory')) {
-        return $link;
-    }
-
-    $rel = current_filter() === 'wpseo_prev_rel_link' ? 'prev' : 'next';
-    $current_page = function_exists('kingy_ali_directory_current_page') ? kingy_ali_directory_current_page() : max(1, absint(get_query_var('paged')));
-    $total_pages = kingy_ali_tool_directory_total_pages_for_current_request();
-    $target_page = $rel === 'prev' ? $current_page - 1 : $current_page + 1;
-
-    if ($target_page < 1 || $target_page > $total_pages) {
-        return false;
-    }
-
-    $url = kingy_ali_directory_archive_page_url(home_url('/ai-tools/'), $target_page);
-    return '<link rel="' . esc_attr($rel) . '" href="' . esc_url($url) . '" />';
-}
-
-function kingy_ali_tool_directory_total_pages_for_current_request() {
-    static $cache = array();
-
-    if (!function_exists('kingy_ali_query_tool_directory') || !function_exists('kingy_ali_directory_request_filters')) {
-        return 0;
-    }
-
-    $filters = kingy_ali_directory_request_filters();
-    $per_page = function_exists('kingy_ali_tool_directory_per_page') ? kingy_ali_tool_directory_per_page(24) : 24;
-    $current_page = function_exists('kingy_ali_directory_current_page') ? kingy_ali_directory_current_page() : max(1, absint(get_query_var('paged')));
-    $cache_key = md5(wp_json_encode(array($filters, $per_page, $current_page)));
-    if (isset($cache[$cache_key])) {
-        return $cache[$cache_key];
-    }
-
-    $query = kingy_ali_query_tool_directory(
-        array_merge(
-            $filters,
-            array(
-                'limit' => $per_page,
-                'paged' => $current_page,
-                'paginate' => true,
-                'track_search' => false,
-            )
-        )
-    );
-
-    $cache[$cache_key] = isset($query->max_num_pages) ? absint($query->max_num_pages) : 0;
-    return $cache[$cache_key];
-}
-
-function kingy_ali_directory_archive_canonical_url() {
-    $directory_meta = kingy_ali_current_directory_archive_meta();
-    if (!$directory_meta || empty($directory_meta['url'])) {
-        return '';
-    }
-
-    $paged = absint(get_query_var('paged'));
-    if (!$paged) {
-        $paged = absint(get_query_var('page'));
-    }
-
-    return kingy_ali_directory_archive_page_url($directory_meta['url'], max(1, $paged));
-}
-
-function kingy_ali_directory_archive_page_url($base_url, $page) {
-    $base_url = trailingslashit($base_url);
-    $page = max(1, absint($page));
-    if ($page <= 1) {
-        return $base_url;
-    }
-
-    return $base_url . user_trailingslashit('page/' . $page, 'paged');
 }
 
 function kingy_ali_output_launch_meta_description() {
@@ -1442,10 +1622,12 @@ function kingy_ali_related_page_schema($meta) {
 function kingy_ali_launch_collection_pages_meta() {
     return array(
         'ai-launches' => array(
-            'title' => __('AI Launch Command Center: Track New AI Tools, Models, Agents, and Startups', 'kingy-ai-launch-intelligence'),
-            'description' => __('Use the Kingy AI Launch Command Center to track new AI tools, agents, model releases, startups, funding announcements, demos, categories, and creator-friendly launch signals.', 'kingy-ai-launch-intelligence'),
+            'title' => __('AI Launch Intelligence: Changes & Evidence | Kingy AI', 'kingy-ai-launch-intelligence'),
+            'description' => __('Track AI launches, model updates, pricing changes and tested workflows. See official sources, company claims, evidence and what remains unverified.', 'kingy-ai-launch-intelligence'),
+            'social_title' => __('What launched, what changed, what it costs, and what worked', 'kingy-ai-launch-intelligence'),
+            'social_description' => __('Follow source-linked AI launches, product changes, pricing and workflow evidence without treating every company claim as verified.', 'kingy-ai-launch-intelligence'),
             'url' => home_url('/ai-launches/'),
-            'query_args' => array(),
+            'query_args' => array('limit' => 18),
         ),
         'ai-launches/today' => array(
             'title' => __('Today\'s AI Launches: New AI Tools and Model Releases', 'kingy-ai-launch-intelligence'),
@@ -1493,13 +1675,13 @@ function kingy_ali_launch_collection_pages_meta() {
             'title' => __('AI Search and Research Tool Launches: Source-Backed AI Research Products', 'kingy-ai-launch-intelligence'),
             'description' => __('Compare AI search and research launches with retrieval, citations, official source links, API availability, report workflows, and editorial trust notes.', 'kingy-ai-launch-intelligence'),
             'url' => home_url('/ai-launches/ai-search-research-tools/'),
-            'query_args' => array('category' => 'ai-search-tools'),
+            'query_args' => array('category' => 'ai-search-research-tools'),
         ),
         'ai-launches/ai-app-builders' => array(
             'title' => __('AI App Builder and Vibe Coding Launches: New AI Software Builders', 'kingy-ai-launch-intelligence'),
             'description' => __('Track AI app builders, vibe coding tools, AI IDEs, coding agents, and prompt-to-app launches with source-backed context and production-readiness notes.', 'kingy-ai-launch-intelligence'),
             'url' => home_url('/ai-launches/ai-app-builders/'),
-            'query_args' => array('category' => 'ai-coding-tools'),
+            'query_args' => array('category' => 'ai-coding-tools', 'limit' => 18),
         ),
         'ai-launches/youtube-worthy-ai-tools' => array(
             'title' => __('YouTube-Worthy AI Tools: AI Launches With Strong Demo Potential', 'kingy-ai-launch-intelligence'),
@@ -1598,6 +1780,20 @@ function kingy_ali_launch_collection_should_noindex_inner() {
     }
 
     $query_args = $meta['query_args'];
+    $requested_page = function_exists('kingy_ali_request_get_value')
+        ? kingy_ali_sanitize_launch_page(kingy_ali_request_get_value('kali_page'))
+        : 1;
+    if ($requested_page > 1) {
+        $query_args['limit'] = !empty($query_args['limit']) ? absint($query_args['limit']) : 12;
+        $query_args['page'] = $requested_page;
+        $page_query = kingy_ali_query_launches($query_args);
+        $page_is_empty = empty($page_query->posts);
+        wp_reset_postdata();
+        if ($page_is_empty) {
+            return true;
+        }
+    }
+
     if (kingy_ali_launch_collection_path_has_useful_fallback(kingy_ali_current_request_path())) {
         return false;
     }
@@ -1935,6 +2131,7 @@ function kingy_ali_launch_action_page_schema($meta) {
 
 function kingy_ali_launch_collection_schema($meta) {
     $url = isset($meta['url']) ? $meta['url'] : home_url('/ai-launches/');
+    $url = kingy_ali_launch_collection_page_canonical_url($url);
     $item_list = kingy_ali_schema_empty_item_list();
     try {
         $item_list = kingy_ali_launch_collection_item_list($meta);
@@ -1991,7 +2188,12 @@ function kingy_ali_daily_radar_article_schema($post_id) {
 
 function kingy_ali_launch_collection_item_list($meta, $limit = 12) {
     $query_args = isset($meta['query_args']) && is_array($meta['query_args']) ? $meta['query_args'] : array();
-    $query_args['limit'] = max(1, absint($limit));
+    $query_args['limit'] = !empty($query_args['limit']) ? max(1, absint($query_args['limit'])) : max(1, absint($limit));
+    if (function_exists('kingy_ali_request_filters')) {
+        $request_filters = kingy_ali_request_filters();
+        $query_args['page'] = $request_filters['page'];
+        $query_args['sort'] = $request_filters['sort'];
+    }
     try {
         $query = kingy_ali_query_launches($query_args);
     } catch (Throwable $throwable) {
@@ -2004,16 +2206,13 @@ function kingy_ali_launch_collection_item_list($meta, $limit = 12) {
     }
 
     $items = array();
-    $position = 1;
+    $page = isset($query_args['page']) ? kingy_ali_sanitize_launch_page($query_args['page']) : 1;
+    $position = (($page - 1) * $query_args['limit']) + 1;
     foreach ((array) $query->posts as $post) {
         $post_id = is_object($post) && isset($post->ID) ? absint($post->ID) : absint($post);
         if (!$post_id) {
             continue;
         }
-        if (function_exists('kingy_ali_profile_should_noindex') && kingy_ali_profile_should_noindex($post_id)) {
-            continue;
-        }
-
         $item = array(
             '@type' => 'ListItem',
             'position' => $position,
@@ -2035,7 +2234,7 @@ function kingy_ali_launch_collection_item_list($meta, $limit = 12) {
 
     return array(
         '@type' => 'ItemList',
-        'numberOfItems' => count($items),
+        'numberOfItems' => isset($query->found_posts) ? absint($query->found_posts) : count($items),
         'itemListElement' => $items,
     );
 }
@@ -2044,16 +2243,14 @@ function kingy_ali_schema_launch_summary($post_id) {
     $official_url = kingy_ali_schema_url(kingy_ali_get_meta($post_id, 'official_url'));
 
     return array(
-        '@type' => 'Event',
+        '@type' => 'CreativeWork',
         '@id' => kingy_ali_schema_entity_id($post_id, 'launch'),
         'name' => get_the_title($post_id),
         'description' => kingy_ali_schema_description(kingy_ali_schema_meta_text($post_id, 'what_launched', get_the_excerpt($post_id))),
         'url' => get_permalink($post_id),
         'sameAs' => $official_url,
-        'startDate' => kingy_ali_schema_meta_text($post_id, 'launch_date'),
-        'eventAttendanceMode' => 'https://schema.org/OnlineEventAttendanceMode',
-        'eventStatus' => 'https://schema.org/EventScheduled',
-        'organizer' => kingy_ali_schema_launch_organizer($post_id, kingy_ali_schema_meta_text($post_id, 'company')),
+        'dateCreated' => kingy_ali_schema_meta_text($post_id, 'launch_date'),
+        'creator' => kingy_ali_schema_launch_organizer($post_id, kingy_ali_schema_meta_text($post_id, 'company')),
         'keywords' => kingy_ali_schema_keywords($post_id),
         'audience' => kingy_ali_schema_audience($post_id),
         'citation' => kingy_ali_schema_citations($post_id),
@@ -2085,8 +2282,10 @@ function kingy_ali_directory_archive_meta($archive_type) {
             'post_type' => 'kingy_ai_model',
         ),
         'tools' => array(
-            'title' => __('AI Tool Directory: Search AI Tools, Pricing, Demos, and Launches', 'kingy-ai-launch-intelligence'),
-            'description' => __('Search Kingy AI Tool profiles connected to structured AI launch history, categories, audiences, demos, pricing, and company records.', 'kingy-ai-launch-intelligence'),
+            'title' => __('AI Product Records: Pricing, Launches & Evidence | Kingy AI', 'kingy-ai-launch-intelligence'),
+            'description' => __('Search AI product records with launch history, pricing status, demos, audiences and source notes. See what is verified, claimed or still unknown.', 'kingy-ai-launch-intelligence'),
+            'social_title' => __('Compare AI products by launches, pricing and evidence', 'kingy-ai-launch-intelligence'),
+            'social_description' => __('Search durable AI product records and inspect what changed, what it costs and which claims have supporting evidence.', 'kingy-ai-launch-intelligence'),
             'url' => home_url('/ai-tools/'),
             'post_type' => 'kingy_ai_tool',
         ),
@@ -2368,7 +2567,19 @@ function kingy_ali_schema_keywords($post_id) {
             continue;
         }
 
-        $keywords = array_merge($keywords, wp_list_pluck($terms, 'name'));
+        foreach ((array) $terms as $term) {
+            if (
+                $taxonomy === 'kingy_tool_attribute'
+                && get_post_type($post_id) === 'kingy_ai_launch'
+                && function_exists('kingy_ali_public_launch_attribute_is_visible')
+                && (!isset($term->slug) || !kingy_ali_public_launch_attribute_is_visible($post_id, $term->slug))
+            ) {
+                continue;
+            }
+            if (isset($term->name)) {
+                $keywords[] = $term->name;
+            }
+        }
     }
 
     $target_query = kingy_ali_schema_meta_text($post_id, 'target_search_query');
@@ -2411,9 +2622,18 @@ function kingy_ali_schema_yes_no_boolean($value) {
 }
 
 function kingy_ali_schema_kingy_review($post_id) {
-    $score = kingy_ali_schema_meta_text($post_id, 'kingy_launch_score');
+    if (function_exists('kingy_ali_launch_score_snapshot')) {
+        $score_snapshot = kingy_ali_launch_score_snapshot($post_id);
+        $score = isset($score_snapshot['kingy']['value']) ? $score_snapshot['kingy']['value'] : null;
+    } else {
+        $raw_score = kingy_ali_schema_meta_text($post_id, 'kingy_launch_score');
+        $suppressed = function_exists('kingy_ali_quality_truthy_meta')
+            ? kingy_ali_quality_truthy_meta($post_id, 'scores_suppressed')
+            : false;
+        $score = !$suppressed && $raw_score !== '' && is_numeric($raw_score) ? (float) $raw_score : null;
+    }
     $review_body = kingy_ali_schema_meta_text($post_id, 'kingy_verdict');
-    $has_score = $score !== '' && is_numeric($score);
+    $has_score = $score !== null && is_numeric($score);
     if (!$has_score && $review_body === '') {
         return '';
     }
@@ -2563,13 +2783,17 @@ function kingy_ali_model_page_noindex_fail_open() {
     }
 }
 
-function kingy_ali_profile_should_noindex($post_id) {
+function kingy_ali_entity_quality_gate_should_noindex($post_id, $refresh = false) {
     static $cache = array();
     static $checking = array();
 
     $post_id = absint($post_id);
     if (!$post_id) {
         return false;
+    }
+
+    if ($refresh) {
+        unset($cache[$post_id], $checking[$post_id]);
     }
 
     if (array_key_exists($post_id, $cache)) {
@@ -2877,6 +3101,9 @@ function kingy_ali_output_filtered_results_robots() {
     }
 
     if (defined('WPSEO_VERSION') || class_exists('WPSEO_Frontend')) {
+        // Yoast suppresses its canonical element on these noindex query
+        // surfaces. Keep one explicit canonical; rendered acceptance checks
+        // guard against either a missing or duplicate element.
         echo '<link rel="canonical" href="' . esc_url(kingy_ali_filtered_results_canonical_url()) . '">' . "\n";
         return;
     }
@@ -2900,6 +3127,14 @@ function kingy_ali_is_filtered_or_search_results_page() {
     }
 
     foreach ($query_values as $key => $value) {
+        if ((string) $key === 'kali_page') {
+            continue;
+        }
+
+        if ((string) $key === 'kali_sort' && kingy_ali_sanitize_launch_sort($value) === 'newest') {
+            continue;
+        }
+
         if (strpos((string) $key, 'kali_') === 0 && kingy_ali_filtered_query_value_present($value)) {
             return true;
         }
@@ -3055,3 +3290,19 @@ function kingy_ali_current_url_without_query() {
 
     return home_url('/');
 }
+
+/**
+ * Collapse stale homepage pagination routes onto the canonical homepage.
+ *
+ * The current static homepage renders the same content at /page/N/ while
+ * declaring the homepage as canonical. A permanent redirect removes those
+ * duplicate, indexable routes without deleting any post or archive content.
+ */
+function kingy_ali_redirect_stale_homepage_pagination(): void {
+	$paged = max( (int) get_query_var( 'paged' ), (int) get_query_var( 'page' ) );
+	if ( is_front_page() && $paged > 1 ) {
+		wp_safe_redirect( home_url( '/' ), 301, 'Kingy AI' );
+		exit;
+	}
+}
+add_action( 'template_redirect', 'kingy_ali_redirect_stale_homepage_pagination', -50 );
