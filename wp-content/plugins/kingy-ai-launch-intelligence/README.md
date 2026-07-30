@@ -182,6 +182,30 @@ AI model profiles are intended to stay noindexed until they have a provider, mod
 12. Use **Settings** to set the Contact CTA URL and optional Client Examples CTA URL used by Launch Visibility Score and submission success next steps.
 13. Use **Export Launch CSV** when you want a re-importable spreadsheet for launch backfills. Use **Export Tool CSV** and **Export Company CSV** as audit sheets for reviewing profile coverage and planning manual enrichment.
 
+## Safe Graph Sync WP-CLI
+
+Use the targeted graph sync command when a known launch record should repair its matching tool/company metadata without publishing anything.
+
+Dry-run is the default and broad/all mode is intentionally unsupported:
+
+```sh
+wp kingy-ali sync-graph --launch_ids=916998 --dry-run --format=json
+```
+
+Use tool-only mode when the company profile is already populated and should only be resolved/linked, not updated:
+
+```sh
+wp kingy-ali sync-graph --launch_ids=916998 --skip-company-updates --dry-run --format=json
+```
+
+Apply requires an explicit flag and preserves the original statuses of the launch, tool, and company:
+
+```sh
+wp kingy-ali sync-graph --launch_ids=916998 --apply --preserve-status --format=json
+```
+
+The first intended production review target is launch `916998` and existing draft tool `916999` for Microsoft 365 Education AI Teaching Capabilities. Review the JSON diff before using `--apply`. The command refuses missing or wrong post types, ambiguous matches, and non-empty target fields unless `--overwrite` is explicitly provided.
+
 ## Verification
 
 Run the lightweight plugin check before packaging a new ZIP:
@@ -209,3 +233,30 @@ require_once WP_CONTENT_DIR . '/plugins/kingy-ai-launch-intelligence/bootstrap.p
 The bootstrap defines the package as embedded code, skips activation/deactivation hooks, and lets normal one-time upgrade checks create or update terms, analytics tables, rewrite rules, and managed page checks.
 
 Company directory cards use a lighter public-card readiness check than individual company profile indexing, so sourced company records can appear in the directory while thin company profiles still receive noindex safeguards.
+## Embeddable KALI tool modules
+
+All tool modules accept `tool` (published tool ID or slug), `mode` (`live` or `snapshot`), and `as_of` (`YYYY-MM-DD`). Production currently has no verified historical pricing or feature snapshots, so every snapshot/as-of request fails closed. It never substitutes current values for historical values and always labels the current record verification date as current, not historical.
+
+- Facts: `[kingy_kali_tool_facts tool="cursor" mode="live"]` or the **KALI tool facts** block. Use for the current tool fact grid.
+- Pricing: `[kingy_kali_tool_pricing tool="cursor" mode="live"]` or the **KALI tool pricing** block. Use for current pricing/free-plan facts and the current verification label.
+- Features: `[kingy_kali_tool_features tool="cursor" mode="live"]` or the **KALI tool features** block. Use for the current capability summary; snapshot requests fail closed.
+- Verification: `[kingy_kali_tool_verification tool="cursor" mode="live"]` or the **KALI verification** block. Use for the current verification, freshness, sources, and correction panel.
+- Sources: `[kingy_kali_tool_sources tool="cursor" mode="live"]` or the **KALI tool sources** block. Use for focused source links and correction controls.
+- Launch history: `[kingy_kali_tool_launch_history tool="cursor" mode="live" limit="12"]` or the **KALI tool launch history** block. Use for published, index-ready launches linked to the tool.
+
+The generic form is `[kingy_kali_tool_module module="pricing" tool="cursor" mode="snapshot" as_of="2026-01-15"]`. Until verified history exists, that example renders only the historical-unavailable state and the clearly identified current record verification date.
+
+## Living Companion Videos
+
+The `kingy_video` post type uses permanent `/videos/{slug}/` URLs and a noindexed `/videos/` archive. It composes current KALI records with a separately stored, verified publication-moment snapshot; the editor must never copy pricing or feature values into prose.
+
+Safe editor workflow:
+
+1. Create a **Companion Videos** draft. Add the YouTube URL/ID, video publication date, and published tool IDs or slugs. Save the draft once.
+2. Choose **Capture verified snapshot**. Capture is explicit and write-once. Re-capture requires confirmation and preserves the previous JSON as a revision. With the current production data, capture intentionally fails closed with “No verified historical snapshot is available.”
+3. Write at least 300 words of unique editorial context with inline source links. Do not paste bare URLs, pricing, or feature claims into the body.
+4. Select one story-specific featured image and complete actual-pixel/contact-sheet review. The theme renders it once as the hero; never insert it or a near-duplicate in the body. The video facade uses the YouTube CDN thumbnail and loads the privacy-enhanced iframe only after a click.
+5. Review desktop and exact-mobile previews. Confirm the snapshot/live labels, comparison, canonical tool links, sponsorship disclosure, keyboard operation, schema, noindex, and absence of console/network errors. Optional pricing or comparison links stay omitted unless an independent source is approved later.
+6. Check the image and editorial QA boxes only after those rendered reviews. Indexing and publication remain technically blocked until Curtis explicitly approves the individual page and a later release defines `KINGY_ALI_COMPANION_INDEXING_ENABLED` as true.
+
+Tool pages show up to six newest published companions under **Featured in these videos**. Companion and related tool URLs use a five-minute shared-cache fallback plus dependency-targeted purging when either side changes.

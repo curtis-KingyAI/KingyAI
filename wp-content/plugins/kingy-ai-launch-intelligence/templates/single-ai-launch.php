@@ -15,10 +15,12 @@ if (!function_exists('kingy_ali_terms_to_string')) {
 }
 
 if (!function_exists('kingy_ali_render_single_fact')) {
-    function kingy_ali_render_single_fact($label, $value, $field = '') {
+    function kingy_ali_render_single_fact($label, $value, $field = '', $empty_label = '') {
         $value = kingy_ali_public_profile_text($value);
         if ($value === '') {
-            $value = __('Unknown', 'kingy-ai-launch-intelligence');
+            $value = $empty_label !== ''
+                ? $empty_label
+                : __('Not publicly confirmed', 'kingy-ai-launch-intelligence');
         }
 
         $body = $field ? kingy_ali_launch_render_inline_internal_links($value, get_the_ID(), $field) : esc_html($value);
@@ -27,9 +29,9 @@ if (!function_exists('kingy_ali_render_single_fact')) {
 }
 
 if (!function_exists('kingy_ali_render_single_fact_html')) {
-    function kingy_ali_render_single_fact_html($label, $html) {
+    function kingy_ali_render_single_fact_html($label, $html, $empty_label = '') {
         if ($html === '') {
-            $html = esc_html__('Unknown', 'kingy-ai-launch-intelligence');
+            $html = esc_html($empty_label !== '' ? $empty_label : __('Not classified', 'kingy-ai-launch-intelligence'));
         }
 
         echo '<div><dt>' . esc_html($label) . '</dt><dd>' . wp_kses_post($html) . '</dd></div>';
@@ -226,7 +228,7 @@ if (!function_exists('kingy_ali_launch_yes_no_label')) {
             return __('No', 'kingy-ai-launch-intelligence');
         }
 
-        return $value ? ucfirst($value) : __('Unknown', 'kingy-ai-launch-intelligence');
+        return $value ? ucfirst($value) : __('Not publicly confirmed', 'kingy-ai-launch-intelligence');
     }
 }
 
@@ -274,7 +276,7 @@ if (!function_exists('kingy_ali_launch_source_links')) {
         $links = array();
         if ($official_url) {
             $links[] = array(
-                'label' => __('Official launch source', 'kingy-ai-launch-intelligence'),
+                'label' => __('Official site', 'kingy-ai-launch-intelligence'),
                 'url' => $official_url,
             );
         }
@@ -340,10 +342,9 @@ if (!function_exists('kingy_ali_launch_has_attribute_slug')) {
 
 if (!function_exists('kingy_ali_launch_has_coverage_signal')) {
     function kingy_ali_launch_has_coverage_signal($post_id) {
-        $signal_slugs = array(
-            'creator-coverage-candidate',
-            'sponsor-candidate',
-            'strong-demo',
+        // These attributes are derived from source/taxonomy facts rather than
+        // score metadata, so a stale score-derived term cannot trigger a CTA.
+        $non_score_signal_slugs = array(
             'video-demo-available',
             'creator-friendly',
             'business-friendly',
@@ -352,24 +353,28 @@ if (!function_exists('kingy_ali_launch_has_coverage_signal')) {
             'funding-announced',
         );
 
-        return kingy_ali_launch_has_attribute_slug($post_id, $signal_slugs)
-            || kingy_ali_public_profile_number(kingy_ali_get_meta($post_id, 'youtube_score')) >= 7
-            || kingy_ali_public_profile_number(kingy_ali_get_meta($post_id, 'demo_quality_score')) >= 7
-            || kingy_ali_public_profile_number(kingy_ali_get_meta($post_id, 'sponsor_fit_score_internal')) >= 7
-            || kingy_ali_public_profile_meta_text($post_id, 'creator_coverage_interest') === 'yes'
-            || kingy_ali_public_profile_meta_text($post_id, 'sponsorship_interest') === 'yes'
-            || kingy_ali_public_profile_meta_text($post_id, 'youtube_interest') === 'yes';
+        return kingy_ali_launch_has_attribute_slug($post_id, $non_score_signal_slugs)
+            || (function_exists('kingy_ali_public_launch_score_meets') && kingy_ali_public_launch_score_meets($post_id, 'youtube', 7))
+            || (function_exists('kingy_ali_public_launch_score_meets') && kingy_ali_public_launch_score_meets($post_id, 'demo', 7));
+    }
+}
+
+if (!function_exists('kingy_ali_launch_is_editorially_approved')) {
+    function kingy_ali_launch_is_editorially_approved($post_id) {
+        $verification_status = sanitize_key((string) kingy_ali_get_meta($post_id, 'verification_status'));
+
+        return in_array($verification_status, array('verified', 'partially_verified'), true);
     }
 }
 
 if (!function_exists('kingy_ali_render_launch_coverage_next_steps')) {
     function kingy_ali_render_launch_coverage_next_steps($post_id) {
-        if (!kingy_ali_launch_has_coverage_signal($post_id)) {
+        if (!kingy_ali_launch_is_editorially_approved($post_id) || !kingy_ali_launch_has_coverage_signal($post_id)) {
             return;
         }
 
-        $youtube_signal = kingy_ali_public_profile_number(kingy_ali_get_meta($post_id, 'youtube_score')) >= 7
-            || kingy_ali_launch_has_attribute_slug($post_id, array('creator-coverage-candidate', 'strong-demo', 'video-demo-available', 'creator-friendly'));
+        $youtube_signal = (function_exists('kingy_ali_public_launch_score_meets') && kingy_ali_public_launch_score_meets($post_id, 'youtube', 7))
+            || kingy_ali_launch_has_attribute_slug($post_id, array('video-demo-available', 'creator-friendly'));
         ?>
         <section class="kingy-ali-link-panel kingy-ali-coverage-next">
             <h2><?php esc_html_e('Creator Coverage Next Steps', 'kingy-ai-launch-intelligence'); ?></h2>
@@ -398,7 +403,10 @@ if (!function_exists('kingy_ali_render_launch_context_links')) {
             ),
         );
 
-        if ($launch_date) {
+        $has_day_precision = function_exists('kingy_ali_public_profile_date_has_day_precision')
+            ? kingy_ali_public_profile_date_has_day_precision($launch_date)
+            : preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $launch_date) === 1;
+        if ($has_day_precision) {
             $links[] = array(
                 'label' => __('Today\'s launches', 'kingy-ai-launch-intelligence'),
                 'url' => home_url('/ai-launches/today/'),
@@ -465,6 +473,9 @@ get_header();
             'related_calculator_url' => kingy_ali_sanitize_public_profile_link_url(kingy_ali_get_meta($post_id, 'related_calculator_url')),
             'best_next_link_url' => kingy_ali_sanitize_public_profile_link_url(kingy_ali_get_meta($post_id, 'best_next_link_url')),
         );
+        $related_editorial_urls = function_exists('kingy_ali_related_editorial_urls_for_launch')
+            ? kingy_ali_related_editorial_urls_for_launch($post_id)
+            : array();
         $launch_date = kingy_ali_public_profile_meta_text($post_id, 'launch_date');
         $company = kingy_ali_public_profile_meta_text($post_id, 'company');
         $what_launched = kingy_ali_public_profile_meta_text($post_id, 'what_launched');
@@ -484,11 +495,39 @@ get_header();
         $category_terms = get_the_terms($post_id, 'kingy_launch_category');
         $audience_terms = get_the_terms($post_id, 'kingy_audience');
         $launch_type_terms = get_the_terms($post_id, 'kingy_launch_type');
+        $launch_type_html = kingy_ali_render_launch_term_links($launch_type_terms, 'kingy_launch_type');
+        $category_html = kingy_ali_render_launch_term_links($category_terms, 'kingy_launch_category');
+        $audience_html = kingy_ali_render_launch_term_links($audience_terms, 'kingy_audience');
+        if ($audience_html === '' && $who_it_is_for !== '') {
+            $audience_html = kingy_ali_launch_render_inline_internal_links($who_it_is_for, $post_id, 'who_it_is_for');
+        }
         $source_links = kingy_ali_launch_source_links($official_url, $source_urls, $source_notes);
-        $launch_score = kingy_ali_public_profile_meta_text($post_id, 'kingy_launch_score');
-        $demo_quality_score = kingy_ali_public_profile_meta_text($post_id, 'demo_quality_score');
-        $youtube_score = kingy_ali_public_profile_meta_text($post_id, 'youtube_score');
-        $has_scores = $launch_score !== '' || $demo_quality_score !== '' || $youtube_score !== '';
+        $trust_snapshot = kingy_ali_launch_trust_snapshot($post_id);
+        $verification_status = sanitize_key((string) kingy_ali_get_meta($post_id, 'verification_status'));
+        $is_editorially_approved = kingy_ali_launch_is_editorially_approved($post_id);
+        $is_founder_submission = !empty(kingy_ali_get_meta($post_id, 'founder_submitted'))
+            || $verification_status === 'founder_submitted';
+        $is_unverified_founder_submission = $is_founder_submission && !$is_editorially_approved;
+        $launch_date_label = kingy_ali_public_profile_date_label($launch_date);
+        if ($launch_date_label === '') {
+            $launch_date_label = __('Not publicly confirmed', 'kingy-ai-launch-intelligence');
+        }
+        if ($verification_status === 'verified') {
+            $source_panel_kicker = __('Source-backed record', 'kingy-ai-launch-intelligence');
+            $source_panel_heading = __('Verified Sources', 'kingy-ai-launch-intelligence');
+        } elseif ($is_unverified_founder_submission) {
+            $source_panel_kicker = __('Founder-submitted record', 'kingy-ai-launch-intelligence');
+            $source_panel_heading = __('Founder-supplied sources', 'kingy-ai-launch-intelligence');
+        } else {
+            $source_panel_kicker = __('Source list', 'kingy-ai-launch-intelligence');
+            $source_panel_heading = __('Sources', 'kingy-ai-launch-intelligence');
+        }
+        $score_snapshot = $trust_snapshot['score'];
+        $has_scores = !empty($score_snapshot['public']) && (
+            $score_snapshot['kingy']['state'] !== 'not_scored'
+            || $score_snapshot['demo']['state'] !== 'not_scored'
+            || $score_snapshot['youtube']['state'] !== 'not_scored'
+        );
         $related_tool_id = kingy_ali_public_profile_id(kingy_ali_get_meta($post_id, 'related_tool_id'));
         if (!kingy_ali_related_post_is_public_index_ready($related_tool_id, 'kingy_ai_tool')) {
             $related_tool_id = 0;
@@ -502,7 +541,7 @@ get_header();
             <header class="kingy-ali-single__header">
                 <div class="kingy-ali-single__header-inner">
                     <div class="kingy-ali-single__headline">
-                        <p class="kingy-ali-kicker"><?php esc_html_e('Verified AI Launch Profile', 'kingy-ai-launch-intelligence'); ?></p>
+                        <p class="kingy-ali-kicker"><?php esc_html_e('AI Launch Profile', 'kingy-ai-launch-intelligence'); ?></p>
                         <h1><?php the_title(); ?></h1>
                         <?php if ($what_launched) : ?>
                             <p><?php echo kingy_ali_launch_render_inline_internal_links($what_launched, $post_id, 'what_launched'); ?></p>
@@ -517,13 +556,15 @@ get_header();
                     <aside class="kingy-ali-single__hero-facts" aria-label="<?php esc_attr_e('Launch summary', 'kingy-ai-launch-intelligence'); ?>">
                         <dl>
                             <div><dt><?php esc_html_e('Company', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html($company ? $company : __('Unknown', 'kingy-ai-launch-intelligence')); ?></dd></div>
-                            <div><dt><?php esc_html_e('Launch date', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html(kingy_ali_public_profile_date_label($launch_date)); ?></dd></div>
+                            <div><dt><?php esc_html_e('Launch date', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html($launch_date_label); ?></dd></div>
                             <div><dt><?php esc_html_e('Category', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo wp_kses_post(kingy_ali_render_launch_term_links($category_terms, 'kingy_launch_category', 'launch_profile_hero')); ?></dd></div>
-                            <div><dt><?php esc_html_e('Verification', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html(ucfirst(kingy_ali_public_profile_meta_text($post_id, 'verification_status', __('Verified', 'kingy-ai-launch-intelligence')))); ?></dd></div>
+                            <div><dt><?php esc_html_e('Verification', 'kingy-ai-launch-intelligence'); ?></dt><dd data-verification-status="<?php echo esc_attr($trust_snapshot['status']); ?>"><?php echo esc_html($trust_snapshot['label']); ?></dd></div>
                         </dl>
                     </aside>
                 </div>
             </header>
+
+            <?php echo kingy_ali_render_profile_featured_image($post_id); ?>
 
             <section class="kingy-ali-snapshot">
                 <div class="kingy-ali-section-heading">
@@ -532,10 +573,10 @@ get_header();
                 </div>
                 <dl class="kingy-ali-facts">
                     <?php kingy_ali_render_single_fact(__('Company', 'kingy-ai-launch-intelligence'), $company); ?>
-                    <?php kingy_ali_render_single_fact(__('Launch date', 'kingy-ai-launch-intelligence'), kingy_ali_public_profile_date_label($launch_date)); ?>
-                    <?php kingy_ali_render_single_fact_html(__('Launch type', 'kingy-ai-launch-intelligence'), kingy_ali_render_launch_term_links($launch_type_terms, 'kingy_launch_type')); ?>
-                    <?php kingy_ali_render_single_fact_html(__('Category', 'kingy-ai-launch-intelligence'), kingy_ali_render_launch_term_links($category_terms, 'kingy_launch_category')); ?>
-                    <?php kingy_ali_render_single_fact_html(__('Audience', 'kingy-ai-launch-intelligence'), kingy_ali_render_launch_term_links($audience_terms, 'kingy_audience')); ?>
+                    <?php kingy_ali_render_single_fact(__('Launch date', 'kingy-ai-launch-intelligence'), $launch_date_label); ?>
+                    <?php kingy_ali_render_single_fact_html(__('Launch type', 'kingy-ai-launch-intelligence'), $launch_type_html); ?>
+                    <?php kingy_ali_render_single_fact_html(__('Category', 'kingy-ai-launch-intelligence'), $category_html); ?>
+                    <?php kingy_ali_render_single_fact_html(__('Audience', 'kingy-ai-launch-intelligence'), $audience_html, __('Not specified', 'kingy-ai-launch-intelligence')); ?>
                     <?php kingy_ali_render_single_fact(__('Pricing', 'kingy-ai-launch-intelligence'), $pricing, 'pricing'); ?>
                     <?php kingy_ali_render_single_fact(__('Free plan', 'kingy-ai-launch-intelligence'), $free_plan); ?>
                     <?php kingy_ali_render_single_fact(__('API', 'kingy-ai-launch-intelligence'), $api_available); ?>
@@ -552,9 +593,9 @@ get_header();
                     <h2><?php esc_html_e('Kingy Scores', 'kingy-ai-launch-intelligence'); ?></h2>
                     <p><?php esc_html_e('Scores are editorial review signals across launch quality, demo evidence, YouTube potential, and search readiness.', 'kingy-ai-launch-intelligence'); ?></p>
                     <dl class="kingy-ali-score-list kingy-ali-score-list--large">
-                        <div><dt><?php esc_html_e('Launch Score', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html(kingy_ali_format_score($launch_score)); ?></dd></div>
-                        <div><dt><?php esc_html_e('Demo Quality', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html(kingy_ali_format_score($demo_quality_score)); ?></dd></div>
-                        <div><dt><?php esc_html_e('YouTube Potential', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html(kingy_ali_score_band($youtube_score)); ?></dd></div>
+                        <div><dt><?php esc_html_e('Launch Score', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html($score_snapshot['kingy']['label']); ?></dd></div>
+                        <div><dt><?php esc_html_e('Demo Quality', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html($score_snapshot['demo']['label']); ?></dd></div>
+                        <div><dt><?php esc_html_e('YouTube Potential', 'kingy-ai-launch-intelligence'); ?></dt><dd><?php echo esc_html($score_snapshot['youtube']['label']); ?></dd></div>
                     </dl>
                 </section>
             <?php endif; ?>
@@ -562,12 +603,34 @@ get_header();
             <?php kingy_ali_render_launch_coverage_next_steps($post_id); ?>
 
             <section class="kingy-ali-content-band">
-                <h2><?php esc_html_e('Kingy AI Take', 'kingy-ai-launch-intelligence'); ?></h2>
-                <?php if ($kingy_verdict) : ?>
-                    <p><?php echo esc_html($kingy_verdict); ?></p>
+                <?php
+                // OpenClaw launch 926112 has a closed, evidence-reviewed editorial body that
+                // already includes its Kingy verdict, methodology limitation, and disclosure.
+                // Render that body once instead of duplicating the separate verdict meta.
+                $render_openclaw_926112_body = absint($post_id) === 926112
+                    && trim((string) get_post_field('post_content', $post_id, 'raw')) !== '';
+                ?>
+                <?php if ($render_openclaw_926112_body) : ?>
+                    <style id="kingy-openclaw-926112-body-guard">
+                        .kingy-ali-launch-body code {
+                            overflow-wrap: anywhere;
+                            white-space: normal;
+                            word-break: break-word;
+                        }
+                    </style>
+                    <div class="entry-content kingy-ali-launch-body"><?php the_content(); ?></div>
                 <?php else : ?>
-                    <?php the_content(); ?>
+                    <h2><?php esc_html_e('Kingy AI Take', 'kingy-ai-launch-intelligence'); ?></h2>
+                    <?php if ($kingy_verdict) : ?>
+                        <p><?php echo esc_html($kingy_verdict); ?></p>
+                    <?php else : ?>
+                        <?php the_content(); ?>
+                    <?php endif; ?>
                 <?php endif; ?>
+                <aside class="kingy-stack-radar-connection">
+                    <strong><?php esc_html_e('Track changes to your AI stack', 'kingy-ai-launch-intelligence'); ?></strong>
+                    <p><a href="<?php echo esc_url(home_url('/ai-stack-change-radar/')); ?>"><?php esc_html_e('Open the Kingy AI Stack Change Radar →', 'kingy-ai-launch-intelligence'); ?></a></p>
+                </aside>
             </section>
 
             <?php if ($who_it_is_for || $what_feels_promising || $what_feels_unproven) : ?>
@@ -589,8 +652,8 @@ get_header();
             <?php if ($source_links) : ?>
                 <section class="kingy-ali-link-panel kingy-ali-source-panel">
                     <div class="kingy-ali-section-heading">
-                        <p class="kingy-ali-kicker"><?php esc_html_e('Source-backed record', 'kingy-ai-launch-intelligence'); ?></p>
-                        <h2><?php esc_html_e('Verified Sources', 'kingy-ai-launch-intelligence'); ?></h2>
+                        <p class="kingy-ali-kicker"><?php echo esc_html($source_panel_kicker); ?></p>
+                        <h2><?php echo esc_html($source_panel_heading); ?></h2>
                     </div>
                     <div class="kingy-ali-source-grid">
                         <?php foreach ($source_links as $link) : ?>
@@ -604,7 +667,7 @@ get_header();
                 </section>
             <?php endif; ?>
 
-            <?php if ($related_tool_id || $related_company_id || array_filter($related_urls)) : ?>
+            <?php if ($related_tool_id || $related_company_id || $related_editorial_urls || array_filter($related_urls)) : ?>
                 <section class="kingy-ali-link-panel">
                     <h2><?php esc_html_e('Related Kingy Links', 'kingy-ai-launch-intelligence'); ?></h2>
                     <div class="kingy-ali-link-list">
@@ -615,6 +678,10 @@ get_header();
                             <a data-kingy-ali-track="clicked_company" data-object-id="<?php echo esc_attr($related_company_id); ?>" data-event-surface="launch_profile_related" href="<?php echo esc_url(get_permalink($related_company_id)); ?>"><?php esc_html_e('View company profile', 'kingy-ai-launch-intelligence'); ?></a>
                         <?php endif; ?>
                         <?php kingy_ali_render_external_link(__('Related article', 'kingy-ai-launch-intelligence'), $related_urls['related_article_url'], 'launch_profile_related'); ?>
+                        <?php foreach ($related_editorial_urls as $editorial_url => $editorial_post_id) : ?>
+                            <?php if ($related_urls['related_article_url'] === $editorial_url) { continue; } ?>
+                            <a data-kingy-ali-track="clicked_related_article" data-object-id="<?php echo esc_attr($editorial_post_id); ?>" data-event-label="<?php echo esc_attr(get_the_title($editorial_post_id)); ?>" data-event-surface="launch_profile_related" href="<?php echo esc_url($editorial_url); ?>"><?php echo esc_html(get_the_title($editorial_post_id)); ?></a>
+                        <?php endforeach; ?>
                         <?php kingy_ali_render_external_link(__('Related course', 'kingy-ai-launch-intelligence'), $related_urls['related_course_url'], 'launch_profile_related'); ?>
                         <?php kingy_ali_render_external_link(__('Related review', 'kingy-ai-launch-intelligence'), $related_urls['related_review_url'], 'launch_profile_related'); ?>
                         <?php kingy_ali_render_external_link(__('Alternatives page', 'kingy-ai-launch-intelligence'), $related_urls['related_alternatives_url'], 'launch_profile_related'); ?>
@@ -631,7 +698,9 @@ get_header();
             <div class="kingy-ali-cta-row">
                 <a data-kingy-ali-track="clicked_submit_cta" data-event-label="<?php esc_attr_e('Submit a related launch', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="launch_profile_cta" href="<?php echo esc_url(home_url('/ai-launches/submit/')); ?>"><?php esc_html_e('Submit a related launch', 'kingy-ai-launch-intelligence'); ?></a>
                 <a data-kingy-ali-track="clicked_visibility_score_cta" data-event-label="<?php esc_attr_e('Get a Launch Visibility Score', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="launch_profile_cta" href="<?php echo esc_url(home_url('/ai-launches/launch-visibility-score/')); ?>"><?php esc_html_e('Get a Launch Visibility Score', 'kingy-ai-launch-intelligence'); ?></a>
-                <a data-kingy-ali-track="clicked_roi_calculator" data-event-label="<?php esc_attr_e('Estimate creator campaign ROI from launch profile', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="launch_profile_cta" href="<?php echo esc_url(home_url('/ai-sponsored-video-roi-calculator/')); ?>"><?php esc_html_e('Estimate creator ROI', 'kingy-ai-launch-intelligence'); ?></a>
+                <?php if ($is_editorially_approved) : ?>
+                    <a data-kingy-ali-track="clicked_roi_calculator" data-event-label="<?php esc_attr_e('Estimate creator campaign ROI from launch profile', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="launch_profile_cta" href="<?php echo esc_url(home_url('/ai-sponsored-video-roi-calculator/')); ?>"><?php esc_html_e('Estimate creator ROI', 'kingy-ai-launch-intelligence'); ?></a>
+                <?php endif; ?>
                 <a data-kingy-ali-track="clicked_contact_cta" data-event-label="<?php esc_attr_e('Contact Kingy AI from launch profile', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="launch_profile_cta" href="<?php echo esc_url(kingy_ali_contact_url()); ?>"><?php esc_html_e('Contact Kingy AI', 'kingy-ai-launch-intelligence'); ?></a>
             </div>
         </article>

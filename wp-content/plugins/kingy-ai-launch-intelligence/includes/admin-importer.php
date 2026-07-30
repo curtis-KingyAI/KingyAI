@@ -2676,9 +2676,12 @@ function kingy_ali_import_column_keys() {
         'category',
         'audience',
         'official_url',
+        'official_announcement_url',
+        'official_docs_url',
         'what_launched',
         'who_it_is_for',
         'pricing',
+        'pricing_url',
         'free_plan',
         'api_available',
         'open_source_or_open_weight',
@@ -4608,7 +4611,14 @@ function kingy_ali_import_launch_record_result($record) {
 
     $title = !empty($record['launch_name']) ? sanitize_text_field($record['launch_name']) : kingy_ali_import_launch_title($record, $product_name);
     $slug = kingy_ali_import_launch_slug($record, $product_name);
-    $existing = get_page_by_path($slug, OBJECT, 'kingy_ai_launch');
+    $fingerprint = function_exists('kingy_ali_quality_launch_fingerprint_from_record') ? kingy_ali_quality_launch_fingerprint_from_record($record) : '';
+    $existing = $fingerprint && function_exists('kingy_ali_quality_find_launch_by_fingerprint') ? kingy_ali_quality_find_launch_by_fingerprint($fingerprint) : null;
+    if (!$existing) {
+        $existing = get_page_by_path($slug, OBJECT, 'kingy_ai_launch');
+    }
+    if (!$existing && function_exists('kingy_ali_quality_find_legacy_launch_duplicate')) {
+        $existing = kingy_ali_quality_find_legacy_launch_duplicate($record, $slug);
+    }
     $was_existing = (bool) $existing;
     $status = isset($record['status']) && $record['status'] ? sanitize_key($record['status']) : 'draft';
     if (!in_array($status, array('publish', 'pending', 'draft'), true)) {
@@ -4658,6 +4668,10 @@ function kingy_ali_import_launch_record_result($record) {
         }
     }
 
+    if ($fingerprint) {
+        update_post_meta($post_id, kingy_ali_meta_key('canonical_fingerprint'), $fingerprint);
+    }
+
     if (!empty($record['category'])) {
         kingy_ali_import_terms($post_id, $record['category'], 'kingy_launch_category');
     }
@@ -4673,6 +4687,10 @@ function kingy_ali_import_launch_record_result($record) {
     kingy_ali_sync_derived_attributes($post_id);
     if ($tool_id) {
         kingy_ali_sync_derived_attributes($tool_id);
+    }
+
+    if (function_exists('kingy_ali_quality_import_status')) {
+        $status = kingy_ali_quality_import_status($status, $post_id);
     }
 
     if (get_post_status($post_id) !== $status) {
@@ -4897,13 +4915,15 @@ function kingy_ali_import_url_columns($import_type = 'launches') {
 
     return array(
         'official_url',
+        'official_announcement_url',
+        'official_docs_url',
+        'pricing_url',
         'demo_url',
         'product_hunt_url',
         'github_url',
         'huggingface_url',
         'x_url',
         'youtube_url',
-        'funding',
         'press_kit_url',
         'related_article_url',
         'related_course_url',
@@ -5024,6 +5044,11 @@ function kingy_ali_import_launch_slug($record, $product_name) {
 }
 
 function kingy_ali_import_terms($post_id, $value, $taxonomy) {
+    if (function_exists('kingy_ali_quality_ensure_terms')) {
+        kingy_ali_quality_ensure_terms($post_id, $value, $taxonomy);
+        return;
+    }
+
     $terms = array_filter(array_map('trim', explode(',', $value)));
     $slugs = array();
 

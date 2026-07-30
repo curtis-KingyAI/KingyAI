@@ -174,6 +174,24 @@ function kingy_ali_register_taxonomies() {
 }
 
 function kingy_ali_default_terms() {
+    $audience_terms = function_exists('kingy_ali_quality_gate_audience_terms')
+        ? kingy_ali_quality_gate_audience_terms()
+        : array(
+            'Creators' => 'creators',
+            'YouTubers' => 'youtubers',
+            'Founders' => 'founders',
+            'Marketers' => 'marketers',
+            'Developers' => 'developers',
+            'Small Business Owners' => 'small-business-owners',
+            'Agencies' => 'agencies',
+            'Researchers' => 'researchers',
+            'Students' => 'students',
+            'Enterprises' => 'enterprises',
+            'Designers' => 'designers',
+            'Sales Teams' => 'sales-teams',
+            'Operators' => 'operators',
+        );
+
     return array(
         'kingy_launch_category' => array(
             'AI Agents' => 'ai-agents',
@@ -200,21 +218,7 @@ function kingy_ali_default_terms() {
             'AI Robotics' => 'ai-robotics',
             'AI Hardware' => 'ai-hardware',
         ),
-        'kingy_audience' => array(
-            'Creators' => 'creators',
-            'YouTubers' => 'youtubers',
-            'Founders' => 'founders',
-            'Marketers' => 'marketers',
-            'Developers' => 'developers',
-            'Small Business Owners' => 'small-business-owners',
-            'Agencies' => 'agencies',
-            'Researchers' => 'researchers',
-            'Students' => 'students',
-            'Enterprises' => 'enterprises',
-            'Designers' => 'designers',
-            'Sales Teams' => 'sales-teams',
-            'Operators' => 'operators',
-        ),
+        'kingy_audience' => $audience_terms,
         'kingy_tool_attribute' => array(
             'Free Plan' => 'free-plan',
             'Paid Only' => 'paid-only',

@@ -45,6 +45,12 @@ function kingy_ali_submission_fields() {
 function kingy_ali_shortcode_submit_form() {
     kingy_ali_enqueue_assets();
 
+    $conversion_attribution = array(
+        'source_channel' => kingy_ali_submission_attribution_value('utm_source', 'direct'),
+        'source_content_id' => kingy_ali_submission_attribution_value('utm_content', 'launch_submit'),
+        'campaign_id' => kingy_ali_submission_attribution_value('utm_campaign', 'organic'),
+    );
+
     if (kingy_ali_submission_get_value('kingy_launch_submitted') === '1') {
         return kingy_ali_render_submission_success();
     }
@@ -57,6 +63,9 @@ function kingy_ali_shortcode_submit_form() {
         <p class="kingy-ali-policy-note"><?php echo esc_html(kingy_ali_launch_score_methodology_note()); ?></p>
         <?php wp_nonce_field('kingy_ali_submit_launch', 'kingy_ali_submit_launch_nonce'); ?>
         <input type="hidden" name="kingy_ali_action" value="submit_launch">
+        <input type="hidden" name="kingy_source_channel" value="<?php echo esc_attr($conversion_attribution['source_channel']); ?>">
+        <input type="hidden" name="kingy_source_content_id" value="<?php echo esc_attr($conversion_attribution['source_content_id']); ?>">
+        <input type="hidden" name="kingy_campaign_id" value="<?php echo esc_attr($conversion_attribution['campaign_id']); ?>">
         <label class="kingy-ali-hp" aria-hidden="true">
             <span><?php esc_html_e('Leave this field empty', 'kingy-ai-launch-intelligence'); ?></span>
             <input type="text" name="kingy_ali_website">
@@ -66,12 +75,28 @@ function kingy_ali_shortcode_submit_form() {
                 <?php kingy_ali_render_submission_field($key, $field); ?>
             <?php endforeach; ?>
         </div>
+        <label class="kingy-ali-field kingy-ali-field--consent">
+            <input type="checkbox" name="kingy_ali_consent" value="accepted" required>
+            <span><?php esc_html_e('I consent to Kingy AI storing and reviewing this submission and contacting me about it. *', 'kingy-ai-launch-intelligence'); ?></span>
+        </label>
         <button type="submit"><?php esc_html_e('Submit launch', 'kingy-ai-launch-intelligence'); ?></button>
         <p class="kingy-ali-policy-note"><?php echo esc_html(kingy_ali_launch_data_privacy_note()); ?></p>
         <p class="kingy-ali-policy-note"><?php echo esc_html(kingy_ali_creator_disclosure_note()); ?></p>
     </form>
     <?php
     return ob_get_clean();
+}
+
+function kingy_ali_submission_attribution_value($query_key, $fallback) {
+    $raw = kingy_ali_submission_get_value($query_key);
+    if (function_exists('kingy_conversion_bounded_value')) {
+        return kingy_conversion_bounded_value($raw, $fallback);
+    }
+
+    $value = strtolower(sanitize_text_field($raw));
+    $value = preg_replace('/[^a-z0-9_.-]/', '_', $value);
+    $value = trim((string) $value, '_.-');
+    return $value !== '' ? substr($value, 0, 80) : $fallback;
 }
 
 function kingy_ali_render_submission_field($key, $field) {
@@ -275,6 +300,17 @@ function kingy_ali_handle_launch_submission() {
         }
     }
 
+    if (kingy_ali_submission_post_value('kingy_ali_consent') !== 'accepted') {
+        wp_die(esc_html__('Consent is required before a launch submission can be stored.', 'kingy-ai-launch-intelligence'));
+    }
+
+    $conversion_attribution = array(
+        'source_channel' => kingy_ali_submission_attribution_post_value('kingy_source_channel', 'direct'),
+        'source_content_id' => kingy_ali_submission_attribution_post_value('kingy_source_content_id', 'launch_submit'),
+        'campaign_id' => kingy_ali_submission_attribution_post_value('kingy_campaign_id', 'organic'),
+        'consent_state' => 'accepted',
+    );
+
     if (kingy_ali_submission_rate_limited($data['founder_contact_email'])) {
         wp_die(esc_html__('Too many launch submissions were sent recently. Please wait before submitting another launch.', 'kingy-ai-launch-intelligence'));
     }
@@ -337,13 +373,21 @@ function kingy_ali_handle_launch_submission() {
 
     update_post_meta($post_id, kingy_ali_meta_key('founder_submitted'), '1');
     update_post_meta($post_id, kingy_ali_meta_key('verification_status'), 'founder_submitted');
+    update_post_meta($post_id, kingy_ali_meta_key('consent_state'), 'accepted');
+    update_post_meta($post_id, kingy_ali_meta_key('source_channel'), $conversion_attribution['source_channel']);
+    update_post_meta($post_id, kingy_ali_meta_key('source_content_id'), $conversion_attribution['source_content_id']);
+    update_post_meta($post_id, kingy_ali_meta_key('campaign_id'), $conversion_attribution['campaign_id']);
 
     if (!empty($data['category'])) {
         wp_set_object_terms($post_id, $data['category'], 'kingy_launch_category', false);
     }
 
     if (!empty($data['audience'])) {
-        wp_set_object_terms($post_id, $data['audience'], 'kingy_audience', false);
+        if (function_exists('kingy_ali_quality_ensure_terms')) {
+            kingy_ali_quality_ensure_terms($post_id, $data['audience'], 'kingy_audience');
+        } else {
+            wp_set_object_terms($post_id, $data['audience'], 'kingy_audience', false);
+        }
     }
 
     wp_set_object_terms($post_id, 'founder-submitted', 'kingy_tool_attribute', true);
@@ -357,6 +401,8 @@ function kingy_ali_handle_launch_submission() {
     if ($tool_id) {
         kingy_ali_sync_derived_attributes($tool_id);
     }
+
+    do_action('kingy_launch_submission_received', $post_id, $data, $conversion_attribution);
 
     kingy_ali_track_event(
         'founder_submission',
@@ -394,6 +440,18 @@ function kingy_ali_handle_launch_submission() {
     $redirect = add_query_arg('kingy_launch_submitted', '1', kingy_ali_public_form_redirect_base(home_url('/ai-launches/submit/')));
     wp_safe_redirect($redirect);
     exit;
+}
+
+function kingy_ali_submission_attribution_post_value($key, $fallback) {
+    $raw = kingy_ali_submission_post_value($key);
+    if (function_exists('kingy_conversion_bounded_value')) {
+        return kingy_conversion_bounded_value($raw, $fallback);
+    }
+
+    $value = strtolower(sanitize_text_field($raw));
+    $value = preg_replace('/[^a-z0-9_.-]/', '_', $value);
+    $value = trim((string) $value, '_.-');
+    return $value !== '' ? substr($value, 0, 80) : $fallback;
 }
 
 function kingy_ali_append_submission_source($sources, $label, $url) {

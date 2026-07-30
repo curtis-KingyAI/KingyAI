@@ -1,0 +1,440 @@
+.kingy-ali-companion-single,
+.kingy-ali-companion-archive {
+  --kingy-companion-accent: #e51b23;
+  --kingy-companion-ink: #18201d;
+  --kingy-companion-muted: #52615b;
+  --kingy-companion-line: #d9e2dd;
+  --kingy-companion-soft: #f2f7f4;
+  box-sizing: border-box;
+  color: var(--kingy-companion-ink);
+  margin-inline: auto;
+  max-width: 1180px;
+  min-width: 0;
+  padding: clamp(22px, 4vw, 48px) clamp(16px, 3vw, 32px);
+}
+
+.kingy-ali-companion-single *,
+.kingy-ali-companion-archive * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.kingy-ali-companion-single__header {
+  margin: 0 auto clamp(22px, 4vw, 42px);
+  max-width: 880px;
+  text-align: center;
+}
+
+.kingy-ali-companion-single__header h1,
+.kingy-ali-companion-archive h1 {
+  font-size: clamp(2rem, 6vw, 4.25rem);
+  line-height: 1.03;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kingy-ali-companion-single__header > p:last-child,
+.kingy-ali-companion-archive__intro {
+  color: var(--kingy-companion-muted);
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.65;
+  margin: 18px auto 0;
+  max-width: 760px;
+}
+
+.kingy-ali-companion-single .kingy-ali-profile-media {
+  margin: 0 auto clamp(26px, 5vw, 52px);
+  max-width: 980px;
+}
+
+.kingy-ali-companion-video,
+.kingy-ali-companion-section {
+  margin: clamp(28px, 5vw, 58px) 0;
+}
+
+.kingy-ali-youtube-facade,
+.kingy-ali-youtube-facade button,
+.kingy-ali-youtube-facade iframe {
+  aspect-ratio: 16 / 9;
+  background: #0d1110;
+  border: 0;
+  border-radius: 18px;
+  display: block;
+  overflow: hidden;
+  width: 100%;
+}
+
+.kingy-ali-youtube-facade button {
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+
+.kingy-ali-youtube-facade > iframe {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.kingy-ali-youtube-facade img {
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 160ms ease, transform 160ms ease;
+  width: 100%;
+}
+
+.kingy-ali-youtube-facade button:hover img {
+  opacity: .84;
+  transform: scale(1.01);
+}
+
+.kingy-ali-youtube-facade button:focus-visible,
+.kingy-ali-companion-single a:focus-visible,
+.kingy-ali-companion-archive a:focus-visible {
+  outline: 4px solid #1276d2;
+  outline-offset: 4px;
+}
+
+.kingy-ali-youtube-facade__play {
+  background: var(--kingy-companion-accent);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+  height: clamp(64px, 9vw, 90px);
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(64px, 9vw, 90px);
+}
+
+.kingy-ali-youtube-facade__play::after {
+  border-bottom: 12px solid transparent;
+  border-left: 20px solid #fff;
+  border-top: 12px solid transparent;
+  content: "";
+  left: 53%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.kingy-ali-companion-provenance {
+  background: var(--kingy-companion-soft);
+  border: 1px solid var(--kingy-companion-line);
+  border-left: 5px solid var(--kingy-companion-accent);
+  border-radius: 12px;
+  line-height: 1.65;
+  padding: clamp(16px, 3vw, 24px);
+}
+
+.kingy-ali-companion-editorial .kingy-commercial-disclosure {
+  background: #fffaf0;
+  border: 1px solid #e1c98e;
+  border-left: 5px solid #9b6a00;
+  border-radius: 12px;
+  margin: 1.5rem 0;
+  padding: clamp(16px, 3vw, 24px);
+}
+
+.kingy-ali-companion-editorial .kingy-commercial-disclosure p {
+  margin: 0;
+}
+
+.kingy-ali-companion-disclosure {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.kingy-ali-companion-section > h2 {
+  font-size: clamp(1.55rem, 4vw, 2.35rem);
+  line-height: 1.15;
+  margin: 0 0 10px;
+}
+
+.kingy-ali-companion-section__intro {
+  color: var(--kingy-companion-muted);
+  line-height: 1.65;
+  margin: 0 0 24px;
+  max-width: 780px;
+}
+
+.kingy-ali-companion-tool-stack,
+.kingy-ali-companion-links-grid {
+  display: grid;
+  gap: clamp(16px, 3vw, 26px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kingy-ali-companion-card-grid {
+  display: grid;
+  gap: clamp(16px, 3vw, 26px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 545px));
+  justify-content: center;
+}
+
+.kingy-ali-companion-snapshot,
+.kingy-ali-companion-live-tool,
+.kingy-ali-companion-link-card,
+.kingy-ali-companion-card,
+.kingy-ali-companion-change-column {
+  background: #fff;
+  border: 1px solid var(--kingy-companion-line);
+  border-radius: 14px;
+  overflow: hidden;
+  padding: clamp(16px, 3vw, 24px);
+}
+
+.kingy-ali-companion-live-tool > h3,
+.kingy-ali-companion-snapshot > h3,
+.kingy-ali-companion-snapshot > h4,
+.kingy-ali-companion-link-card > h3,
+.kingy-ali-companion-change-column > h3 {
+  font-size: 1.25rem;
+  margin: 0 0 16px;
+}
+
+.kingy-ali-companion-live-tool .kingy-ali-content-band,
+.kingy-ali-companion-live-tool .kingy-ali-trust-panel,
+.kingy-ali-companion-change-column .kingy-ali-content-band,
+.kingy-ali-companion-change-column .kingy-ali-tool-module {
+  box-shadow: none;
+  margin: 16px 0 0;
+}
+
+.kingy-ali-companion-change {
+  border: 1px solid var(--kingy-companion-line);
+  border-radius: 16px;
+  margin-top: 24px;
+  overflow: hidden;
+  padding: clamp(16px, 3vw, 26px);
+}
+
+.kingy-ali-companion-change > h3 {
+  margin: 0 0 16px;
+}
+
+.kingy-ali-companion-change-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kingy-ali-companion-change-column--publication {
+  background: #fffaf0;
+  border-color: #e1c98e;
+}
+
+.kingy-ali-companion-change-column--live {
+  background: #f2f8ff;
+  border-color: #bfd5ea;
+}
+
+.kingy-ali-companion-editorial {
+  font-size: 1.05rem;
+  line-height: 1.75;
+  margin-inline: auto;
+  max-width: 820px;
+}
+
+.kingy-ali-companion-live-tool .kingy-ali-tool-module > h4,
+.kingy-ali-companion-change-column .kingy-ali-tool-module > h4,
+.kingy-ali-companion-live-tool .kingy-ali-trust-panel h4,
+.kingy-ali-companion-change-column .kingy-ali-trust-panel h4 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin: 0 0 16px;
+}
+
+.kingy-ali-companion-live-tool .kingy-ali-trust-panel h5,
+.kingy-ali-companion-change-column .kingy-ali-trust-panel h5 {
+  font-size: 1rem;
+  line-height: 1.4;
+  margin: 20px 0 10px;
+}
+
+.kingy-ali-companion-editorial > h2 {
+  margin-bottom: 1.25rem;
+}
+
+.kingy-ali-companion-editorial p,
+.kingy-ali-companion-editorial ul,
+.kingy-ali-companion-editorial ol,
+.kingy-ali-companion-editorial blockquote,
+.kingy-ali-companion-editorial pre,
+.kingy-ali-companion-editorial figure,
+.kingy-ali-companion-editorial table {
+  margin-bottom: 1.25rem;
+  margin-top: 0;
+}
+
+.kingy-ali-companion-editorial h2:not(:first-child) {
+  margin: 2.75rem 0 .9rem;
+}
+
+.kingy-ali-companion-editorial h3 {
+  margin: 2rem 0 .75rem;
+}
+
+.kingy-ali-companion-editorial h4,
+.kingy-ali-companion-editorial h5,
+.kingy-ali-companion-editorial h6 {
+  margin: 1.6rem 0 .65rem;
+}
+
+.kingy-ali-companion-editorial :is(h2, h3, h4, h5, h6)[id] {
+  scroll-margin-top: 110px;
+}
+
+.kingy-ali-companion-editorial ul,
+.kingy-ali-companion-editorial ol {
+  padding-left: 1.4em;
+}
+
+.kingy-ali-companion-editorial li + li {
+  margin-top: .45rem;
+}
+
+.kingy-ali-companion-editorial pre {
+  background: #f6f8f7;
+  border: 1px solid var(--kingy-companion-line);
+  border-radius: 12px;
+  font-size: .9em;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  overflow-x: auto;
+  padding: clamp(14px, 3vw, 22px);
+  white-space: pre-wrap;
+}
+
+.kingy-ali-companion-editorial :not(pre) > code {
+  background: #f2f4f3;
+  border-radius: 4px;
+  padding: .1em .3em;
+}
+
+.kingy-ali-companion-editorial pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.kingy-ali-companion-editorial > :last-child {
+  margin-bottom: 0;
+}
+
+.kingy-ali-companion-editorial a,
+.kingy-ali-companion-link-card a,
+.kingy-ali-companion-card a {
+  text-underline-offset: 3px;
+}
+
+.kingy-ali-companion-link-card ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kingy-ali-companion-card {
+  padding: 0;
+}
+
+.kingy-ali-companion-card img {
+  aspect-ratio: 16 / 9;
+  display: block;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+}
+
+.kingy-ali-companion-card span,
+.kingy-ali-companion-card time {
+  display: block;
+  padding: 12px 16px 0;
+}
+
+.kingy-ali-companion-card span {
+  font-weight: 800;
+}
+
+.kingy-ali-companion-card time {
+  color: var(--kingy-companion-muted);
+  padding-bottom: 16px;
+}
+
+.kingy-ali-companion-pagination {
+  margin-top: 30px;
+}
+
+.kingy-ali-companion-unavailable {
+  background: #fffaf0;
+  border: 1px solid #d6b36a;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+@media (max-width: 760px) {
+  .kingy-ali-companion-tool-stack,
+  .kingy-ali-companion-links-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kingy-ali-companion-single,
+  .kingy-ali-companion-archive {
+    overflow-x: clip;
+  }
+}
+
+@media (max-width: 980px) {
+  .kingy-ali-companion-change-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kingy-ali-youtube-facade img {
+    transition: none;
+  }
+}
+
+/* Companion pages reuse general KALI definition lists, but their evidence text is
+ * substantially longer. Keep single-tool modules full-width and give labels and
+ * values stable, readable columns instead of allowing intrinsic-width collisions. */
+.kingy-ali-companion-single .kingy-ali-companion-tool-stack {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr));
+}
+
+.kingy-ali-companion-single .kingy-ali-score-list > div {
+  align-items: start;
+  display: grid;
+  gap: 10px 18px;
+  grid-template-columns: minmax(150px, .28fr) minmax(0, 1fr);
+  justify-content: initial;
+  padding: 12px 0;
+}
+
+.kingy-ali-companion-single .kingy-ali-score-list dt,
+.kingy-ali-companion-single .kingy-ali-score-list dd {
+  text-align: left;
+  width: auto;
+}
+
+.kingy-ali-companion-single .kingy-ali-score-list dt {
+  line-height: 1.45;
+}
+
+.kingy-ali-companion-single .kingy-ali-score-list dd {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.kingy-ali-companion-single .kingy-ali-companion-change-column--publication .kingy-ali-score-list > div {
+  gap: 6px;
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 760px) {
+  .kingy-ali-companion-single .kingy-ali-score-list > div {
+    gap: 6px;
+    grid-template-columns: 1fr;
+  }
+}

@@ -118,6 +118,8 @@ get_header();
                 <?php endif; ?>
             </header>
 
+            <?php echo kingy_ali_render_profile_featured_image($post_id); ?>
+
             <section class="kingy-ali-facts">
                 <?php kingy_ali_tool_fact(__('Company', 'kingy-ai-launch-intelligence'), kingy_ali_public_profile_meta_text($post_id, 'company')); ?>
                 <?php kingy_ali_tool_fact(__('Primary category', 'kingy-ai-launch-intelligence'), kingy_ali_tool_terms_to_string(get_the_terms($post_id, 'kingy_launch_category'))); ?>
@@ -190,6 +192,10 @@ get_header();
 
             <?php if (function_exists('kingy_ali_render_related_model_profile_panel')) : ?>
                 <?php kingy_ali_render_related_model_profile_panel($post_id, 'related_tool_id', 'tool_profile_related_models'); ?>
+            <?php endif; ?>
+
+            <?php if (function_exists('kingy_ali_render_tool_companion_videos')) : ?>
+                <?php echo kingy_ali_render_tool_companion_videos($post_id, 6); ?>
             <?php endif; ?>
 
             <section class="kingy-ali-content-band kingy-ali-launch-history">

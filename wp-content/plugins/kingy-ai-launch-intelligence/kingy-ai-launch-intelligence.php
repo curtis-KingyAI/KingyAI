@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kingy AI Launch Intelligence
  * Description: Structured AI launch database, searchable launch hub, founder submissions, scoring, analytics, and import tools for Kingy AI.
- * Version: 0.1.263
+ * Version: 0.1.289-feeds-taxonomy-metadata-fix
  * Author: Kingy AI
  * Text Domain: kingy-ai-launch-intelligence
  */
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('KINGY_ALI_VERSION', '0.1.263');
+define('KINGY_ALI_VERSION', '0.1.289-feeds-taxonomy-metadata-fix');
 if (!defined('KINGY_ALI_ENABLE_REPAIRED_STRATEGIC_ROUTES')) {
     define('KINGY_ALI_ENABLE_REPAIRED_STRATEGIC_ROUTES', true);
 }
@@ -30,11 +30,19 @@ require_once KINGY_ALI_PLUGIN_DIR . 'includes/taxonomies.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/meta-fields.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/attributes.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/scoring.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/quality-gates.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/analytics.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/companies.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/tools.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/safe-sync-graph.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/public-trust.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/launch-index.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/stack-change-radar.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/feeds-hub.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/feeds-measurement.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/search.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/tool-modules.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/companion-videos.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/directories.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/models.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/shortcodes.php';
@@ -44,14 +52,18 @@ require_once KINGY_ALI_PLUGIN_DIR . 'includes/microsoft-copilot-course.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/ai-launch-academy.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/codex-zero-to-hero-fix.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/custom-html-safety.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/wp-sync-guard.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/website-qa-checklist.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/seo-qa-checklist.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/security-review-checklist.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/agent-skills-worksheet.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/submissions.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/schema.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/seo-eligibility.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/campaign-breakdowns.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/setup-pages.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/launch-freshness.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/launch-live.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/article-generator.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/editorial-queues.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/maintenance.php';
@@ -65,6 +77,9 @@ if (!function_exists('kingy_ali_product_graph_reports_dir')) {
     }
 }
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/admin-importer.php';
+if (defined('WP_CLI') && WP_CLI && file_exists(KINGY_ALI_PLUGIN_DIR . 'includes/p0-migration.php')) {
+    require_once KINGY_ALI_PLUGIN_DIR . 'includes/p0-migration.php';
+}
 
 if (!defined('KINGY_ALI_EMBEDDED') || !KINGY_ALI_EMBEDDED) {
     register_activation_hook(KINGY_ALI_PLUGIN_FILE, 'kingy_ali_activate');
@@ -171,148 +186,6 @@ add_filter('use_block_editor_for_post_type', 'kingy_ali_restore_block_editor_for
 add_filter('use_block_editor_for_post', 'kingy_ali_restore_block_editor_for_core_posts', PHP_INT_MAX, 2);
 add_filter('use_block_editor_for_post', 'kingy_ali_use_classic_editor_for_agent_use_cases_page', PHP_INT_MAX, 2);
 
-/* kingy-ali-launch-collection-cache-purge-20260625 */
-add_action('save_post_kingy_ai_launch', 'kingy_ali_maybe_purge_launch_collection_caches_for_post', 50, 3);
-add_action('deleted_post', 'kingy_ali_maybe_purge_launch_collection_caches_for_deleted_post', 50, 2);
-add_action('rest_api_init', 'kingy_ali_register_launch_collection_cache_purge_route');
-
-function kingy_ali_maybe_purge_launch_collection_caches_for_post($post_id, $post, $update) {
-    unset($update);
-
-    $post_id = absint($post_id);
-    if (!$post_id || wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
-        return;
-    }
-
-    if (!is_object($post) || !isset($post->post_type) || $post->post_type !== 'kingy_ai_launch') {
-        return;
-    }
-
-    kingy_ali_purge_launch_collection_caches($post_id);
-}
-
-function kingy_ali_maybe_purge_launch_collection_caches_for_deleted_post($post_id, $post) {
-    $post_id = absint($post_id);
-    if (!$post_id || !is_object($post) || !isset($post->post_type) || $post->post_type !== 'kingy_ai_launch') {
-        return;
-    }
-
-    kingy_ali_purge_launch_collection_caches($post_id);
-}
-
-function kingy_ali_register_launch_collection_cache_purge_route() {
-    register_rest_route(
-        'kingy-ali/v1',
-        '/purge-launch-collections',
-        array(
-            'methods' => 'POST',
-            'callback' => 'kingy_ali_rest_purge_launch_collection_caches',
-            'permission_callback' => function () {
-                return current_user_can('publish_posts') || current_user_can('manage_options');
-            },
-        )
-    );
-}
-
-function kingy_ali_rest_purge_launch_collection_caches() {
-    $result = kingy_ali_purge_launch_collection_caches(0);
-    return rest_ensure_response($result);
-}
-
-function kingy_ali_launch_collection_cache_paths() {
-    return array(
-        '/',
-        '/ai-launches/',
-        '/ai-launches/today/',
-        '/ai-launches/this-week/',
-        '/ai-launches/launches-of-the-week/',
-        '/ai-launches/ai-agents/',
-        '/ai-launches/ai-video-tools/',
-        '/ai-launches/ai-coding-tools/',
-        '/ai-launches/ai-image-tools/',
-        '/ai-launches/open-weight-models/',
-        '/ai-launches/ai-search-and-research-tools/',
-        '/ai-launches/ai-coding-agents-and-ides/',
-        '/ai-launches/funding/',
-    );
-}
-
-function kingy_ali_delete_launch_collection_transients() {
-    global $wpdb;
-
-    if (!isset($wpdb) || !is_object($wpdb) || empty($wpdb->options)) {
-        return 0;
-    }
-
-    $deleted = 0;
-    foreach (array(
-        'kingy_ali_daily_radar_posts_v3_',
-        'kingy_ali_latest_launches_of_week_edition_cta_v2',
-        'kingy_ali_homepage_latest_launch_items_v3_',
-    ) as $prefix) {
-        $like = $wpdb->esc_like('_transient_' . $prefix) . '%';
-        $timeout_like = $wpdb->esc_like('_transient_timeout_' . $prefix) . '%';
-        $deleted += (int) $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $like));
-        $deleted += (int) $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $timeout_like));
-    }
-
-    return $deleted;
-}
-
-function kingy_ali_purge_launch_collection_caches($launch_post_id = 0) {
-    $launch_post_id = absint($launch_post_id);
-    $paths = kingy_ali_launch_collection_cache_paths();
-    $urls = array();
-
-    foreach ($paths as $path) {
-        $url = home_url($path);
-        $urls[] = $url;
-        $page_id = url_to_postid($url);
-        if ($page_id) {
-            clean_post_cache($page_id);
-            if (function_exists('wp_cache_post_change')) {
-                wp_cache_post_change($page_id);
-            }
-        }
-    }
-
-    if ($launch_post_id) {
-        clean_post_cache($launch_post_id);
-        if (function_exists('wp_cache_post_change')) {
-            wp_cache_post_change($launch_post_id);
-        }
-    }
-
-    $transients_deleted = kingy_ali_delete_launch_collection_transients();
-
-    if (function_exists('wp_cache_clear_cache')) {
-        wp_cache_clear_cache();
-    }
-
-    if (function_exists('prune_super_cache') && isset($GLOBALS['cache_path']) && is_string($GLOBALS['cache_path']) && $GLOBALS['cache_path'] !== '') {
-        prune_super_cache($GLOBALS['cache_path'], true);
-    }
-
-    foreach ($urls as $url) {
-        do_action('litespeed_purge_url', $url);
-        if (function_exists('w3tc_flush_url')) {
-            w3tc_flush_url($url);
-        }
-    }
-
-    if (function_exists('rocket_clean_files')) {
-        rocket_clean_files($urls);
-    }
-
-    return array(
-        'purged' => true,
-        'launch_post_id' => $launch_post_id,
-        'paths' => $paths,
-        'transients_deleted' => $transients_deleted,
-        'wp_super_cache_available' => function_exists('wp_cache_clear_cache') || function_exists('prune_super_cache'),
-    );
-}
-
 function kingy_ali_capture_singular_admin_bar_edit_id() {
     if (is_admin()) {
         return;
@@ -405,7 +278,7 @@ function kingy_ali_use_classic_editor_for_agent_use_cases_page($use_block_editor
 }
 
 function kingy_ali_register_assets() {
-    $kingy_ali_launch_asset_version = KINGY_ALI_VERSION . '-ai-tools-pagination-card-20260708c';
+    $kingy_ali_launch_asset_version = KINGY_ALI_VERSION . '-rocket-live-post-20260717a-freshness-heading-20260728a-today-responsive-20260728a-hub-week-responsive-20260728c-cross-page-consistency-20260729b';
 
     wp_register_style(
         'kingy-ali-launch-intelligence',
@@ -418,6 +291,14 @@ function kingy_ali_register_assets() {
         'kingy-ali-launch-filters',
         KINGY_ALI_PLUGIN_URL . 'assets/js/launch-filters.js',
         array(),
+        $kingy_ali_launch_asset_version,
+        true
+    );
+
+    wp_register_script(
+        'kingy-ali-launch-live',
+        KINGY_ALI_PLUGIN_URL . 'assets/js/launch-live.js',
+        array('kingy-ali-launch-filters'),
         $kingy_ali_launch_asset_version,
         true
     );
@@ -451,6 +332,7 @@ function kingy_ali_register_assets() {
 function kingy_ali_enqueue_assets() {
     wp_enqueue_style('kingy-ali-launch-intelligence');
     wp_enqueue_script('kingy-ali-launch-filters');
+    wp_enqueue_script('kingy-ali-launch-live');
 }
 
 function kingy_ali_enqueue_model_assets() {
@@ -503,6 +385,14 @@ function kingy_ali_is_public_launch_intelligence_surface() {
 }
 
 function kingy_ali_enqueue_public_page_assets() {
+    if (
+        function_exists('kingy_ali_is_phase1_public_quality_surface')
+        && kingy_ali_is_phase1_public_quality_surface()
+        && (is_search() || is_404())
+    ) {
+        wp_enqueue_style('kingy-ali-launch-intelligence');
+    }
+
     if (kingy_ali_is_public_launch_intelligence_surface()) {
         if (function_exists('kingy_ali_is_model_intelligence_page') && kingy_ali_is_model_intelligence_page()) {
             kingy_ali_enqueue_model_assets();
@@ -562,37 +452,32 @@ function kingy_ali_output_critical_layout_css() {
     }
     ?>
 <style id="kingy-ali-critical-layout-css">
-body.kingy-ali-phase1-quality-surface .jeg_search_result,body.kingy-ali-phase1-quality-surface .jeg_header_sticky,body.kingy-ali-phase1-quality-surface .jeg_footer_primary{display:none!important}
 body.kingy-ali-launch-intelligence-page .entry-header{display:block!important;margin:0 0 clamp(20px,3vw,32px)}
-body.kingy-ali-launch-intelligence-page,.kingy-ali-template,.kingy-ali-hub,.kingy-ali-single{color:#172026;font-family:Roboto,Helvetica,Arial,sans-serif}
-body.kingy-ali-launch-intelligence-page .entry-header .jeg_post_title,.kingy-ali-page-title,.kingy-ali-hero h1,.kingy-ali-hero h2,.kingy-ali-single h1,.kingy-ali-coverage-intro h1,.kingy-ali-coverage-intro h2{color:#172026;font-size:clamp(2rem,4vw,3.8rem);letter-spacing:0;line-height:1.05;margin:0 0 14px}
-body.kingy-ali-launch-intelligence-page .entry-header .jeg_meta_container{display:none}
-body.page.kingy-ali-launch-intelligence-page .jeg_main .jeg_main_content>.entry-content>.content-inner{box-sizing:border-box;margin:0 auto;max-width:1240px;padding:clamp(20px,3vw,36px) clamp(20px,4vw,48px) clamp(48px,6vw,80px)}
-body.page.kingy-ali-launch-intelligence-page .jeg_main .jeg_main_content>.entry-content>.content-inner>:first-child{margin-top:0}
-body.page.kingy-ali-launch-intelligence-page .jeg_main .jeg_main_content>.entry-content>.content-inner>:last-child{margin-bottom:0}
-body.single-kingy_ai_launch.kingy-ali-launch-intelligence-page .kingy-ali-template,body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-template{box-sizing:border-box;margin-inline:auto;max-width:1180px;padding:clamp(18px,3vw,34px) clamp(16px,4vw,32px) clamp(44px,6vw,72px);width:100%}
+body.kingy-ali-launch-intelligence-page, .kingy-ali-template, .kingy-ali-hub, .kingy-ali-single{color:#172026;font-family:Roboto,Helvetica,Arial,sans-serif}
+.kingy-ali-page-title, .kingy-ali-hero h1, .kingy-ali-hero h2, .kingy-ali-single h1, .kingy-ali-coverage-intro h1, .kingy-ali-coverage-intro h2{color:#172026;font-size:clamp(2rem,4vw,3.8rem);letter-spacing:0;line-height:1.05;margin:0 0 14px}
+body.single-kingy_ai_launch.kingy-ali-launch-intelligence-page .kingy-ali-template, body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-template{box-sizing:border-box;margin-inline:auto;max-width:1180px;padding:clamp(18px,3vw,34px) clamp(16px,4vw,32px) clamp(44px,6vw,72px);width:100%}
 .kingy-ali-page-title{box-sizing:border-box;margin:clamp(20px,3vw,36px) 0 clamp(20px,3vw,32px)}.kingy-ali-page-title--injected{padding-left:calc(clamp(28px,4vw,44px) + clamp(22px,4vw,42px) + 1px);padding-right:calc(clamp(28px,4vw,44px) + clamp(22px,4vw,42px) + 1px)}
-.kingy-ali-hero,.kingy-ali-single__header,.kingy-ali-coverage-intro{background:#f3f7f4;border-bottom:1px solid #dbe5de;padding:clamp(28px,5vw,64px)}
-.kingy-ali-hero p,.kingy-ali-single__header p,.kingy-ali-coverage-intro p{font-size:1.08rem;line-height:1.6;margin:0;max-width:860px}
+.kingy-ali-hero, .kingy-ali-single__header, .kingy-ali-coverage-intro{background:#f3f7f4;border-bottom:1px solid #dbe5de;padding:clamp(28px,5vw,64px)}
+.kingy-ali-hero p, .kingy-ali-single__header p, .kingy-ali-coverage-intro p{font-size:1.08rem;line-height:1.6;margin:0;max-width:860px}
 .kingy-ali-single__header{border:1px solid #dbe5de;border-radius:8px;margin-bottom:24px}.kingy-ali-single__header-inner{display:grid;gap:clamp(22px,4vw,44px);grid-template-columns:minmax(0,1fr) minmax(260px,360px)}.kingy-ali-single__actions{align-items:center;display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.kingy-ali-single__hero-facts{align-self:stretch;background:#fff;border:1px solid #d7e2dc;border-radius:8px;box-shadow:0 10px 30px rgba(23,32,38,.06);padding:18px}.kingy-ali-single__hero-facts dl{display:grid;gap:12px;margin:0}.kingy-ali-single__hero-facts div{border-bottom:1px solid #edf2ef;display:grid;gap:4px;padding-bottom:12px}.kingy-ali-single__hero-facts div:last-child{border-bottom:0;padding-bottom:0}.kingy-ali-single__hero-facts dt{color:#607068;font-size:.82rem;font-weight:700;text-transform:uppercase}.kingy-ali-single__hero-facts dd{color:#172026;font-weight:700;line-height:1.35;margin:0}
-body.single-kingy_ai_launch.kingy-ali-launch-intelligence-page .kingy-ali-single__header,body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-single__header{margin-bottom:clamp(24px,4vw,40px)}
-body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single{align-items:start;display:grid;gap:clamp(18px,3vw,28px);grid-template-columns:minmax(0,1fr) minmax(280px,360px);max-width:100%}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>*{min-width:0}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>:is(.kingy-ali-single__header,.kingy-ali-content-band,.kingy-ali-content-grid,.kingy-ali-link-panel,.kingy-ali-launch-history,.kingy-ali-cta-row){grid-column:1/-1;margin-bottom:0;margin-top:0}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-facts{align-self:start;background:transparent;border:0;grid-column:1;margin:0;padding:0}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-trust-panel{align-self:start;gap:16px;grid-column:2;grid-template-columns:1fr;margin:0;padding:clamp(18px,2.5vw,24px)}
+body.single-kingy_ai_launch.kingy-ali-launch-intelligence-page .kingy-ali-single__header, body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-single__header{margin-bottom:clamp(24px,4vw,40px)}
+body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single{align-items:start;display:grid;gap:clamp(18px,3vw,28px);grid-template-columns:minmax(0,1fr) minmax(280px,360px);max-width:100%}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>*{min-width:0}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>:is(.kingy-ali-single__header,.kingy-ali-profile-media,.kingy-ali-content-band,.kingy-ali-content-grid,.kingy-ali-link-panel,.kingy-ali-launch-history,.kingy-ali-cta-row){grid-column:1/-1;margin-bottom:0;margin-top:0}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-facts{align-self:start;background:transparent;border:0;grid-column:1;margin:0;padding:0}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-trust-panel{align-self:start;gap:16px;grid-column:2;grid-template-columns:1fr;margin:0;padding:clamp(18px,2.5vw,24px)}
 .kingy-ali-kicker{color:#2d6b58;font-size:.82rem;font-weight:700;letter-spacing:0;margin:0 0 10px;text-transform:uppercase}
 .kingy-ali-facts{background:#fbfcfb;border:1px solid #dbe5de;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin:24px 0;padding:18px}
 .kingy-ali-facts div{align-items:center;display:flex;gap:12px;justify-content:space-between}
 .kingy-ali-facts dt{color:#607068;font-weight:600}.kingy-ali-facts dd{margin:0;text-align:right}
 body.single-kingy_ai_launch.kingy-ali-launch-intelligence-page .kingy-ali-snapshot{margin:0 0 clamp(24px,4vw,40px)}body.single-kingy_ai_launch.kingy-ali-launch-intelligence-page .kingy-ali-section-heading{margin-bottom:clamp(14px,2vw,22px)}
 .kingy-ali-section-heading{margin-bottom:16px}.kingy-ali-section-heading h2{font-size:clamp(1.45rem,2.5vw,2rem);letter-spacing:0;line-height:1.18;margin:0}.kingy-ali-source-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}.kingy-ali-source-grid a{background:#fbfcfb;border:1px solid #dbe5de;border-radius:8px;color:#172026;display:grid;gap:6px;min-height:92px;padding:15px;text-decoration:none}.kingy-ali-source-grid span{color:#607068;font-size:.88rem;overflow-wrap:anywhere}
-.kingy-ali-score-panel,.kingy-ali-link-panel,.kingy-ali-content-band,.kingy-ali-text-panel,.kingy-ali-trust-panel{background:#fff;border:1px solid #dde4e0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.05);margin:24px 0;padding:22px}body.page.kingy-ali-launch-intelligence-page .kingy-ali-content-band,body.page.kingy-ali-launch-intelligence-page .kingy-ali-submit-form,body.page.kingy-ali-launch-intelligence-page .kingy-ali-calculator,body.page.kingy-ali-launch-intelligence-page .kingy-ali-empty{padding:clamp(28px,4vw,44px)}
-body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>:first-child{margin-top:0}body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>:last-child{margin-bottom:0}body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>:is(h2,h3){line-height:1.18;margin-bottom:clamp(12px,2vw,16px)}body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>p{margin-bottom:clamp(12px,2vw,16px)}body.kingy-ali-launch-intelligence-page .kingy-ali-link-panel>.kingy-ali-link-list,body.kingy-ali-launch-intelligence-page .kingy-ali-section-heading+.kingy-ali-content-grid,body.kingy-ali-launch-intelligence-page .kingy-ali-section-heading+.kingy-ali-link-list,body.kingy-ali-launch-intelligence-page .kingy-ali-content-grid+.kingy-ali-link-list{margin-top:clamp(14px,2vw,18px)}
-body.kingy-ali-launch-intelligence-page .kingy-ali-company-path,body.kingy-ali-launch-intelligence-page .kingy-ali-empty{box-sizing:border-box;max-width:100%;overflow:hidden;padding:clamp(28px,5vw,44px)}body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-section-heading,body.kingy-ali-launch-intelligence-page .kingy-ali-empty>p{max-width:920px}body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-cta-row,body.kingy-ali-launch-intelligence-page .kingy-ali-empty .kingy-ali-cta-row{align-items:stretch;gap:12px;margin-top:clamp(18px,3vw,28px);max-width:100%;width:100%}body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-cta-row a,body.kingy-ali-launch-intelligence-page .kingy-ali-empty .kingy-ali-cta-row a{align-items:center;box-sizing:border-box;flex:1 1 220px;font-size:clamp(.95rem,1.4vw,1rem);line-height:1.25;max-width:100%;min-height:46px;min-width:min(100%,220px);padding:11px 16px;text-align:center;white-space:normal}@media(max-width:540px){body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-cta-row a,body.kingy-ali-launch-intelligence-page .kingy-ali-empty .kingy-ali-cta-row a{flex-basis:100%}}
-.kingy-ali-card__actions,.kingy-ali-cta-row,.kingy-ali-link-list{display:flex;flex-wrap:wrap;gap:10px}
-.kingy-ali-card__actions,.kingy-ali-cta-row{align-items:center;margin-top:16px}
-.kingy-ali-card__actions a,.kingy-ali-cta-row a,.kingy-ali-link-list a,.kingy-ali-single__actions a{background:#172026;border:1px solid #172026;border-radius:6px;color:#fff;display:inline-flex;font-weight:700;justify-content:center;padding:10px 14px;text-decoration:none}
-.kingy-ali-card__actions a+a,.kingy-ali-link-list a,.kingy-ali-single__actions a+a{background:#fff;color:#172026}
-body.kingy-ali-launch-intelligence-page ins.adsbygoogle,body.kingy-ali-launch-intelligence-page .ai-fallback-adsense,body.kingy-ali-launch-intelligence-page .code-block:has(ins.adsbygoogle),body.kingy-ali-launch-intelligence-page .code-block:has(.adsbygoogle),body.kingy-ali-launch-intelligence-page .code-block:has(.ai-fallback-adsense){display:block;min-height:280px}
+.kingy-ali-score-panel, .kingy-ali-link-panel, .kingy-ali-content-band, .kingy-ali-text-panel, .kingy-ali-trust-panel{background:#fff;border:1px solid #dde4e0;border-radius:8px;box-shadow:0 1px 2px rgba(15,23,42,.05);margin:24px 0;padding:22px}body.page.kingy-ali-launch-intelligence-page .kingy-ali-content-band, body.page.kingy-ali-launch-intelligence-page .kingy-ali-submit-form, body.page.kingy-ali-launch-intelligence-page .kingy-ali-calculator, body.page.kingy-ali-launch-intelligence-page .kingy-ali-empty{padding:clamp(28px,4vw,44px)}
+body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>:first-child{margin-top:0}body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>:last-child{margin-bottom:0}body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>:is(h2,h3){line-height:1.18;margin-bottom:clamp(12px,2vw,16px)}body.kingy-ali-launch-intelligence-page :is(.kingy-ali-content-band,.kingy-ali-link-panel,.kingy-ali-text-panel,.kingy-ali-score-panel,.kingy-ali-trust-panel,.kingy-ali-empty)>p{margin-bottom:clamp(12px,2vw,16px)}body.kingy-ali-launch-intelligence-page .kingy-ali-link-panel>.kingy-ali-link-list, body.kingy-ali-launch-intelligence-page .kingy-ali-section-heading+.kingy-ali-content-grid, body.kingy-ali-launch-intelligence-page .kingy-ali-section-heading+.kingy-ali-link-list, body.kingy-ali-launch-intelligence-page .kingy-ali-content-grid+.kingy-ali-link-list{margin-top:clamp(14px,2vw,18px)}
+body.kingy-ali-launch-intelligence-page .kingy-ali-company-path, body.kingy-ali-launch-intelligence-page .kingy-ali-empty{box-sizing:border-box;max-width:100%;overflow:hidden;padding:clamp(28px,5vw,44px)}body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-section-heading, body.kingy-ali-launch-intelligence-page .kingy-ali-empty>p{max-width:920px}body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-cta-row, body.kingy-ali-launch-intelligence-page .kingy-ali-empty .kingy-ali-cta-row{align-items:stretch;gap:12px;margin-top:clamp(18px,3vw,28px);max-width:100%;width:100%}body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-cta-row a, body.kingy-ali-launch-intelligence-page .kingy-ali-empty .kingy-ali-cta-row a{align-items:center;box-sizing:border-box;flex:1 1 220px;font-size:clamp(.95rem,1.4vw,1rem);line-height:1.25;max-width:100%;min-height:46px;min-width:min(100%,220px);padding:11px 16px;text-align:center;white-space:normal}@media(max-width:540px){body.kingy-ali-launch-intelligence-page .kingy-ali-company-path .kingy-ali-cta-row a, body.kingy-ali-launch-intelligence-page .kingy-ali-empty .kingy-ali-cta-row a{flex-basis:100%}}
+.kingy-ali-card__actions, .kingy-ali-cta-row, .kingy-ali-link-list{display:flex;flex-wrap:wrap;gap:10px}
+.kingy-ali-card__actions, .kingy-ali-cta-row{align-items:center;margin-top:16px}
+.kingy-ali-card__actions a, .kingy-ali-cta-row a, .kingy-ali-link-list a, .kingy-ali-single__actions a{background:#172026;border:1px solid #172026;border-radius:6px;color:#fff;display:inline-flex;font-weight:700;justify-content:center;padding:10px 14px;text-decoration:none}
+.kingy-ali-card__actions a+a, .kingy-ali-link-list a, .kingy-ali-single__actions a+a{background:#fff;color:#172026}
+body.kingy-ali-launch-intelligence-page ins.adsbygoogle, body.kingy-ali-launch-intelligence-page .ai-fallback-adsense, body.kingy-ali-launch-intelligence-page .code-block:has(ins.adsbygoogle), body.kingy-ali-launch-intelligence-page .code-block:has(.adsbygoogle), body.kingy-ali-launch-intelligence-page .code-block:has(.ai-fallback-adsense){display:block;min-height:280px}
 @media(max-width:900px){body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single{grid-template-columns:1fr}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>:is(.kingy-ali-facts,.kingy-ali-trust-panel){grid-column:1/-1}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-trust-panel{grid-template-columns:minmax(0,1.2fr) minmax(240px,.8fr)}}
-@media(max-width:720px){body.kingy-ali-launch-intelligence-page ins.adsbygoogle,body.kingy-ali-launch-intelligence-page .ai-fallback-adsense,body.kingy-ali-launch-intelligence-page .code-block:has(ins.adsbygoogle),body.kingy-ali-launch-intelligence-page .code-block:has(.adsbygoogle),body.kingy-ali-launch-intelligence-page .code-block:has(.ai-fallback-adsense){min-height:250px}.kingy-ali-single__header{padding:22px}.kingy-ali-single__header-inner{grid-template-columns:1fr}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-trust-panel{grid-template-columns:1fr}.kingy-ali-score-list div,.kingy-ali-facts div{align-items:flex-start;flex-direction:column}.kingy-ali-score-list dd,.kingy-ali-facts dd{text-align:left}}
+@media(max-width:720px){body.kingy-ali-launch-intelligence-page ins.adsbygoogle, body.kingy-ali-launch-intelligence-page .ai-fallback-adsense, body.kingy-ali-launch-intelligence-page .code-block:has(ins.adsbygoogle), body.kingy-ali-launch-intelligence-page .code-block:has(.adsbygoogle), body.kingy-ali-launch-intelligence-page .code-block:has(.ai-fallback-adsense){min-height:250px}.kingy-ali-single__header{padding:22px}.kingy-ali-single__header-inner{grid-template-columns:1fr}body.single-kingy_ai_tool.kingy-ali-launch-intelligence-page .kingy-ali-tool-single>.kingy-ali-trust-panel{grid-template-columns:1fr}.kingy-ali-score-list div, .kingy-ali-facts div{align-items:flex-start;flex-direction:column}.kingy-ali-score-list dd, .kingy-ali-facts dd{text-align:left}}
 </style>
     <?php
 }
@@ -676,6 +561,16 @@ function kingy_ali_template_include($template) {
 
     if (is_singular('kingy_ai_tool')) {
         $plugin_template = KINGY_ALI_PLUGIN_DIR . 'templates/single-ai-tool.php';
+        return file_exists($plugin_template) ? $plugin_template : $template;
+    }
+
+    if (is_singular('kingy_video')) {
+        $plugin_template = KINGY_ALI_PLUGIN_DIR . 'templates/single-kingy-video.php';
+        return file_exists($plugin_template) ? $plugin_template : $template;
+    }
+
+    if (is_post_type_archive('kingy_video')) {
+        $plugin_template = KINGY_ALI_PLUGIN_DIR . 'templates/archive-kingy-video.php';
         return file_exists($plugin_template) ? $plugin_template : $template;
     }
 

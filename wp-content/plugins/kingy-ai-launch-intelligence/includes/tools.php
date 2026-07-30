@@ -10,7 +10,8 @@ function kingy_ali_find_or_create_tool($tool_name, $args = array()) {
         return 0;
     }
 
-    $what_it_does = isset($args['what_it_does']) ? kingy_ali_tool_text_value($args['what_it_does']) : '';
+    $is_launch_sync = kingy_ali_tool_update_context($args) === 'launch';
+    $what_it_does = !$is_launch_sync && isset($args['what_it_does']) ? kingy_ali_tool_text_value($args['what_it_does']) : '';
     $existing = get_page_by_path(sanitize_title($tool_name), OBJECT, 'kingy_ai_tool');
     if ($existing) {
         kingy_ali_update_tool_from_args($existing->ID, $args);
@@ -20,7 +21,7 @@ function kingy_ali_find_or_create_tool($tool_name, $args = array()) {
     $post_id = wp_insert_post(
         array(
             'post_type' => 'kingy_ai_tool',
-            'post_status' => isset($args['post_status']) ? sanitize_key($args['post_status']) : 'draft',
+            'post_status' => $is_launch_sync ? 'draft' : (isset($args['post_status']) ? sanitize_key($args['post_status']) : 'draft'),
             'post_title' => $tool_name,
             'post_name' => sanitize_title($tool_name),
             'post_content' => $what_it_does !== '' ? sanitize_textarea_field($what_it_does) : '',
@@ -37,17 +38,20 @@ function kingy_ali_find_or_create_tool($tool_name, $args = array()) {
     return (int) $post_id;
 }
 
-function kingy_ali_update_tool_from_args($tool_id, $args) {
-    if (!empty($args['post_status']) && $args['post_status'] === 'publish' && get_post_status($tool_id) !== 'publish') {
-        wp_update_post(
-            array(
-                'ID' => absint($tool_id),
-                'post_status' => 'publish',
-            )
-        );
+function kingy_ali_tool_update_context($args) {
+    if (!is_array($args) || !isset($args['source_context']) || !is_scalar($args['source_context'])) {
+        return '';
     }
 
-    $field_map = array(
+    return sanitize_key((string) $args['source_context']);
+}
+
+function kingy_ali_tool_update_field_map($args) {
+    if (kingy_ali_tool_update_context($args) === 'launch') {
+        return array('latest_launch_id');
+    }
+
+    return array(
         'company',
         'official_url',
         'demo_url',
@@ -64,6 +68,20 @@ function kingy_ali_update_tool_from_args($tool_id, $args) {
         'latest_launch_id',
         'last_verified',
     );
+}
+
+function kingy_ali_update_tool_from_args($tool_id, $args) {
+    $is_launch_sync = kingy_ali_tool_update_context($args) === 'launch';
+    if (!$is_launch_sync && !empty($args['post_status']) && $args['post_status'] === 'publish' && get_post_status($tool_id) !== 'publish') {
+        wp_update_post(
+            array(
+                'ID' => absint($tool_id),
+                'post_status' => 'publish',
+            )
+        );
+    }
+
+    $field_map = kingy_ali_tool_update_field_map($args);
 
     $fields = kingy_ali_tool_meta_fields();
     foreach ($field_map as $key) {
@@ -80,15 +98,15 @@ function kingy_ali_update_tool_from_args($tool_id, $args) {
         update_post_meta($tool_id, kingy_ali_meta_key($key), $value);
     }
 
-    if (!empty($args['category'])) {
+    if (!$is_launch_sync && !empty($args['category'])) {
         kingy_ali_set_tool_terms($tool_id, $args['category'], 'kingy_launch_category');
     }
 
-    if (!empty($args['audience'])) {
+    if (!$is_launch_sync && !empty($args['audience'])) {
         kingy_ali_set_tool_terms($tool_id, $args['audience'], 'kingy_audience');
     }
 
-    if (!empty($args['attributes'])) {
+    if (!$is_launch_sync && !empty($args['attributes'])) {
         kingy_ali_set_tool_terms($tool_id, $args['attributes'], 'kingy_tool_attribute');
     }
 }
@@ -139,14 +157,6 @@ function kingy_ali_link_launch_to_tool($launch_id, $tool_id) {
         kingy_ali_update_tool_latest_launch($previous_tool_id);
     }
 
-    if (get_post_status($launch_id) === 'publish' && get_post_status($tool_id) !== 'publish') {
-        wp_update_post(
-            array(
-                'ID' => $tool_id,
-                'post_status' => 'publish',
-            )
-        );
-    }
 }
 
 function kingy_ali_update_tool_latest_launch($tool_id) {
@@ -196,32 +206,11 @@ function kingy_ali_sync_tool_from_launch($launch_id, $tool_name = '') {
         $tool_name = get_the_title($launch_id);
     }
 
-    $category_terms = get_the_terms($launch_id, 'kingy_launch_category');
-    $audience_terms = get_the_terms($launch_id, 'kingy_audience');
-    $attribute_terms = get_the_terms($launch_id, 'kingy_tool_attribute');
-
     $tool_id = kingy_ali_find_or_create_tool(
         $tool_name,
         array(
-            'post_status' => get_post_status($launch_id) === 'publish' ? 'publish' : 'draft',
-            'company' => kingy_ali_tool_meta_text($launch_id, 'company'),
-            'official_url' => kingy_ali_tool_meta_text($launch_id, 'official_url'),
-            'demo_url' => kingy_ali_tool_meta_text($launch_id, 'demo_url', kingy_ali_tool_meta_text($launch_id, 'youtube_url')),
-            'what_it_does' => kingy_ali_tool_meta_text($launch_id, 'what_launched'),
-            'best_for' => kingy_ali_tool_meta_text($launch_id, 'who_it_is_for'),
-            'pricing' => kingy_ali_tool_meta_text($launch_id, 'pricing'),
-            'free_plan' => kingy_ali_tool_meta_text($launch_id, 'free_plan'),
-            'api_available' => kingy_ali_tool_meta_text($launch_id, 'api_available'),
-            'open_source_or_open_weight' => kingy_ali_tool_meta_text($launch_id, 'open_source_or_open_weight'),
-            'alternatives_url' => kingy_ali_tool_meta_text($launch_id, 'related_alternatives_url'),
-            'related_article_url' => kingy_ali_tool_meta_text($launch_id, 'related_article_url'),
-            'related_course_url' => kingy_ali_tool_meta_text($launch_id, 'related_course_url'),
-            'related_review_url' => kingy_ali_tool_meta_text($launch_id, 'related_review_url'),
+            'source_context' => 'launch',
             'latest_launch_id' => $launch_id,
-            'last_verified' => kingy_ali_tool_meta_text($launch_id, 'last_verified'),
-            'category' => kingy_ali_term_slugs($category_terms),
-            'audience' => kingy_ali_term_slugs($audience_terms),
-            'attributes' => kingy_ali_term_slugs($attribute_terms),
         )
     );
 
@@ -239,6 +228,11 @@ function kingy_ali_sync_tool_from_launch($launch_id, $tool_name = '') {
 }
 
 function kingy_ali_set_tool_terms($tool_id, $terms, $taxonomy) {
+    if (function_exists('kingy_ali_quality_ensure_terms')) {
+        kingy_ali_quality_ensure_terms($tool_id, $terms, $taxonomy);
+        return;
+    }
+
     if (!is_array($terms)) {
         $terms = array_filter(array_map('trim', explode(',', (string) $terms)));
     }

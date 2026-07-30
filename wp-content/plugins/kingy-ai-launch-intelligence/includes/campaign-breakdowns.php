@@ -17,6 +17,13 @@ add_action('save_post_page', 'kingy_ali_flag_campaign_breakdown_for_enrichment',
 function kingy_ali_campaign_breakdown_meta_fields() {
     return array(
         'campaign_format_version' => array('label' => 'Campaign format version', 'type' => 'text', 'public' => false),
+        'campaign_render_contract' => array(
+            'label' => 'Campaign render contract',
+            'type' => 'text',
+            'public' => false,
+            'show_in_rest' => false,
+            'allowed' => array('reference-v1', 'legacy-v1', 'manual-review', 'off'),
+        ),
         'campaign_video_url' => array('label' => 'Campaign video URL', 'type' => 'url'),
         'campaign_video_id' => array('label' => 'Campaign YouTube video ID', 'type' => 'text'),
         'campaign_youtube_title' => array('label' => 'YouTube title', 'type' => 'text'),
@@ -55,7 +62,7 @@ function kingy_ali_register_campaign_breakdown_meta_fields() {
                 'sanitize_callback' => function ($value) use ($field) {
                     return kingy_ali_campaign_breakdown_sanitize_meta_value($value, $field);
                 },
-                'show_in_rest' => true,
+                'show_in_rest' => !isset($field['show_in_rest']) || $field['show_in_rest'] !== false,
                 'auth_callback' => function () {
                     return current_user_can('edit_pages');
                 },
@@ -75,6 +82,10 @@ function kingy_ali_campaign_breakdown_sanitize_meta_value($value, $field) {
     }
 
     $value = trim((string) $value);
+    if (isset($field['allowed']) && is_array($field['allowed'])) {
+        return in_array($value, $field['allowed'], true) ? $value : '';
+    }
+
     if ($type === 'url') {
         return esc_url_raw($value, array('http', 'https'));
     }
@@ -93,6 +104,70 @@ function kingy_ali_campaign_breakdown_meta($post_id, $key, $default = '') {
     }
 
     return is_scalar($value) ? trim((string) $value) : $default;
+}
+
+function kingy_ali_campaign_breakdown_explicit_render_contract($post_id) {
+    $contract = kingy_ali_campaign_breakdown_meta($post_id, 'campaign_render_contract');
+    return in_array($contract, array('reference-v1', 'legacy-v1', 'manual-review', 'off'), true) ? $contract : '';
+}
+
+function kingy_ali_campaign_breakdown_render_contract($post_id, $content = '') {
+    $explicit = kingy_ali_campaign_breakdown_explicit_render_contract($post_id);
+    if ($explicit !== '') {
+        return $explicit;
+    }
+
+    if (kingy_ali_campaign_breakdown_meta($post_id, 'campaign_needs_manual_review') === '1') {
+        return 'manual-review';
+    }
+
+    return strpos((string) $content, 'kingy-campaign-breakdown') !== false ? 'compat-reference' : 'compat-legacy';
+}
+
+function kingy_ali_campaign_breakdown_content_has_json_ld($content) {
+    return (bool) preg_match('/<script\b[^>]*type=["\']application\/ld\+json["\']/i', (string) $content);
+}
+
+function kingy_ali_campaign_breakdown_content_has_legacy_collision($content) {
+    return (bool) preg_match('/<(?:h1|img|iframe)\b/i', (string) $content)
+        || kingy_ali_campaign_breakdown_content_has_json_ld($content);
+}
+
+function kingy_ali_campaign_breakdown_uses_plugin_wrapper($post_id, $content = '') {
+    $contract = kingy_ali_campaign_breakdown_render_contract($post_id, $content);
+    if ($contract === 'compat-legacy' && kingy_ali_campaign_breakdown_content_has_legacy_collision($content)) {
+        return false;
+    }
+
+    return $contract === 'legacy-v1' || $contract === 'compat-legacy';
+}
+
+function kingy_ali_campaign_breakdown_uses_plugin_assets($post_id, $content = '') {
+    return in_array(
+        kingy_ali_campaign_breakdown_render_contract($post_id, $content),
+        array('legacy-v1', 'compat-legacy', 'compat-reference'),
+        true
+    );
+}
+
+function kingy_ali_campaign_breakdown_uses_plugin_seo($post_id, $content = '') {
+    return in_array(
+        kingy_ali_campaign_breakdown_render_contract($post_id, $content),
+        array('reference-v1', 'legacy-v1', 'compat-reference', 'compat-legacy'),
+        true
+    );
+}
+
+function kingy_ali_campaign_breakdown_uses_plugin_schema($post_id, $content = '') {
+    if (kingy_ali_campaign_breakdown_content_has_json_ld($content)) {
+        return false;
+    }
+
+    return in_array(
+        kingy_ali_campaign_breakdown_render_contract($post_id, $content),
+        array('legacy-v1', 'compat-reference', 'compat-legacy'),
+        true
+    );
 }
 
 function kingy_ali_is_campaign_breakdown_page($post_id = 0) {
@@ -152,8 +227,28 @@ function kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $conten
         return false;
     }
 
-    if (kingy_ali_campaign_breakdown_meta($post_id, 'campaign_needs_manual_review') === '1') {
+    $contract = kingy_ali_campaign_breakdown_render_contract($post_id, $content);
+    if (in_array($contract, array('manual-review', 'off'), true)) {
         return false;
+    }
+
+    if ($contract === 'compat-legacy' && kingy_ali_campaign_breakdown_content_has_legacy_collision($content)) {
+        return false;
+    }
+
+    if ($contract === 'legacy-v1') {
+        return kingy_ali_campaign_breakdown_has_explicit_identity($post_id)
+            && !kingy_ali_campaign_breakdown_label_needs_review(kingy_ali_campaign_breakdown_product_label($post_id))
+            && kingy_ali_campaign_breakdown_video_id($post_id, $content) !== ''
+            && kingy_ali_campaign_breakdown_meta($post_id, 'campaign_official_product_url') !== ''
+            && kingy_ali_campaign_breakdown_meta($post_id, 'campaign_source_urls') !== ''
+            && has_post_thumbnail($post_id)
+            && !kingy_ali_campaign_breakdown_content_has_legacy_collision($content);
+    }
+
+    if ($contract === 'reference-v1') {
+        return kingy_ali_campaign_breakdown_has_explicit_identity($post_id)
+            && !kingy_ali_campaign_breakdown_label_needs_review(kingy_ali_campaign_breakdown_product_label($post_id));
     }
 
     if (kingy_ali_campaign_breakdown_has_explicit_identity($post_id)) {
@@ -170,14 +265,16 @@ function kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $conten
 
 function kingy_ali_enqueue_campaign_breakdown_assets() {
     $post_id = kingy_ali_current_campaign_breakdown_post_id();
-    if ($post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, get_post_field('post_content', $post_id)) && wp_style_is('kingy-ali-launch-intelligence', 'registered')) {
+    $content = $post_id ? get_post_field('post_content', $post_id) : '';
+    if ($post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $content) && kingy_ali_campaign_breakdown_uses_plugin_assets($post_id, $content) && wp_style_is('kingy-ali-launch-intelligence', 'registered')) {
         wp_enqueue_style('kingy-ali-launch-intelligence');
     }
 }
 
 function kingy_ali_campaign_breakdown_body_class($classes) {
     $post_id = kingy_ali_current_campaign_breakdown_post_id();
-    if (!$post_id || !kingy_ali_campaign_breakdown_can_render_public_layout($post_id, get_post_field('post_content', $post_id))) {
+    $content = $post_id ? get_post_field('post_content', $post_id) : '';
+    if (!$post_id || !kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $content) || !kingy_ali_campaign_breakdown_uses_plugin_assets($post_id, $content)) {
         return $classes;
     }
 
@@ -294,6 +391,11 @@ function kingy_ali_render_campaign_breakdown_content($content) {
         return $content;
     }
 
+    if (!kingy_ali_campaign_breakdown_uses_plugin_wrapper($post_id, $content)) {
+        return $content;
+    }
+
+    // Temporary compatibility fallback until every legacy marker record has an explicit contract.
     if (strpos($content, 'kingy-campaign-breakdown') !== false) {
         return $content;
     }
@@ -313,14 +415,12 @@ function kingy_ali_campaign_breakdown_hero_html($post_id, $content) {
 
     $video_id = kingy_ali_campaign_breakdown_video_id($post_id, $content);
     $video_url = kingy_ali_campaign_breakdown_video_url($post_id, $content);
-    $thumbnail = kingy_ali_campaign_breakdown_meta($post_id, 'campaign_youtube_thumbnail');
-
     ob_start();
     ?>
-    <section class="kingy-campaign-breakdown kingy-campaign-breakdown__hero" aria-label="<?php esc_attr_e('Campaign Breakdown', 'kingy-ai-launch-intelligence'); ?>">
+    <section class="kingy-campaign-breakdown kingy-campaign-breakdown__hero" aria-labelledby="kingy-campaign-breakdown-title-<?php echo esc_attr(absint($post_id)); ?>">
         <div class="kingy-campaign-breakdown__copy">
             <p class="kingy-ali-kicker"><?php esc_html_e('Campaign Breakdown', 'kingy-ai-launch-intelligence'); ?></p>
-            <h1><?php echo esc_html($title); ?></h1>
+            <h2 id="kingy-campaign-breakdown-title-<?php echo esc_attr(absint($post_id)); ?>"><?php echo esc_html($title); ?></h2>
             <p><?php echo esc_html(kingy_ali_campaign_breakdown_intro($post_id)); ?></p>
             <p class="kingy-campaign-breakdown__positioning"><?php esc_html_e('You do AI. We do distribution.', 'kingy-ai-launch-intelligence'); ?></p>
             <div class="kingy-campaign-breakdown__actions">
@@ -341,8 +441,6 @@ function kingy_ali_campaign_breakdown_hero_html($post_id, $content) {
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowfullscreen></iframe>
                 </div>
-            <?php elseif ($thumbnail) : ?>
-                <img src="<?php echo esc_url($thumbnail); ?>" alt="<?php echo esc_attr($product); ?>" loading="lazy">
             <?php else : ?>
                 <div class="kingy-campaign-breakdown__video kingy-campaign-breakdown__video--empty">
                     <span><?php esc_html_e('Video source pending review', 'kingy-ai-launch-intelligence'); ?></span>
@@ -412,7 +510,8 @@ function kingy_ali_campaign_breakdown_meta_description($post_id) {
 
 function kingy_ali_campaign_breakdown_document_title($parts) {
     $post_id = kingy_ali_current_campaign_breakdown_post_id();
-    if ($post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, get_post_field('post_content', $post_id))) {
+    $content = $post_id ? get_post_field('post_content', $post_id) : '';
+    if ($post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $content) && kingy_ali_campaign_breakdown_uses_plugin_seo($post_id, $content)) {
         $parts['title'] = kingy_ali_campaign_breakdown_seo_title($post_id);
     }
 
@@ -421,21 +520,23 @@ function kingy_ali_campaign_breakdown_document_title($parts) {
 
 function kingy_ali_campaign_breakdown_wpseo_title($title) {
     $post_id = kingy_ali_current_campaign_breakdown_post_id();
-    return $post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, get_post_field('post_content', $post_id)) ? kingy_ali_campaign_breakdown_seo_title($post_id) : $title;
+    $content = $post_id ? get_post_field('post_content', $post_id) : '';
+    return $post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $content) && kingy_ali_campaign_breakdown_uses_plugin_seo($post_id, $content) ? kingy_ali_campaign_breakdown_seo_title($post_id) : $title;
 }
 
 function kingy_ali_campaign_breakdown_wpseo_metadesc($description) {
     $post_id = kingy_ali_current_campaign_breakdown_post_id();
-    return $post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, get_post_field('post_content', $post_id)) ? kingy_ali_campaign_breakdown_meta_description($post_id) : $description;
+    $content = $post_id ? get_post_field('post_content', $post_id) : '';
+    return $post_id && kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $content) && kingy_ali_campaign_breakdown_uses_plugin_seo($post_id, $content) ? kingy_ali_campaign_breakdown_meta_description($post_id) : $description;
 }
 
 function kingy_ali_output_campaign_breakdown_schema() {
     $post_id = kingy_ali_current_campaign_breakdown_post_id();
-    if (!$post_id || !kingy_ali_campaign_breakdown_can_render_public_layout($post_id, get_post_field('post_content', $post_id))) {
+    $content = $post_id ? get_post_field('post_content', $post_id) : '';
+    if (!$post_id || !kingy_ali_campaign_breakdown_can_render_public_layout($post_id, $content) || !kingy_ali_campaign_breakdown_uses_plugin_schema($post_id, $content)) {
         return;
     }
 
-    $content = get_post_field('post_content', $post_id);
     $video_id = kingy_ali_campaign_breakdown_video_id($post_id, $content);
     $video_url = kingy_ali_campaign_breakdown_video_url($post_id, $content);
     $thumbnail = kingy_ali_campaign_breakdown_meta($post_id, 'campaign_youtube_thumbnail');
@@ -507,7 +608,54 @@ function kingy_ali_campaign_breakdown_review_blockers($post_id, $content = '') {
         $blockers[] = 'missing_featured_image';
     }
 
+    if (kingy_ali_campaign_breakdown_content_has_legacy_collision($content)) {
+        $blockers[] = 'content_owns_h1_image_video_or_schema';
+    }
+
     return array_values(array_unique($blockers));
+}
+
+/**
+ * A reviewed editorial-only video example deliberately owns its custom body
+ * video and schema. Once the evidence workflow has approved those exact bytes,
+ * the legacy campaign-breakdown enricher must not reclassify the page during a
+ * status-only save.
+ */
+function kingy_ali_campaign_breakdown_is_reviewed_editorial_example($post_id) {
+    $post_id = absint($post_id);
+    if (!$post_id
+        || kingy_ali_campaign_breakdown_meta($post_id, 'campaign_enrichment_status') !== 'reviewed_editorial_only'
+        || kingy_ali_campaign_breakdown_meta($post_id, 'campaign_needs_manual_review') === '1') {
+        return false;
+    }
+
+    $case_id = absint(get_post_meta($post_id, '_kingy_sponsor_case_post_id', true));
+    if (!$case_id || get_post_status($case_id) !== 'private') {
+        return false;
+    }
+
+    $workflow = (string) get_post_meta($case_id, '_kingy_case_workflow_state', true);
+    if (!in_array($workflow, array('approved_for_publish', 'published'), true)
+        || (string) get_post_meta($case_id, '_kingy_case_proof_type', true) !== 'video_example') {
+        return false;
+    }
+
+    if (!function_exists('kingy_evidence_case_current_hashes') || !function_exists('kingy_evidence_case_gate_result')) {
+        return false;
+    }
+
+    $current_hashes = kingy_evidence_case_current_hashes($case_id);
+    foreach (array('content', 'evidence', 'featured') as $type) {
+        $approved_hash = (string) get_post_meta($case_id, '_kingy_case_approved_' . $type . '_hash', true);
+        if ($approved_hash === ''
+            || empty($current_hashes[$type])
+            || !hash_equals($approved_hash, (string) $current_hashes[$type])) {
+            return false;
+        }
+    }
+
+    $gate = kingy_evidence_case_gate_result($case_id);
+    return !empty($gate['pass']) && empty($gate['blockers']);
 }
 
 function kingy_ali_flag_campaign_breakdown_for_enrichment($post_id, $post, $update) {
@@ -516,6 +664,10 @@ function kingy_ali_flag_campaign_breakdown_for_enrichment($post_id, $post, $upda
     }
 
     if (!kingy_ali_is_campaign_breakdown_page($post_id)) {
+        return;
+    }
+
+    if (kingy_ali_campaign_breakdown_is_reviewed_editorial_example($post_id)) {
         return;
     }
 

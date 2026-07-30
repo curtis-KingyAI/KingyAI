@@ -46,11 +46,18 @@ function kingy_ali_launch_meta_fields() {
     return array(
         'company' => array('label' => 'Company', 'type' => 'text', 'section' => 'Basics'),
         'official_url' => array('label' => 'Official link', 'type' => 'url', 'section' => 'Basics'),
-        'launch_date' => array('label' => 'Launch date', 'type' => 'date', 'section' => 'Basics'),
+        'launch_date' => array(
+            'label' => 'Launch date',
+            'type' => 'date',
+            'allow_month' => true,
+            'section' => 'Basics',
+        ),
         'what_launched' => array('label' => 'What launched', 'type' => 'textarea', 'section' => 'Basics'),
         'who_it_is_for' => array('label' => 'Who it is for', 'type' => 'textarea', 'section' => 'Basics'),
         'pricing' => array('label' => 'Pricing', 'type' => 'text', 'section' => 'Basics'),
         'pricing_url' => array('label' => 'Pricing URL', 'type' => 'url', 'section' => 'Sources'),
+        'official_announcement_url' => array('label' => 'Official announcement URL', 'type' => 'url', 'section' => 'Sources'),
+        'official_docs_url' => array('label' => 'Official documentation URL', 'type' => 'url', 'section' => 'Sources'),
         'free_plan' => array('label' => 'Free plan', 'type' => 'select', 'options' => kingy_ali_yes_no_unknown_options(), 'section' => 'Basics'),
         'api_available' => array('label' => 'API available', 'type' => 'select', 'options' => kingy_ali_yes_no_unknown_options(), 'section' => 'Basics'),
         'open_source_or_open_weight' => array('label' => 'Open source/open weight', 'type' => 'select', 'options' => kingy_ali_yes_no_unknown_options(), 'section' => 'Basics'),
@@ -72,6 +79,8 @@ function kingy_ali_launch_meta_fields() {
         'demo_quality_score' => array('label' => 'Demo Quality Score', 'type' => 'number', 'min' => 0, 'max' => 10, 'step' => '0.1', 'section' => 'Scores'),
         'youtube_score' => array('label' => 'YouTube Content Score', 'type' => 'number', 'min' => 0, 'max' => 10, 'step' => '0.1', 'section' => 'Scores'),
         'seo_score' => array('label' => 'SEO Content Score', 'type' => 'number', 'min' => 0, 'max' => 10, 'step' => '0.1', 'section' => 'Scores'),
+        'scores_suppressed' => array('label' => 'Suppress public scores until reviewed', 'type' => 'checkbox', 'section' => 'Scores', 'public' => false),
+        'score_editorial_approval' => array('label' => 'Editorially approve exceptional/repeated score pattern', 'type' => 'checkbox', 'section' => 'Scores', 'public' => false),
         'sponsor_fit_score_internal' => array('label' => 'Internal Partner-Fit Score', 'type' => 'number', 'min' => 0, 'max' => 10, 'step' => '0.1', 'section' => 'Scores', 'public' => false),
         'kingy_verdict' => array('label' => 'Kingy AI take', 'type' => 'textarea', 'section' => 'Basics'),
         'what_feels_promising' => array('label' => 'What feels promising', 'type' => 'textarea', 'section' => 'Basics'),
@@ -134,6 +143,8 @@ function kingy_ali_launch_meta_fields() {
         'noindex' => array('label' => 'Noindex this launch profile', 'type' => 'checkbox', 'section' => 'SEO', 'public' => false),
         'budget_likelihood_internal' => array('label' => 'Internal budget likelihood', 'type' => 'select', 'options' => kingy_ali_budget_likelihood_options(), 'section' => 'Internal Notes', 'public' => false),
         'internal_notes' => array('label' => 'Internal notes', 'type' => 'textarea', 'section' => 'Internal Notes', 'public' => false),
+        'canonical_fingerprint' => array('label' => 'Canonical import fingerprint', 'type' => 'text', 'section' => 'Internal Notes', 'public' => false),
+        'quality_gate_result' => array('label' => 'Last quality gate result', 'type' => 'textarea', 'section' => 'Internal Notes', 'public' => false),
     );
 }
 
@@ -145,6 +156,7 @@ function kingy_ali_tool_meta_fields() {
         'what_it_does' => array('label' => 'What it does', 'type' => 'textarea', 'section' => 'Basics'),
         'best_for' => array('label' => 'Best for', 'type' => 'textarea', 'section' => 'Basics'),
         'pricing' => array('label' => 'Pricing', 'type' => 'text', 'section' => 'Basics'),
+        'pricing_url' => array('label' => 'Pricing URL', 'type' => 'url', 'section' => 'Sources'),
         'free_plan' => array('label' => 'Free plan', 'type' => 'select', 'options' => kingy_ali_yes_no_unknown_options(), 'section' => 'Basics'),
         'api_available' => array('label' => 'API available', 'type' => 'select', 'options' => kingy_ali_yes_no_unknown_options(), 'section' => 'Basics'),
         'open_source_or_open_weight' => array('label' => 'Open source/open weight', 'type' => 'select', 'options' => kingy_ali_yes_no_unknown_options(), 'section' => 'Basics'),
@@ -280,9 +292,23 @@ function kingy_ali_model_meta_fields() {
 }
 
 function kingy_ali_register_meta_fields() {
+    register_post_meta(
+        'post',
+        '_kingy_ali_daily_radar_email_v1',
+        array(
+            'single' => true,
+            'type' => 'string',
+            'sanitize_callback' => 'kingy_ali_sanitize_daily_radar_email_contract',
+            'show_in_rest' => true,
+            'auth_callback' => 'kingy_ali_authorize_daily_radar_email_contract',
+        )
+    );
+
     foreach (kingy_ali_launch_meta_fields() as $key => $field) {
         kingy_ali_register_single_meta('kingy_ai_launch', $key, $field);
     }
+
+    kingy_ali_register_private_launch_metadata_schema();
 
     foreach (kingy_ali_tool_meta_fields() as $key => $field) {
         kingy_ali_register_single_meta('kingy_ai_tool', $key, $field);
@@ -295,6 +321,82 @@ function kingy_ali_register_meta_fields() {
     foreach (kingy_ali_model_meta_fields() as $key => $field) {
         kingy_ali_register_single_meta('kingy_ai_model', $key, $field);
     }
+}
+
+function kingy_ali_private_launch_metadata_schema() {
+    return array(
+        'official_launch_url' => array('type' => 'url'),
+        'why_it_matters' => array('type' => 'textarea'),
+        'best_use_case' => array('type' => 'textarea'),
+        'current_limitations' => array('type' => 'textarea'),
+        'kingy_last_updated' => array('type' => 'date'),
+        'score_components' => array('type' => 'json'),
+        'score_history' => array('type' => 'json'),
+        'verdict_history' => array('type' => 'json'),
+    );
+}
+
+function kingy_ali_register_private_launch_metadata_schema() {
+    foreach (kingy_ali_private_launch_metadata_schema() as $key => $field) {
+        register_post_meta(
+            'kingy_ai_launch',
+            kingy_ali_meta_key($key),
+            array(
+                'single' => true,
+                'type' => 'string',
+                'sanitize_callback' => function ($value) use ($field) {
+                    if ($field['type'] === 'json') {
+                        if (!is_scalar($value)) {
+                            return '';
+                        }
+                        $value = trim((string) $value);
+                        json_decode($value, true);
+                        return $value !== '' && json_last_error() === JSON_ERROR_NONE ? $value : '';
+                    }
+                    return kingy_ali_sanitize_meta_value($value, $field);
+                },
+                'show_in_rest' => false,
+                'auth_callback' => function () {
+                    return current_user_can('edit_posts');
+                },
+            )
+        );
+    }
+}
+
+function kingy_ali_sanitize_daily_radar_email_contract($value) {
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = trim($value);
+    if ($value === '' || strlen($value) > 100000) {
+        return '';
+    }
+
+    $decoded = json_decode($value, true);
+    if (!is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
+        return '';
+    }
+
+    if ((int) ($decoded['schema_version'] ?? 0) !== 1) {
+        return '';
+    }
+
+    $issue_date = isset($decoded['issue_date']) ? (string) $decoded['issue_date'] : '';
+    $lead_slug = isset($decoded['lead_slug']) ? (string) $decoded['lead_slug'] : '';
+    $quick_launches = isset($decoded['quick_launches']) && is_array($decoded['quick_launches'])
+        ? $decoded['quick_launches']
+        : null;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $issue_date) || $lead_slug === '' || $quick_launches === null) {
+        return '';
+    }
+
+    return $value;
+}
+
+function kingy_ali_authorize_daily_radar_email_contract($allowed, $meta_key, $post_id) {
+    return $post_id && current_user_can('edit_post', (int) $post_id);
 }
 
 function kingy_ali_register_single_meta($post_type, $key, $field) {
@@ -355,7 +457,28 @@ function kingy_ali_register_public_rest_meta_fields() {
         );
     }
 
+    register_rest_field(
+        'kingy_ai_launch',
+        'kingy_ali_trust',
+        array(
+            'get_callback' => function ($object) {
+                $post_id = isset($object['id']) ? absint($object['id']) : 0;
+                return $post_id ? kingy_ali_rest_launch_payload($post_id) : array();
+            },
+            'schema' => array(
+                'description' => __('Canonical public verification and score snapshot.', 'kingy-ai-launch-intelligence'),
+                'type' => 'object',
+                'context' => array('view', 'edit'),
+                'readonly' => true,
+            ),
+        )
+    );
+
     kingy_ali_register_inline_internal_links_rest_field();
+}
+
+function kingy_ali_rest_launch_payload($post_id) {
+    return kingy_ali_launch_trust_snapshot(absint($post_id));
 }
 
 function kingy_ali_register_inline_internal_links_rest_field() {
@@ -425,18 +548,40 @@ function kingy_ali_rest_public_meta_for_object($object, $fields) {
         return array();
     }
 
-    if (function_exists('kingy_ali_profile_should_noindex') && kingy_ali_profile_should_noindex($post_id)) {
-        return array();
-    }
-
     $public_meta = array();
+    $is_launch = get_post_type($post_id) === 'kingy_ai_launch';
+    $trust = $is_launch && function_exists('kingy_ali_launch_trust_snapshot')
+        ? kingy_ali_launch_trust_snapshot($post_id)
+        : array();
     foreach ($fields as $key => $field) {
         if (!kingy_ali_is_public_meta_field($field)) {
             continue;
         }
 
-        $value = get_post_meta($post_id, kingy_ali_meta_key($key), true);
+        if ($is_launch && $key === 'verification_status' && $trust) {
+            $value = $trust['status'];
+        } elseif ($is_launch && $key === 'last_verified' && $trust) {
+            $value = $trust['last_verified'];
+        } elseif ($is_launch && $key === 'kingy_launch_score' && $trust) {
+            $value = $trust['score']['kingy']['value'];
+        } elseif ($is_launch && $key === 'demo_quality_score' && $trust) {
+            $value = $trust['score']['demo']['value'];
+        } elseif ($is_launch && $key === 'youtube_score' && $trust) {
+            $value = $trust['score']['youtube']['value'];
+        } else {
+            $value = get_post_meta($post_id, kingy_ali_meta_key($key), true);
+            if (function_exists('kingy_ali_public_profile_meta_text') && (!isset($field['type']) || in_array($field['type'], array('text', 'textarea'), true))) {
+                $value = kingy_ali_public_profile_meta_text($post_id, $key);
+            }
+        }
         if ($value === '' || $value === array()) {
+            continue;
+        }
+        if ($value === null) {
+            continue;
+        }
+
+        if (function_exists('kingy_ali_optional_value_is_unknown') && kingy_ali_optional_value_is_unknown($value)) {
             continue;
         }
 
@@ -508,7 +653,9 @@ function kingy_ali_related_post_is_public_index_ready($post_id, $post_type = '')
         return false;
     }
 
-    return !function_exists('kingy_ali_profile_should_noindex') || !kingy_ali_profile_should_noindex($post_id);
+    return function_exists('kingy_ali_entity_seo_is_indexable')
+        ? kingy_ali_entity_seo_is_indexable($post_id)
+        : (!function_exists('kingy_ali_profile_should_noindex') || !kingy_ali_profile_should_noindex($post_id));
 }
 
 function kingy_ali_rest_cast_public_meta_value($value, $field) {
@@ -1051,7 +1198,16 @@ function kingy_ali_render_field_control($key, $field, $value) {
         }
     }
 
-    echo '<input class="regular-text" type="' . esc_attr($type) . '" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"' . $attributes . '>';
+    $input_type = $type;
+    $date_precision_help = '';
+    if ($type === 'date' && !empty($field['allow_month'])) {
+        $input_type = 'text';
+        $attributes .= ' inputmode="numeric" placeholder="YYYY-MM or YYYY-MM-DD" pattern="\d{4}-\d{2}(-\d{2})?"';
+        $date_precision_help = '<p class="description">' . esc_html__('Use YYYY-MM when only the launch month is publicly supported, or YYYY-MM-DD when the exact day is verified.', 'kingy-ai-launch-intelligence') . '</p>';
+    }
+
+    echo '<input class="regular-text" type="' . esc_attr($input_type) . '" id="' . esc_attr($id) . '" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '"' . $attributes . '>';
+    echo $date_precision_help;
 }
 
 function kingy_ali_render_post_select_control($id, $name, $field, $value) {
@@ -1166,20 +1322,72 @@ function kingy_ali_save_launch_meta($post_id) {
 }
 
 function kingy_ali_handle_launch_status_transition($new_status, $old_status, $post) {
-    if (!$post instanceof WP_Post || $post->post_type !== 'kingy_ai_launch' || $new_status === $old_status) {
-        return;
-    }
+    static $reverting = false;
 
-    $tool_id = kingy_ali_editor_related_id(kingy_ali_get_meta($post->ID, 'related_tool_id'));
-    if ($tool_id && get_post_type($tool_id) === 'kingy_ai_tool') {
-        kingy_ali_update_tool_latest_launch($tool_id);
+    if ($reverting || !$post instanceof WP_Post || $post->post_type !== 'kingy_ai_launch' || $new_status === $old_status) {
+        return;
     }
 
     if ($new_status !== 'publish' || wp_is_post_revision($post->ID)) {
         return;
     }
 
-    kingy_ali_sync_launch_relationships($post->ID);
+    $result = kingy_ali_sync_launch_relationships($post->ID);
+    if (empty($result['blocked'])) {
+        return;
+    }
+
+    $reverting = true;
+    wp_update_post(
+        array(
+            'ID' => $post->ID,
+            'post_status' => 'draft',
+        )
+    );
+    $reverting = false;
+}
+
+function kingy_ali_launch_companion_profile_gate($post_id, $post_type) {
+    $post_id = absint($post_id);
+    $post_type = sanitize_key((string) $post_type);
+    $blockers = array();
+
+    if (!$post_id) {
+        return array(
+            'approved' => true,
+            'post_id' => 0,
+            'post_type' => $post_type,
+            'blockers' => array(),
+        );
+    }
+
+    if (!in_array($post_type, array('kingy_ai_tool', 'kingy_ai_company'), true) || get_post_type($post_id) !== $post_type) {
+        $blockers[] = 'invalid_companion_type';
+    } elseif (get_post_status($post_id) !== 'publish') {
+        $blockers[] = 'companion_not_published';
+    } else {
+        if ((int) get_post_thumbnail_id($post_id) <= 0) {
+            $blockers[] = 'companion_missing_featured_image';
+        }
+
+        foreach (kingy_ali_editor_readiness_items($post_id, $post_type) as $item) {
+            if (empty($item['complete'])) {
+                $blockers[] = 'companion_readiness_incomplete';
+                break;
+            }
+        }
+
+        if (function_exists('kingy_ali_profile_should_noindex') && kingy_ali_profile_should_noindex($post_id)) {
+            $blockers[] = 'companion_noindex';
+        }
+    }
+
+    return array(
+        'approved' => empty($blockers),
+        'post_id' => $post_id,
+        'post_type' => $post_type,
+        'blockers' => array_values(array_unique($blockers)),
+    );
 }
 
 function kingy_ali_sync_launch_relationships($post_id) {
@@ -1192,28 +1400,27 @@ function kingy_ali_sync_launch_relationships($post_id) {
     }
 
     $tool_id = kingy_ali_editor_related_id(get_post_meta($post_id, kingy_ali_meta_key('related_tool_id'), true));
-    if ($tool_id && get_post_type($tool_id) === 'kingy_ai_tool') {
-        kingy_ali_link_launch_to_tool($post_id, $tool_id);
-    } else {
-        $tool_id = kingy_ali_sync_tool_from_launch($post_id);
-    }
+    $company_id = kingy_ali_editor_related_id(get_post_meta($post_id, kingy_ali_meta_key('related_company_id'), true));
+    $tool_gate = kingy_ali_launch_companion_profile_gate($tool_id, 'kingy_ai_tool');
+    $company_gate = kingy_ali_launch_companion_profile_gate($company_id, 'kingy_ai_company');
+    $blockers = array_merge($tool_gate['blockers'], $company_gate['blockers']);
 
-    $company_id = kingy_ali_sync_company_from_launch($post_id);
-    if ($company_id && $tool_id) {
-        kingy_ali_link_tool_to_company($tool_id, $company_id);
+    if ($blockers) {
+        return array(
+            'tool_id' => 0,
+            'company_id' => 0,
+            'blocked' => true,
+            'blockers' => array_values(array_unique($blockers)),
+        );
     }
 
     kingy_ali_sync_derived_attributes($post_id);
-    if ($tool_id) {
-        kingy_ali_sync_derived_attributes($tool_id);
-    }
-    if ($company_id) {
-        kingy_ali_sync_derived_attributes($company_id);
-    }
 
     return array(
         'tool_id' => $tool_id,
         'company_id' => $company_id,
+        'blocked' => false,
+        'blockers' => array(),
     );
 }
 
@@ -1350,7 +1557,7 @@ function kingy_ali_sanitize_meta_value($value, $field) {
     }
 
     if ($type === 'number') {
-        if ($value === '') {
+        if ($value === '' || !is_scalar($value) || !is_numeric($value)) {
             return '';
         }
 
@@ -1394,7 +1601,16 @@ function kingy_ali_sanitize_meta_value($value, $field) {
 
     if ($type === 'date') {
         $value = sanitize_text_field($value);
-        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
+        if (!empty($field['allow_month']) && preg_match('/^(\d{4})-(\d{2})$/', $value, $matches)) {
+            $month = (int) $matches[2];
+            return $month >= 1 && $month <= 12 ? $value : '';
+        }
+
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches)) {
+            return '';
+        }
+
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]) ? $value : '';
     }
 
     return sanitize_text_field($value);
