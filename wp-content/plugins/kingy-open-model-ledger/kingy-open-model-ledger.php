@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kingy Open Model Ledger
  * Description: Adds a sourced, revision-aware decision ledger to the existing Kingy AI Model Hub.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Author: Kingy.ai
  * License: GPL-2.0-or-later
  * Text Domain: kingy-open-model-ledger
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'KOML_VERSION' ) ) {
-	define( 'KOML_VERSION', '0.1.2' );
+	define( 'KOML_VERSION', '0.1.3' );
 }
 
 if ( ! defined( 'KOML_DIR' ) ) {
