@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kingy AI Launch Intelligence
  * Description: Structured AI launch database, searchable launch hub, founder submissions, scoring, analytics, and import tools for Kingy AI.
- * Version: 0.1.290-directory-archive-pagination
+ * Version: 0.1.291-pagination-bounds
  * Author: Kingy AI
  * Text Domain: kingy-ai-launch-intelligence
  */
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('KINGY_ALI_VERSION', '0.1.290-directory-archive-pagination');
+define('KINGY_ALI_VERSION', '0.1.291-pagination-bounds');
 if (!defined('KINGY_ALI_ENABLE_REPAIRED_STRATEGIC_ROUTES')) {
     define('KINGY_ALI_ENABLE_REPAIRED_STRATEGIC_ROUTES', true);
 }
@@ -36,6 +36,7 @@ require_once KINGY_ALI_PLUGIN_DIR . 'includes/companies.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/tools.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/safe-sync-graph.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/public-trust.php';
+require_once KINGY_ALI_PLUGIN_DIR . 'includes/pagination.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/launch-index.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/stack-change-radar.php';
 require_once KINGY_ALI_PLUGIN_DIR . 'includes/feeds-hub.php';
@@ -554,6 +555,10 @@ function kingy_ali_dequeue_conflicting_editor_assets() {
 
 add_filter('template_include', 'kingy_ali_template_include', 99);
 function kingy_ali_template_include($template) {
+    if (is_404()) {
+        return $template;
+    }
+
     if (is_singular('kingy_ai_launch')) {
         $plugin_template = KINGY_ALI_PLUGIN_DIR . 'templates/single-ai-launch.php';
         return file_exists($plugin_template) ? $plugin_template : $template;

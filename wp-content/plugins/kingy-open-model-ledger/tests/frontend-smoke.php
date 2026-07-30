@@ -11,6 +11,29 @@ $koml_test_post_status = array();
 $koml_test_thumbnails = array();
 $koml_test_query_vars = array();
 $koml_test_is_model_archive = false;
+$koml_test_is_404 = false;
+$koml_test_status = 200;
+$koml_test_nocache = false;
+$koml_test_max_pages = 2;
+
+class WP_Query {
+    public $max_num_pages;
+
+    public function __construct($args = array()) {
+        global $koml_test_max_pages;
+        $this->max_num_pages = $koml_test_max_pages;
+    }
+}
+
+class KOML_Test_Main_Query {
+    public $is_404 = false;
+
+    public function set_404() {
+        $this->is_404 = true;
+    }
+}
+
+$wp_query = new KOML_Test_Main_Query();
 
 function get_post_meta($post_id, $key, $single = true) {
     global $koml_test_meta;
@@ -64,6 +87,21 @@ function is_post_type_archive($post_type = '') {
 
 function is_page($page = '') {
     return false;
+}
+
+function is_404() {
+    global $koml_test_is_404;
+    return $koml_test_is_404;
+}
+
+function status_header($status) {
+    global $koml_test_status;
+    $koml_test_status = (int) $status;
+}
+
+function nocache_headers() {
+    global $koml_test_nocache;
+    $koml_test_nocache = true;
 }
 
 function wp_unslash($value) {
@@ -140,5 +178,19 @@ $koml_test_query_vars['koml_ledger'] = 1;
 koml_assert_same(true, KOML_Frontend::is_ledger_request(), 'The dedicated query var identifies the ledger route.');
 koml_assert_same(KOML_DIR . 'templates/archive-model-ledger.php', KOML_Frontend::template_include('/theme/archive.php'), 'The dedicated ledger route receives the ledger template.');
 koml_assert_same(array('existing', 'koml_ledger'), KOML_Frontend::register_query_vars(array('existing', 'koml_ledger')), 'The ledger query var registration is idempotent.');
+koml_assert_same(false, KOML_Frontend::archive_page_is_out_of_range(2, 2), 'The final Open Models page remains valid.');
+koml_assert_same(true, KOML_Frontend::archive_page_is_out_of_range(3, 2), 'An Open Models page after the final page is out of range.');
+
+$koml_test_query_vars['paged'] = 2;
+koml_assert_same(false, KOML_Frontend::enforce_pagination_bounds(), 'The final Open Models page keeps its directory response.');
+
+$koml_test_query_vars['paged'] = 3;
+koml_assert_same(true, KOML_Frontend::enforce_pagination_bounds(), 'An out-of-range Open Models page becomes a 404.');
+koml_assert_same(404, $koml_test_status, 'The Open Models overflow response receives HTTP 404.');
+koml_assert_same(true, $wp_query->is_404, 'The Open Models overflow request uses the WordPress 404 template path.');
+koml_assert_same(true, $koml_test_nocache, 'The Open Models overflow response is not cached as a directory page.');
+
+$koml_test_is_404 = true;
+koml_assert_same('/theme/404.php', KOML_Frontend::template_include('/theme/404.php'), 'KOML does not replace the theme 404 template.');
 
 fwrite(STDOUT, "Open Model Ledger frontend smoke tests passed.\n");

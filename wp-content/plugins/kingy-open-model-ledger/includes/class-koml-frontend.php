@@ -10,6 +10,7 @@ final class KOML_Frontend {
         add_action('init', array(__CLASS__, 'maybe_flush_rewrite_rules'), 100);
         add_filter('query_vars', array(__CLASS__, 'register_query_vars'));
         add_filter('pre_handle_404', array(__CLASS__, 'handle_ledger_request'), 10, 2);
+        add_action('template_redirect', array(__CLASS__, 'enforce_pagination_bounds'), 5);
         add_filter('template_include', array(__CLASS__, 'template_include'), 999);
         add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_assets'), 40);
         add_filter('body_class', array(__CLASS__, 'body_classes'));
@@ -50,6 +51,10 @@ final class KOML_Frontend {
     }
 
     public static function template_include($template) {
+        if (is_404()) {
+            return $template;
+        }
+
         if (is_singular('kingy_ai_model') && self::scope_status(get_queried_object_id()) === 'curated') {
             return KOML_DIR . 'templates/single-model-ledger.php';
         }
@@ -96,7 +101,7 @@ final class KOML_Frontend {
         if (self::is_surface()) {
             $classes[] = 'koml-surface';
         }
-        if (self::is_ledger_request()) {
+        if (self::is_ledger_request() && !is_404()) {
             $classes[] = 'koml-directory';
         }
         if (is_singular('kingy_ai_model')) {
@@ -106,7 +111,7 @@ final class KOML_Frontend {
     }
 
     public static function title_parts($parts) {
-        if (self::is_ledger_request()) {
+        if (self::is_ledger_request() && !is_404()) {
             $parts['title'] = __('Open Model Ledger', 'kingy-open-model-ledger');
         } elseif (self::is_open_weight_feed() && self::has_feed_events() && self::feed_has_featured_image()) {
             $parts['title'] = __('Open-Weight Model Release & Change Feed', 'kingy-open-model-ledger');
@@ -118,7 +123,7 @@ final class KOML_Frontend {
 
     public static function is_surface() {
         return (is_singular('kingy_ai_model') && self::scope_status(get_queried_object_id()) === 'curated')
-            || self::is_ledger_request()
+            || (self::is_ledger_request() && !is_404())
             || self::is_open_weight_feed()
             || is_page('model-fit');
     }
@@ -131,6 +136,40 @@ final class KOML_Frontend {
         $page = max(1, absint($page));
         $path = $page > 1 ? '/open-models/page/' . $page . '/' : '/open-models/';
         return home_url($path);
+    }
+
+    public static function archive_page_is_out_of_range($requested_page, $total_pages) {
+        $requested_page = max(1, absint($requested_page));
+        $total_pages = absint($total_pages);
+        return $requested_page > 1 && ($total_pages < 1 || $requested_page > $total_pages);
+    }
+
+    public static function enforce_pagination_bounds() {
+        if (!self::is_ledger_request() || is_404()) {
+            return false;
+        }
+
+        $requested_page = max(1, (int) get_query_var('paged'), (int) get_query_var('page'));
+        if ($requested_page <= 1) {
+            return false;
+        }
+
+        $query = new WP_Query(self::curated_query_args());
+        $total_pages = isset($query->max_num_pages) ? absint($query->max_num_pages) : 0;
+        if (!self::archive_page_is_out_of_range($requested_page, $total_pages)) {
+            return false;
+        }
+
+        global $wp_query;
+        if (is_object($wp_query) && method_exists($wp_query, 'set_404')) {
+            $wp_query->set_404();
+        } elseif (is_object($wp_query)) {
+            $wp_query->is_404 = true;
+        }
+        status_header(404);
+        nocache_headers();
+
+        return true;
     }
 
     public static function is_open_weight_feed() {
