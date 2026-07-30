@@ -14,7 +14,7 @@ get_header();
             <p class="koml-kicker"><?php esc_html_e('Chronological ledger events', 'kingy-open-model-ledger'); ?></p>
             <h1><?php esc_html_e('Open-Weight Model Release & Change Feed', 'kingy-open-model-ledger'); ?></h1>
             <p class="koml-deck"><?php esc_html_e('A dated feed of weights becoming available, artifact revisions, license changes, runtime support, provider pricing, deprecations and replacements. Each event resolves to one canonical model record.', 'kingy-open-model-ledger'); ?></p>
-            <div class="koml-hero__actions"><a class="koml-button" href="<?php echo esc_url(get_post_type_archive_link('kingy_ai_model')); ?>"><?php esc_html_e('Open the Model Ledger', 'kingy-open-model-ledger'); ?></a></div>
+            <div class="koml-hero__actions"><a class="koml-button" href="<?php echo esc_url(KOML_Frontend::ledger_url()); ?>"><?php esc_html_e('Open the Model Ledger', 'kingy-open-model-ledger'); ?></a></div>
         </div>
         <aside class="koml-principle"><strong><?php esc_html_e('Important', 'kingy-open-model-ledger'); ?></strong><p><?php esc_html_e('“Open weight” means model parameters are downloadable under stated terms. It does not by itself mean open source, unrestricted commercial use, or OSAID 1.0 conformance.', 'kingy-open-model-ledger'); ?></p></aside>
     </header>

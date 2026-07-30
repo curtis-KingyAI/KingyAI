@@ -3,11 +3,14 @@
 define('ABSPATH', __DIR__ . '/');
 define('DAY_IN_SECONDS', 86400);
 define('OBJECT', 'OBJECT');
+define('KOML_DIR', dirname(__DIR__) . '/');
 
 $koml_test_meta = array();
 $koml_test_model_fit_page = null;
 $koml_test_post_status = array();
 $koml_test_thumbnails = array();
+$koml_test_query_vars = array();
+$koml_test_is_model_archive = false;
 
 function get_post_meta($post_id, $key, $single = true) {
     global $koml_test_meta;
@@ -35,6 +38,44 @@ function get_post_status($post_id) {
 function has_post_thumbnail($post_id) {
     global $koml_test_thumbnails;
     return !empty($koml_test_thumbnails[$post_id]);
+}
+
+function absint($value) {
+    return abs((int) $value);
+}
+
+function home_url($path = '') {
+    return 'https://example.test' . $path;
+}
+
+function get_query_var($key) {
+    global $koml_test_query_vars;
+    return isset($koml_test_query_vars[$key]) ? $koml_test_query_vars[$key] : '';
+}
+
+function is_singular($post_type = '') {
+    return false;
+}
+
+function is_post_type_archive($post_type = '') {
+    global $koml_test_is_model_archive;
+    return $post_type === 'kingy_ai_model' && $koml_test_is_model_archive;
+}
+
+function is_page($page = '') {
+    return false;
+}
+
+function wp_unslash($value) {
+    return $value;
+}
+
+function wp_parse_url($url, $component = -1) {
+    return parse_url($url, $component);
+}
+
+function untrailingslashit($value) {
+    return rtrim((string) $value, '/\\');
 }
 
 require_once dirname(__DIR__) . '/includes/class-koml-frontend.php';
@@ -89,5 +130,15 @@ $koml_test_thumbnails[80] = false;
 koml_assert_same(false, KOML_Frontend::model_fit_is_ready(), 'A published calculator stays disabled without a featured image.');
 $koml_test_thumbnails[80] = true;
 koml_assert_same(true, KOML_Frontend::model_fit_is_ready(), 'A published calculator with a featured image enables the directory CTA.');
+
+koml_assert_same('https://example.test/open-models/', KOML_Frontend::ledger_url(), 'The ledger has a distinct additive route.');
+koml_assert_same('https://example.test/open-models/page/3/', KOML_Frontend::ledger_url(3), 'Ledger pagination uses path URLs.');
+koml_assert_same(false, KOML_Frontend::is_ledger_request(), 'The general model archive is not a ledger request.');
+$koml_test_is_model_archive = true;
+koml_assert_same('/theme/archive.php', KOML_Frontend::template_include('/theme/archive.php'), 'KOML does not take over the general model archive.');
+$koml_test_query_vars['koml_ledger'] = 1;
+koml_assert_same(true, KOML_Frontend::is_ledger_request(), 'The dedicated query var identifies the ledger route.');
+koml_assert_same(KOML_DIR . 'templates/archive-model-ledger.php', KOML_Frontend::template_include('/theme/archive.php'), 'The dedicated ledger route receives the ledger template.');
+koml_assert_same(array('existing', 'koml_ledger'), KOML_Frontend::register_query_vars(array('existing', 'koml_ledger')), 'The ledger query var registration is idempotent.');
 
 fwrite(STDOUT, "Open Model Ledger frontend smoke tests passed.\n");

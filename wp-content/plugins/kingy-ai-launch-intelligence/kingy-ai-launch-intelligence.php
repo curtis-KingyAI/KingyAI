@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kingy AI Launch Intelligence
  * Description: Structured AI launch database, searchable launch hub, founder submissions, scoring, analytics, and import tools for Kingy AI.
- * Version: 0.1.289-feeds-taxonomy-metadata-fix
+ * Version: 0.1.290-directory-archive-pagination
  * Author: Kingy AI
  * Text Domain: kingy-ai-launch-intelligence
  */
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('KINGY_ALI_VERSION', '0.1.289-feeds-taxonomy-metadata-fix');
+define('KINGY_ALI_VERSION', '0.1.290-directory-archive-pagination');
 if (!defined('KINGY_ALI_ENABLE_REPAIRED_STRATEGIC_ROUTES')) {
     define('KINGY_ALI_ENABLE_REPAIRED_STRATEGIC_ROUTES', true);
 }

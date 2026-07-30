@@ -1190,6 +1190,14 @@ function kingy_ali_launch_filter_url_args($filters) {
 }
 
 function kingy_ali_launch_filter_base_url() {
+    if (is_tax('kingy_launch_category')) {
+        $term = get_queried_object();
+        $term_url = $term && !is_wp_error($term) ? get_term_link($term) : '';
+        if (is_string($term_url) && $term_url !== '') {
+            return apply_filters('kingy_ali_launch_filter_base_url', $term_url);
+        }
+    }
+
     global $wp;
 
     if (!empty($wp->request)) {
@@ -1274,17 +1282,28 @@ function kingy_ali_render_launch_pagination($query, $filters = array()) {
     $current = is_object($query) && method_exists($query, 'get') ? kingy_ali_sanitize_launch_page($query->get('paged')) : 1;
     $base_args = kingy_ali_launch_filter_url_args(wp_parse_args($filters, kingy_ali_request_filters()));
     unset($base_args['kali_page']);
-    $base_url = kingy_ali_launch_filter_base_url();
-    if ($base_args) {
-        $base_url = add_query_arg($base_args, $base_url);
-    }
     $pagination_token = 999999999;
-    $base = str_replace((string) $pagination_token, '%#%', add_query_arg('kali_page', $pagination_token, $base_url));
+    $format = '';
+    if (is_tax('kingy_launch_category')) {
+        unset($base_args['kali_category']);
+        $base_url = trailingslashit(kingy_ali_launch_filter_base_url()) . '%_%';
+        if ($base_args) {
+            $base_url = add_query_arg($base_args, $base_url);
+        }
+        $base = $base_url;
+        $format = 'page/%#%/';
+    } else {
+        $base_url = kingy_ali_launch_filter_base_url();
+        if ($base_args) {
+            $base_url = add_query_arg($base_args, $base_url);
+        }
+        $base = str_replace((string) $pagination_token, '%#%', add_query_arg('kali_page', $pagination_token, $base_url));
+    }
 
     $links = paginate_links(
         array(
             'base' => $base,
-            'format' => '',
+            'format' => $format,
             'current' => $current,
             'total' => $total_pages,
             'type' => 'list',

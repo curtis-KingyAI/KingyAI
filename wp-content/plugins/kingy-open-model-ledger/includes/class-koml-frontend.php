@@ -6,6 +6,10 @@ if (!defined('ABSPATH')) {
 
 final class KOML_Frontend {
     public static function boot() {
+        add_action('init', array(__CLASS__, 'register_rewrite_rules'), 20);
+        add_action('init', array(__CLASS__, 'maybe_flush_rewrite_rules'), 100);
+        add_filter('query_vars', array(__CLASS__, 'register_query_vars'));
+        add_filter('pre_handle_404', array(__CLASS__, 'handle_ledger_request'), 10, 2);
         add_filter('template_include', array(__CLASS__, 'template_include'), 999);
         add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_assets'), 40);
         add_filter('body_class', array(__CLASS__, 'body_classes'));
@@ -13,12 +17,44 @@ final class KOML_Frontend {
         add_shortcode('kingy_model_fit', array(__CLASS__, 'model_fit_shortcode'));
     }
 
+    public static function register_rewrite_rules() {
+        add_rewrite_rule('^open-models/page/([0-9]+)/?$', 'index.php?koml_ledger=1&paged=$matches[1]', 'top');
+        add_rewrite_rule('^open-models/?$', 'index.php?koml_ledger=1', 'top');
+    }
+
+    public static function register_query_vars($query_vars) {
+        $query_vars[] = 'koml_ledger';
+        return array_values(array_unique($query_vars));
+    }
+
+    public static function maybe_flush_rewrite_rules() {
+        $schema = '2026-07-30-v1';
+        if (get_option('koml_rewrite_schema', '') === $schema) {
+            return;
+        }
+
+        flush_rewrite_rules(false);
+        update_option('koml_rewrite_schema', $schema, false);
+    }
+
+    public static function handle_ledger_request($preempt, $query) {
+        if (!self::is_ledger_request()) {
+            return $preempt;
+        }
+
+        if (is_object($query)) {
+            $query->is_404 = false;
+        }
+        status_header(200);
+        return true;
+    }
+
     public static function template_include($template) {
         if (is_singular('kingy_ai_model') && self::scope_status(get_queried_object_id()) === 'curated') {
             return KOML_DIR . 'templates/single-model-ledger.php';
         }
 
-        if (is_post_type_archive('kingy_ai_model')) {
+        if (self::is_ledger_request()) {
             return KOML_DIR . 'templates/archive-model-ledger.php';
         }
 
@@ -60,7 +96,7 @@ final class KOML_Frontend {
         if (self::is_surface()) {
             $classes[] = 'koml-surface';
         }
-        if (is_post_type_archive('kingy_ai_model')) {
+        if (self::is_ledger_request()) {
             $classes[] = 'koml-directory';
         }
         if (is_singular('kingy_ai_model')) {
@@ -70,7 +106,7 @@ final class KOML_Frontend {
     }
 
     public static function title_parts($parts) {
-        if (is_post_type_archive('kingy_ai_model')) {
+        if (self::is_ledger_request()) {
             $parts['title'] = __('Open Model Ledger', 'kingy-open-model-ledger');
         } elseif (self::is_open_weight_feed() && self::has_feed_events() && self::feed_has_featured_image()) {
             $parts['title'] = __('Open-Weight Model Release & Change Feed', 'kingy-open-model-ledger');
@@ -82,9 +118,19 @@ final class KOML_Frontend {
 
     public static function is_surface() {
         return (is_singular('kingy_ai_model') && self::scope_status(get_queried_object_id()) === 'curated')
-            || is_post_type_archive('kingy_ai_model')
+            || self::is_ledger_request()
             || self::is_open_weight_feed()
             || is_page('model-fit');
+    }
+
+    public static function is_ledger_request() {
+        return (bool) get_query_var('koml_ledger');
+    }
+
+    public static function ledger_url($page = 1) {
+        $page = max(1, absint($page));
+        $path = $page > 1 ? '/open-models/page/' . $page . '/' : '/open-models/';
+        return home_url($path);
     }
 
     public static function is_open_weight_feed() {

@@ -46,7 +46,7 @@ $search_value = isset($_GET['ledger_q']) ? sanitize_text_field(wp_unslash($_GET[
             <p class="koml-kicker"><?php esc_html_e('Decision filters', 'kingy-open-model-ledger'); ?></p>
             <h2 id="koml-filter-heading"><?php esc_html_e('Find a release you can actually use', 'kingy-open-model-ledger'); ?></h2>
         </div>
-        <form method="get" action="<?php echo esc_url(get_post_type_archive_link('kingy_ai_model')); ?>" class="koml-filters">
+        <form method="get" action="<?php echo esc_url(KOML_Frontend::ledger_url()); ?>" class="koml-filters">
             <label>
                 <span><?php esc_html_e('Search family or publisher', 'kingy-open-model-ledger'); ?></span>
                 <input type="search" name="ledger_q" value="<?php echo esc_attr($search_value); ?>" placeholder="<?php esc_attr_e('Qwen, OLMo, DeepSeek…', 'kingy-open-model-ledger'); ?>">
@@ -150,6 +150,8 @@ $search_value = isset($_GET['ledger_q']) ? sanitize_text_field(wp_unslash($_GET[
 
         <?php
         $pagination = paginate_links(array(
+            'base' => KOML_Frontend::ledger_url() . '%_%',
+            'format' => 'page/%#%/',
             'total' => $ledger_query->max_num_pages,
             'current' => max(1, (int) get_query_var('paged')),
             'type' => 'list',
@@ -168,7 +170,7 @@ $search_value = isset($_GET['ledger_q']) ? sanitize_text_field(wp_unslash($_GET[
         <section class="koml-empty">
             <h2><?php esc_html_e('No release matches those filters', 'kingy-open-model-ledger'); ?></h2>
             <p><?php esc_html_e('Try a wider filter. A missing result may also mean the release has not passed ledger review yet.', 'kingy-open-model-ledger'); ?></p>
-            <a class="koml-button" href="<?php echo esc_url(get_post_type_archive_link('kingy_ai_model')); ?>"><?php esc_html_e('Clear filters', 'kingy-open-model-ledger'); ?></a>
+            <a class="koml-button" href="<?php echo esc_url(KOML_Frontend::ledger_url()); ?>"><?php esc_html_e('Clear filters', 'kingy-open-model-ledger'); ?></a>
         </section>
     <?php endif; ?>
     <?php wp_reset_postdata(); ?>

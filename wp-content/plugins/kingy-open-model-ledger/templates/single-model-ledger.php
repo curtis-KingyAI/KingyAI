@@ -240,7 +240,7 @@ get_header();
             <?php endif; ?>
 
             <nav class="koml-record-nav" aria-label="Model ledger navigation">
-                <a class="koml-button" href="<?php echo esc_url(get_post_type_archive_link('kingy_ai_model')); ?>"><?php esc_html_e('Back to Open Model Ledger', 'kingy-open-model-ledger'); ?></a>
+                <a class="koml-button" href="<?php echo esc_url(KOML_Frontend::ledger_url()); ?>"><?php esc_html_e('Back to Open Model Ledger', 'kingy-open-model-ledger'); ?></a>
                 <a class="koml-button koml-button--secondary" href="<?php echo esc_url(home_url('/ai-launches/open-weight-models/')); ?>"><?php esc_html_e('Open-weight change feed', 'kingy-open-model-ledger'); ?></a>
             </nav>
         </article>

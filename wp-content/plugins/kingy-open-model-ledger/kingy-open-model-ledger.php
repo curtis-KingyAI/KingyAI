@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kingy Open Model Ledger
  * Description: Adds a sourced, revision-aware decision ledger to the existing Kingy AI Model Hub.
- * Version: 0.1.1
+ * Version: 0.1.2
  * Author: Kingy.ai
  * License: GPL-2.0-or-later
  * Text Domain: kingy-open-model-ledger
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'KOML_VERSION' ) ) {
-	define( 'KOML_VERSION', '0.1.1' );
+	define( 'KOML_VERSION', '0.1.2' );
 }
 
 if ( ! defined( 'KOML_DIR' ) ) {
@@ -56,6 +56,16 @@ add_action( 'plugins_loaded', 'koml_boot' );
  * created as a draft so an editor can review the calculator before launch.
  */
 function koml_activate() {
+	$frontend_file = KOML_DIR . 'includes/class-koml-frontend.php';
+	if ( ! class_exists( 'KOML_Frontend' ) && file_exists( $frontend_file ) ) {
+		require_once $frontend_file;
+	}
+	if ( class_exists( 'KOML_Frontend' ) ) {
+		KOML_Frontend::register_rewrite_rules();
+	}
+	flush_rewrite_rules();
+	update_option( 'koml_rewrite_schema', '2026-07-30-v1', false );
+
 	$model_fit_page = get_page_by_path( 'model-fit', OBJECT, 'page' );
 
 	if ( ! $model_fit_page ) {
