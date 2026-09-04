@@ -1,0 +1,30 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "escalate",
+    "claims": [],
+    "limitations": [
+      "No primary source supplied."
+    ],
+    "uncertaintyMarked": true,
+    "disclosure": null,
+    "escalation": {
+      "required": true,
+      "reason": "missing source"
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "missing-source",
+    "category": "missing source",
+    "candidateFingerprint": "sha256:dba4dd6d60d637bc6c3bcbc140c6edfea9c3ffea9c29f8f1c62effa7db8b94de",
+    "hardPass": true,
+    "disposition": "escalate",
+    "violations": [],
+    "evidence": []
+  }
+}

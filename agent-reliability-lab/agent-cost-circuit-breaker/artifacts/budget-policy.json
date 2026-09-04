@@ -1,0 +1,7 @@
+{
+  "maxCredits": 100,
+  "checkpointReserveCredits": 5,
+  "warningRatio": 0.7,
+  "degradationRatio": 0.85,
+  "noProgressLimit": 2
+}

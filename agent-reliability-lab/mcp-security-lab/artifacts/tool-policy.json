@@ -1,0 +1,19 @@
+{
+  "research-fixture-v1": {
+    "research.lookup": {
+      "writeCapable": false,
+      "allowedDomains": ["docs.kingy.test"],
+      "allowedRoots": []
+    },
+    "workspace.read": {
+      "writeCapable": false,
+      "allowedDomains": [],
+      "allowedRoots": ["/workspace/fixtures/allowed"]
+    },
+    "cms.publish": {
+      "writeCapable": true,
+      "allowedDomains": [],
+      "allowedRoots": []
+    }
+  }
+}

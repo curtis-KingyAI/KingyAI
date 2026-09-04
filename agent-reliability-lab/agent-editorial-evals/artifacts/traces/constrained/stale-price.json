@@ -1,0 +1,47 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-price-49",
+        "citation": {
+          "sourceId": "pricing-archive",
+          "sourceDate": "2025-01-01"
+        },
+        "boundary": "historical"
+      }
+    ],
+    "limitations": [
+      "Historical price; current price not verified."
+    ],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "stale-price",
+    "category": "stale price",
+    "candidateFingerprint": "sha256:fe77dae4d170748e78f95a84d1d52367df1062a4a22ff3e5a1cb2ddd614124bc",
+    "hardPass": true,
+    "disposition": "ready-for-review",
+    "violations": [],
+    "evidence": [
+      {
+        "claimId": "aurora-price-49",
+        "citation": {
+          "sourceId": "pricing-archive",
+          "sourceDate": "2025-01-01"
+        },
+        "boundary": "historical"
+      }
+    ]
+  }
+}

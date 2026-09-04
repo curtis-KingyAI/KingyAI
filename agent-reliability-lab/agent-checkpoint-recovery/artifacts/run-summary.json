@@ -1,0 +1,47 @@
+{
+  "lab": "agent-checkpoint-recovery",
+  "labVersion": "0.1.0",
+  "fixtureId": "launch-aurora-recovery",
+  "startedAt": "2026-09-03T12:00:00.000Z",
+  "outcome": "protected",
+  "assertions": [
+    {
+      "id": "crash-after-collect.resumes-correctly",
+      "result": "pass"
+    },
+    {
+      "id": "crash-after-extract.resumes-correctly",
+      "result": "pass"
+    },
+    {
+      "id": "crash-after-outline.resumes-correctly",
+      "result": "pass"
+    },
+    {
+      "id": "crash-after-draft.resumes-correctly",
+      "result": "pass"
+    },
+    {
+      "id": "crash-after-fact-check.resumes-correctly",
+      "result": "pass"
+    },
+    {
+      "id": "crash-after-ready-for-review.resumes-correctly",
+      "result": "pass"
+    },
+    {
+      "id": "source-change.invalidates-downstream-only",
+      "result": "pass"
+    }
+  ],
+  "evidence": [
+    "artifacts/crash-recovery-report.md",
+    "artifacts/crash-after-collect/workflow-state.json",
+    "artifacts/crash-after-ready-for-review/transition-log.jsonl",
+    "artifacts/input-change/workflow-state.json"
+  ],
+  "limitations": [
+    "JSON checkpoints are a local teaching implementation, not a distributed workflow engine.",
+    "No external side effect is performed or recovered."
+  ]
+}

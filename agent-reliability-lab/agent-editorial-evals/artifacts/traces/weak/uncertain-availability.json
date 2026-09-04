@@ -1,0 +1,58 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "weak",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-availability-unconfirmed",
+        "citation": {
+          "sourceId": "regional-page",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "current"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "uncertain-availability",
+    "category": "uncertain availability",
+    "candidateFingerprint": "sha256:7fd928057f7e089b28605399b3e7e9e3c917f58ccf5c0ad7c28a60413d4be49f",
+    "hardPass": false,
+    "disposition": "blocked",
+    "violations": [
+      {
+        "code": "CLAIM_BOUNDARY_MISMATCH",
+        "detail": "aurora-availability-unconfirmed"
+      },
+      {
+        "code": "MISSING_LIMITATION",
+        "detail": "Availability is not confirmed for every region."
+      },
+      {
+        "code": "UNCERTAINTY_UNMARKED",
+        "detail": "uncertain-availability"
+      }
+    ],
+    "evidence": [
+      {
+        "claimId": "aurora-availability-unconfirmed",
+        "citation": {
+          "sourceId": "regional-page",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "current"
+      }
+    ]
+  }
+}

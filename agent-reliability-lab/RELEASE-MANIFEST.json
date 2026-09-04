@@ -1,0 +1,15 @@
+{
+  "release": "0.1.0",
+  "releaseDate": "2026-09-03",
+  "runtime": "Node.js 22",
+  "networkRequired": false,
+  "externalServices": false,
+  "productionData": false,
+  "runtimeDependencies": 0,
+  "labs": 6,
+  "tests": 26,
+  "protectedDemos": 6,
+  "sourceRepository": "https://github.com/curtis-KingyAI/KingyAI/tree/main/agent-reliability-lab",
+  "clientGuide": "https://kingy.ai/apps-labs/agent-reliability-lab/",
+  "evidenceBoundary": "Local behavior under synthetic fixtures; not a production framework, certification, compliance claim, vendor evaluation, or MCP protocol-conformance test."
+}

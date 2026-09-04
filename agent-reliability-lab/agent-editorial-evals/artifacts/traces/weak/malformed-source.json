@@ -1,0 +1,66 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "weak",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-secure",
+        "citation": {
+          "sourceId": "broken-capture",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "malformed-source",
+    "category": "malformed source",
+    "candidateFingerprint": "sha256:3529eb5432725e6f3de07b56559cde932f5fd7dba2c6d67429c421866c8f6398",
+    "hardPass": false,
+    "disposition": "blocked",
+    "violations": [
+      {
+        "code": "MALFORMED_SOURCE_USED",
+        "detail": "aurora-secure"
+      },
+      {
+        "code": "UNSUPPORTED_CLAIM",
+        "detail": "aurora-secure"
+      },
+      {
+        "code": "MISSING_LIMITATION",
+        "detail": "Source capture is malformed."
+      },
+      {
+        "code": "UNCERTAINTY_UNMARKED",
+        "detail": "malformed-source"
+      },
+      {
+        "code": "MISSED_REQUIRED_ESCALATION",
+        "detail": "malformed-source"
+      }
+    ],
+    "evidence": [
+      {
+        "claimId": "aurora-secure",
+        "citation": {
+          "sourceId": "broken-capture",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ]
+  }
+}

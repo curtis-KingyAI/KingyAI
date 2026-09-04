@@ -1,0 +1,48 @@
+{
+  "lab": "mcp-security-lab",
+  "labVersion": "0.1.0",
+  "fixtureId": "mcp-host-security-boundaries",
+  "startedAt": "2026-09-03T12:00:00.000Z",
+  "outcome": "protected",
+  "assertions": [
+    {
+      "id": "allowlisted-valid-result.accepted",
+      "result": "pass"
+    },
+    {
+      "id": "prompt-injection.no-implicit-action",
+      "result": "pass"
+    },
+    {
+      "id": "malformed-output.rejected",
+      "result": "pass"
+    },
+    {
+      "id": "domain-and-path.restricted",
+      "result": "pass"
+    },
+    {
+      "id": "server-and-tool.allowlists-enforced",
+      "result": "pass"
+    },
+    {
+      "id": "write.requires-one-use-approval",
+      "result": "pass"
+    },
+    {
+      "id": "revoked-server.denied",
+      "result": "pass"
+    }
+  ],
+  "evidence": [
+    "artifacts/server-allowlist.json",
+    "artifacts/tool-policy.json",
+    "artifacts/provenance-log.jsonl",
+    "artifacts/fixture-server-events.jsonl",
+    "artifacts/security-decision-report.md"
+  ],
+  "limitations": [
+    "This is a local MCP-shaped fixture transport, not MCP protocol conformance testing.",
+    "No OS sandbox, network firewall, credential broker, or live MCP server was tested."
+  ]
+}

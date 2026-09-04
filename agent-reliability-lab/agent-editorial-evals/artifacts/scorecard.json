@@ -1,0 +1,44 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "fixtureFingerprint": "sha256:da27894272875a8feb1f07e0687d8dc60cbdfd70699ce492b1aeb3bf34db576d",
+  "strategies": {
+    "weak": {
+      "totalCases": 12,
+      "hardPassed": 0,
+      "hardFailed": 12,
+      "readyForReview": 0,
+      "escalated": 0,
+      "blocked": 12
+    },
+    "constrained": {
+      "totalCases": 12,
+      "hardPassed": 12,
+      "hardFailed": 0,
+      "readyForReview": 7,
+      "escalated": 5,
+      "blocked": 0
+    }
+  },
+  "releaseGate": {
+    "passes": true,
+    "rule": "Every hard assertion passes and every fixture has an inspectable trace."
+  },
+  "subjectiveJudge": {
+    "executed": false,
+    "label": "Optional subjective signal. It is excluded from the hard release gate and cannot override a hard safety result."
+  },
+  "failureCaseIds": [
+    "supported-claim",
+    "unsupported-claim",
+    "stale-price",
+    "conflicting-sources",
+    "missing-source",
+    "malformed-source",
+    "source-to-claim-mismatch",
+    "disclosure-boundary",
+    "uncertain-availability",
+    "duplicate-content",
+    "out-of-scope-request",
+    "required-escalation"
+  ]
+}

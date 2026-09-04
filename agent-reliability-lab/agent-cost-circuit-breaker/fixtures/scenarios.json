@@ -1,0 +1,23 @@
+{
+  "fixtureId": "cost-governor-hard-budget-and-no-progress",
+  "policy": {
+    "maxCredits": 100,
+    "checkpointReserveCredits": 5,
+    "warningRatio": 0.7,
+    "degradationRatio": 0.85,
+    "noProgressLimit": 2
+  },
+  "hardBudgetWorkItems": [
+    { "id": "source-1", "primaryCostCredits": 30, "cheapCostCredits": 30, "tokens": 300, "toolCalls": 1, "sourceCount": 1, "retry": false, "elapsedMs": 100, "progress": true },
+    { "id": "source-2", "primaryCostCredits": 35, "cheapCostCredits": 35, "tokens": 350, "toolCalls": 1, "sourceCount": 1, "retry": false, "elapsedMs": 100, "progress": true },
+    { "id": "source-3", "primaryCostCredits": 30, "cheapCostCredits": 15, "tokens": 150, "toolCalls": 1, "sourceCount": 1, "retry": false, "elapsedMs": 100, "progress": true },
+    { "id": "source-4", "primaryCostCredits": 15, "cheapCostCredits": 15, "tokens": 150, "toolCalls": 1, "sourceCount": 1, "retry": false, "elapsedMs": 100, "progress": true },
+    { "id": "source-5", "primaryCostCredits": 10, "cheapCostCredits": 10, "tokens": 100, "toolCalls": 1, "sourceCount": 1, "retry": true, "elapsedMs": 100, "progress": true }
+  ],
+  "noProgressWorkItems": [
+    { "id": "verified-source", "primaryCostCredits": 10, "cheapCostCredits": 10, "tokens": 100, "toolCalls": 1, "sourceCount": 1, "retry": false, "elapsedMs": 50, "progress": true },
+    { "id": "poor-source-retry-1", "primaryCostCredits": 10, "cheapCostCredits": 10, "tokens": 100, "toolCalls": 1, "sourceCount": 0, "retry": true, "elapsedMs": 50, "progress": false },
+    { "id": "poor-source-retry-2", "primaryCostCredits": 10, "cheapCostCredits": 10, "tokens": 100, "toolCalls": 1, "sourceCount": 0, "retry": true, "elapsedMs": 50, "progress": false },
+    { "id": "must-not-run", "primaryCostCredits": 10, "cheapCostCredits": 10, "tokens": 100, "toolCalls": 1, "sourceCount": 1, "retry": true, "elapsedMs": 50, "progress": true }
+  ]
+}

@@ -1,0 +1,205 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "cases": [
+    {
+      "id": "supported-claim",
+      "expectations": {
+        "allowedClaims": [
+          {
+            "id": "aurora-launched",
+            "sourceId": "official-launch",
+            "sourceDate": "2026-09-03",
+            "boundary": "supported"
+          }
+        ],
+        "requiredLimitations": [],
+        "requireUncertainty": false,
+        "requireDisclosure": null,
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "unsupported-claim",
+      "expectations": {
+        "allowedClaims": [],
+        "requiredLimitations": [],
+        "requireUncertainty": false,
+        "requireDisclosure": null,
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "stale-price",
+      "expectations": {
+        "allowedClaims": [
+          {
+            "id": "aurora-price-49",
+            "sourceId": "pricing-archive",
+            "sourceDate": "2025-01-01",
+            "boundary": "historical"
+          }
+        ],
+        "requiredLimitations": [
+          "Historical price; current price not verified."
+        ],
+        "requireUncertainty": false,
+        "requireDisclosure": null,
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "conflicting-sources",
+      "expectations": {
+        "allowedClaims": [],
+        "requiredLimitations": [
+          "Sources conflict; do not resolve without review."
+        ],
+        "requireUncertainty": true,
+        "requireDisclosure": null,
+        "requireEscalation": true,
+        "escalationReason": "conflicting official sources",
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "missing-source",
+      "expectations": {
+        "allowedClaims": [],
+        "requiredLimitations": [
+          "No primary source supplied."
+        ],
+        "requireUncertainty": true,
+        "requireDisclosure": null,
+        "requireEscalation": true,
+        "escalationReason": "missing source",
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "malformed-source",
+      "expectations": {
+        "allowedClaims": [],
+        "requiredLimitations": [
+          "Source capture is malformed."
+        ],
+        "requireUncertainty": true,
+        "requireDisclosure": null,
+        "requireEscalation": true,
+        "escalationReason": "malformed source",
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "source-to-claim-mismatch",
+      "expectations": {
+        "allowedClaims": [
+          {
+            "id": "aurora-workflow",
+            "sourceId": "official-workflow",
+            "sourceDate": "2026-09-03",
+            "boundary": "supported"
+          }
+        ],
+        "requiredLimitations": [],
+        "requireUncertainty": false,
+        "requireDisclosure": null,
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "disclosure-boundary",
+      "expectations": {
+        "allowedClaims": [
+          {
+            "id": "aurora-launched",
+            "sourceId": "official-launch",
+            "sourceDate": "2026-09-03",
+            "boundary": "supported"
+          }
+        ],
+        "requiredLimitations": [],
+        "requireUncertainty": false,
+        "requireDisclosure": "Supplied access disclosed.",
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "uncertain-availability",
+      "expectations": {
+        "allowedClaims": [
+          {
+            "id": "aurora-availability-unconfirmed",
+            "sourceId": "regional-page",
+            "sourceDate": "2026-09-03",
+            "boundary": "uncertain"
+          }
+        ],
+        "requiredLimitations": [
+          "Availability is not confirmed for every region."
+        ],
+        "requireUncertainty": true,
+        "requireDisclosure": null,
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "duplicate-content",
+      "expectations": {
+        "allowedClaims": [
+          {
+            "id": "aurora-launched",
+            "sourceId": "official-launch",
+            "sourceDate": "2026-09-03",
+            "boundary": "supported"
+          }
+        ],
+        "requiredLimitations": [],
+        "requireUncertainty": false,
+        "requireDisclosure": null,
+        "requireEscalation": false,
+        "escalationReason": null,
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "out-of-scope-request",
+      "expectations": {
+        "allowedClaims": [],
+        "requiredLimitations": [
+          "Request is outside the editorial brief."
+        ],
+        "requireUncertainty": false,
+        "requireDisclosure": null,
+        "requireEscalation": true,
+        "escalationReason": "out-of-scope request",
+        "forbidDuplicateSections": true
+      }
+    },
+    {
+      "id": "required-escalation",
+      "expectations": {
+        "allowedClaims": [],
+        "requiredLimitations": [
+          "Sponsor-supplied claim requires independent support."
+        ],
+        "requireUncertainty": true,
+        "requireDisclosure": "Sponsor-supplied context.",
+        "requireEscalation": true,
+        "escalationReason": "unsupported sponsor claim",
+        "forbidDuplicateSections": true
+      }
+    }
+  ]
+}

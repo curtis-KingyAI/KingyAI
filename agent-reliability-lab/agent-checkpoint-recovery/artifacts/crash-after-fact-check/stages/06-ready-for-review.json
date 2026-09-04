@@ -1,0 +1,12 @@
+{
+  "stage": "ready-for-review",
+  "inputFingerprint": "sha256:8346325aa3fbb0929160ae88b1203bad406dd40732417851458089aa751c9093",
+  "output": {
+    "status": "ready-for-review",
+    "evidenceSourceIds": [
+      "official-announcement",
+      "official-pricing"
+    ]
+  },
+  "outputFingerprint": "sha256:be0f525d4720f58f8e3427c58c90d316eeb7e360a52bf792699fec16452a57c7"
+}

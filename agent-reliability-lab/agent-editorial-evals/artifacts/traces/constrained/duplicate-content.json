@@ -1,0 +1,45 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-launched",
+        "citation": {
+          "sourceId": "official-launch",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "duplicate-content",
+    "category": "duplicate content",
+    "candidateFingerprint": "sha256:2c3ae58002b8c77ca11fd80797678cd2de03ed759a353129a42de5459138b2d8",
+    "hardPass": true,
+    "disposition": "ready-for-review",
+    "violations": [],
+    "evidence": [
+      {
+        "claimId": "aurora-launched",
+        "citation": {
+          "sourceId": "official-launch",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ]
+  }
+}

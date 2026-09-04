@@ -1,0 +1,3 @@
+{"event":"run-paused","runId":"continuity-first","timestamp":"2026-09-03T12:00:00.000Z","status":"paused","committedCredits":35,"remainingCredits":65,"reason":"max-calls-for-demo"}
+{"event":"budget-warning","runId":"continuity-resume","timestamp":"2026-09-03T12:00:00.000Z","status":"active","committedCredits":70,"remainingCredits":30,"threshold":0.7}
+{"event":"run-paused","runId":"continuity-resume","timestamp":"2026-09-03T12:00:00.000Z","status":"paused","committedCredits":70,"remainingCredits":30,"reason":"max-calls-for-demo"}

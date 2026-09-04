@@ -1,0 +1,27 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "draft",
+    "claims": [],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "unsupported-claim",
+    "category": "unsupported claim",
+    "candidateFingerprint": "sha256:ba796b0029471438c512f11a01b818234128e5f808724c9cd6a221a7890a3703",
+    "hardPass": true,
+    "disposition": "ready-for-review",
+    "violations": [],
+    "evidence": []
+  }
+}

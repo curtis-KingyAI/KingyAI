@@ -1,0 +1,45 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-workflow",
+        "citation": {
+          "sourceId": "official-workflow",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "source-to-claim-mismatch",
+    "category": "source-to-claim mismatch",
+    "candidateFingerprint": "sha256:f0ebe6ef8ebf77a6d5b7540d7329e3d6b42d15ec48a84da7ce51a2fd47cd49c9",
+    "hardPass": true,
+    "disposition": "ready-for-review",
+    "violations": [],
+    "evidence": [
+      {
+        "claimId": "aurora-workflow",
+        "citation": {
+          "sourceId": "official-workflow",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ]
+  }
+}

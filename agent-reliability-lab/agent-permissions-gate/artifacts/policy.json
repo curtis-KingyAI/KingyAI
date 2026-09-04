@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "principals": {
+    "launch-research-agent": {
+      "allow": [
+        { "action": "source.collect", "resource": "source://official/*" },
+        { "action": "cms.draft.create", "resource": "cms://drafts/launch-aurora" }
+      ],
+      "approvalRequired": [
+        { "action": "cms.publish", "resource": "cms://records/*" }
+      ]
+    }
+  }
+}

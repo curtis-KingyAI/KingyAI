@@ -1,0 +1,14 @@
+{
+  "name": "kingy-agent-permissions-gate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "demo": "node scripts/demo.js",
+    "test": "node --test",
+    "clean": "node scripts/clean.js"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "0.1.0",
+  "policy": {
+    "maxCredits": 100,
+    "checkpointReserveCredits": 5,
+    "warningRatio": 0.7,
+    "degradationRatio": 0.85,
+    "noProgressLimit": 2
+  },
+  "workItemsFingerprint": "sha256:c898bd03856ccaad19b7028ab26171ad0e69277ee3ab879bb18351eeeefc0a2a",
+  "status": "terminal",
+  "nextWorkIndex": 4,
+  "selectedModel": "cheap",
+  "scope": "narrow",
+  "noProgressStreak": 0,
+  "completedItems": [
+    "source-1",
+    "source-2",
+    "source-3",
+    "source-4"
+  ],
+  "terminal": {
+    "code": "BUDGET_EXHAUSTED",
+    "at": "2026-09-03T12:00:00.000Z"
+  },
+  "signals": {
+    "warned": true,
+    "degraded": true
+  },
+  "ledger": {
+    "spentCredits": 95,
+    "reservedCheckpointCredits": 5,
+    "committedCredits": 100,
+    "estimatedCredits": 95,
+    "tokens": 950,
+    "modelCalls": 4,
+    "toolCalls": 4,
+    "sourceCount": 4,
+    "retries": 0,
+    "elapsedMs": 400
+  },
+  "createdAt": "2026-09-03T12:00:00.000Z"
+}

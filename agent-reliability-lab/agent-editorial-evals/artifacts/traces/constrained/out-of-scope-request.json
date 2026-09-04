@@ -1,0 +1,30 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "escalate",
+    "claims": [],
+    "limitations": [
+      "Request is outside the editorial brief."
+    ],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": true,
+      "reason": "out-of-scope request"
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "out-of-scope-request",
+    "category": "out-of-scope request",
+    "candidateFingerprint": "sha256:7f79265b41c199dda806550ac4a8a3d150df28ff2820c707b4f3f19c2d90d808",
+    "hardPass": true,
+    "disposition": "escalate",
+    "violations": [],
+    "evidence": []
+  }
+}

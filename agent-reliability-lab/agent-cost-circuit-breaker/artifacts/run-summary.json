@@ -1,0 +1,44 @@
+{
+  "lab": "agent-cost-circuit-breaker",
+  "labVersion": "0.1.0",
+  "fixtureId": "cost-governor-hard-budget-and-no-progress",
+  "startedAt": "2026-09-03T12:00:00.000Z",
+  "outcome": "protected",
+  "assertions": [
+    {
+      "id": "warning-recorded",
+      "result": "pass"
+    },
+    {
+      "id": "graceful-degradation-recorded",
+      "result": "pass"
+    },
+    {
+      "id": "hard-budget-stop-and-checkpoint",
+      "result": "pass"
+    },
+    {
+      "id": "no-provider-call-after-hard-cap",
+      "result": "pass"
+    },
+    {
+      "id": "no-progress-stops-before-financial-cap",
+      "result": "pass"
+    },
+    {
+      "id": "resume-budget-continuity",
+      "result": "pass"
+    }
+  ],
+  "evidence": [
+    "artifacts/budget-policy.json",
+    "artifacts/hard-budget/cost-ledger.jsonl",
+    "artifacts/hard-budget/decision-log.jsonl",
+    "artifacts/hard-budget/partial-result.md",
+    "artifacts/cost-circuit-breaker-report.md"
+  ],
+  "limitations": [
+    "Fake credits and local accounting are not provider billing enforcement.",
+    "Checkpoint reserve is accounting-only in this mock; no paid checkpoint call occurs."
+  ]
+}

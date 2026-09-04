@@ -1,0 +1,2 @@
+{"event":"publication-created","timestamp":"2026-09-03T12:00:00.000Z","publicationId":"mock-post-001","idempotencyKey":"publish:launch-aurora:v1","recordId":"launch-aurora"}
+{"event":"publication-created","timestamp":"2026-09-03T12:00:00.000Z","publicationId":"mock-post-002","idempotencyKey":"publish:launch-aurora:v2","recordId":"launch-aurora"}
