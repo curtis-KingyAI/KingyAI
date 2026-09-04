@@ -1,0 +1,30 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "escalate",
+    "claims": [],
+    "limitations": [
+      "Sponsor-supplied claim requires independent support."
+    ],
+    "uncertaintyMarked": true,
+    "disclosure": "Sponsor-supplied context.",
+    "escalation": {
+      "required": true,
+      "reason": "unsupported sponsor claim"
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "required-escalation",
+    "category": "required escalation",
+    "candidateFingerprint": "sha256:e48068bbbbf942cde8518a4d6f9abc5717dc21c7e6d6acf402c8a272f120b10b",
+    "hardPass": true,
+    "disposition": "escalate",
+    "violations": [],
+    "evidence": []
+  }
+}

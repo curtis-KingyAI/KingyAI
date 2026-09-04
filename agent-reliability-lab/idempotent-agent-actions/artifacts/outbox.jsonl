@@ -1,0 +1,2 @@
+{"event":"outbox-reserved","timestamp":"2026-09-03T12:00:00.000Z","idempotencyKey":"publish:launch-aurora:v1","recordId":"launch-aurora","contentFingerprint":"sha256:aurora-v1-fixture"}
+{"event":"outbox-reserved","timestamp":"2026-09-03T12:00:00.000Z","idempotencyKey":"publish:launch-aurora:v2","recordId":"launch-aurora","contentFingerprint":"sha256:aurora-v2-fixture"}

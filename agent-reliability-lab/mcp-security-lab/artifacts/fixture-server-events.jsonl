@@ -1,0 +1,4 @@
+{"event":"fixture-server-invoked","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-001","serverId":"research-fixture-v1","toolName":"research.lookup"}
+{"event":"fixture-server-invoked","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-002","serverId":"research-fixture-v1","toolName":"research.lookup","scenario":"prompt-injection"}
+{"event":"fixture-server-invoked","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-003","serverId":"research-fixture-v1","toolName":"research.lookup","scenario":"malformed-output"}
+{"event":"fixture-server-invoked","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-009","serverId":"research-fixture-v1","toolName":"cms.publish"}

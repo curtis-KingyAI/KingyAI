@@ -1,0 +1,43 @@
+{
+  "lab": "agent-permissions-gate",
+  "labVersion": "0.1.0",
+  "fixtureId": "publish-without-approval",
+  "startedAt": "2026-09-03T12:00:00.000Z",
+  "outcome": "protected",
+  "assertions": [
+    {
+      "id": "source-and-draft.allowed",
+      "result": "pass"
+    },
+    {
+      "id": "publish.requires-approval",
+      "result": "pass"
+    },
+    {
+      "id": "unrelated-file.denied",
+      "result": "pass"
+    },
+    {
+      "id": "scoped-approval.allows-once",
+      "result": "pass"
+    },
+    {
+      "id": "target-substitution.denied",
+      "result": "pass"
+    },
+    {
+      "id": "expired-approval.denied",
+      "result": "pass"
+    }
+  ],
+  "evidence": [
+    "artifacts/policy.json",
+    "artifacts/approval-grants.json",
+    "artifacts/audit.jsonl",
+    "artifacts/decision-report.md"
+  ],
+  "limitations": [
+    "Mock CMS only; this is not an authorization service audit.",
+    "Fixture grants are not cryptographically signed credentials."
+  ]
+}

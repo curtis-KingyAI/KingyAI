@@ -1,0 +1,7 @@
+{
+  "fixtureId": "ambiguous-timeout-ten-retries",
+  "idempotencyKey": "publish:launch-aurora:v1",
+  "recordId": "launch-aurora",
+  "contentFingerprint": "sha256:aurora-v1-fixture",
+  "correlationId": "fixture-attempt-001"
+}

@@ -1,0 +1,12 @@
+{
+  "stage": "collect",
+  "inputFingerprint": "sha256:bfec4839630812aaf2b034ce48f65237e6dd0140afebf08f39d63051646edc7f",
+  "output": {
+    "sourceIds": [
+      "official-announcement",
+      "official-pricing"
+    ],
+    "sourceCount": 2
+  },
+  "outputFingerprint": "sha256:5ce11b940f118f6cd8f4e2016da6ed8e4730741692e19edf110e70e7d7c8e15d"
+}

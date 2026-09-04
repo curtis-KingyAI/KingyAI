@@ -1,0 +1,26 @@
+[
+  {
+    "id": "approval-publish-aurora",
+    "principal": "launch-research-agent",
+    "action": "cms.publish",
+    "resource": "cms://records/launch-aurora",
+    "expiresAt": "2026-09-03T12:15:00.000Z",
+    "used": true
+  },
+  {
+    "id": "approval-publish-aurora-second",
+    "principal": "launch-research-agent",
+    "action": "cms.publish",
+    "resource": "cms://records/launch-aurora",
+    "expiresAt": "2026-09-03T12:15:00.000Z",
+    "used": false
+  },
+  {
+    "id": "approval-publish-expired",
+    "principal": "launch-research-agent",
+    "action": "cms.publish",
+    "resource": "cms://records/launch-aurora",
+    "expiresAt": "2026-09-03T11:45:00.000Z",
+    "used": false
+  }
+]

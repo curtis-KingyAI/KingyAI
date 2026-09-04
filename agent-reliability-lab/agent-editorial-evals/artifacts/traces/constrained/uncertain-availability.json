@@ -1,0 +1,47 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-availability-unconfirmed",
+        "citation": {
+          "sourceId": "regional-page",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "uncertain"
+      }
+    ],
+    "limitations": [
+      "Availability is not confirmed for every region."
+    ],
+    "uncertaintyMarked": true,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "uncertain-availability",
+    "category": "uncertain availability",
+    "candidateFingerprint": "sha256:b1fb48aa6cf9b20e5d1297d4e0f9455c3f4d42c36389fe577043f222a059433f",
+    "hardPass": true,
+    "disposition": "ready-for-review",
+    "violations": [],
+    "evidence": [
+      {
+        "claimId": "aurora-availability-unconfirmed",
+        "citation": {
+          "sourceId": "regional-page",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "uncertain"
+      }
+    ]
+  }
+}

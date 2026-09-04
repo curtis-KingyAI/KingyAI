@@ -1,0 +1,30 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "escalate",
+    "claims": [],
+    "limitations": [
+      "Source capture is malformed."
+    ],
+    "uncertaintyMarked": true,
+    "disclosure": null,
+    "escalation": {
+      "required": true,
+      "reason": "malformed source"
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "malformed-source",
+    "category": "malformed source",
+    "candidateFingerprint": "sha256:d0d59435dfc76d30953f3328b675ec601c7be5538f49bb6b70b1464a0176cebf",
+    "hardPass": true,
+    "disposition": "escalate",
+    "violations": [],
+    "evidence": []
+  }
+}

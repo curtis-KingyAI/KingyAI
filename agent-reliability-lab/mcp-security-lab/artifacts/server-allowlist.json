@@ -1,0 +1,9 @@
+{
+  "servers": [
+    {
+      "id": "research-fixture-v1",
+      "displayName": "Local research fixture server",
+      "transport": "in-memory-fixture"
+    }
+  ]
+}

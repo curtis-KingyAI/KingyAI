@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "0.1.0",
+  "workflowVersion": "0.1.0",
+  "stages": {
+    "collect": {
+      "status": "complete",
+      "inputFingerprint": "sha256:bfec4839630812aaf2b034ce48f65237e6dd0140afebf08f39d63051646edc7f",
+      "outputFingerprint": "sha256:5ce11b940f118f6cd8f4e2016da6ed8e4730741692e19edf110e70e7d7c8e15d",
+      "artifactPath": "artifacts/stages/01-collect.json",
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "workflowVersion": "0.1.0"
+    },
+    "extract": {
+      "status": "complete",
+      "inputFingerprint": "sha256:f7d9a2588f5f09e91a7bceef5d323a8a82f23f2889940cdfa296a2b5ff1ec1e3",
+      "outputFingerprint": "sha256:9c742a1db0619f81fbb5b3f2cff13d3454c29a27abcd25a23417b464f914aed6",
+      "artifactPath": "artifacts/stages/02-extract.json",
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "workflowVersion": "0.1.0"
+    },
+    "outline": {
+      "status": "complete",
+      "inputFingerprint": "sha256:3b98839374e217f9288014d960d8e0846f2d930bf8161990aba8e60487cc5005",
+      "outputFingerprint": "sha256:16ed6f0ebe4ea15ad12255bdf8000b818e95c75580cb623920bac942db6f23d8",
+      "artifactPath": "artifacts/stages/03-outline.json",
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "workflowVersion": "0.1.0"
+    },
+    "draft": {
+      "status": "complete",
+      "inputFingerprint": "sha256:32973f7f2add884e63d94a8fa5c844fc8cf39cb4c5ce62d36947252d0007581f",
+      "outputFingerprint": "sha256:230fa0f91ffe08413e0e6397453d2dc2642acb31b7163c7c10bd418e937f866d",
+      "artifactPath": "artifacts/stages/04-draft.json",
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "workflowVersion": "0.1.0"
+    },
+    "fact-check": {
+      "status": "complete",
+      "inputFingerprint": "sha256:25ffa018b0ce5b82b432c49f09a683d032e1d459b3a11b9fb50ccf113be6b442",
+      "outputFingerprint": "sha256:6c1fd858fb1e39e060057abb1a1c590f567892f9183dcd338dfaefcdc4c10c4d",
+      "artifactPath": "artifacts/stages/05-fact-check.json",
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "workflowVersion": "0.1.0"
+    },
+    "ready-for-review": {
+      "status": "complete",
+      "inputFingerprint": "sha256:8346325aa3fbb0929160ae88b1203bad406dd40732417851458089aa751c9093",
+      "outputFingerprint": "sha256:be0f525d4720f58f8e3427c58c90d316eeb7e360a52bf792699fec16452a57c7",
+      "artifactPath": "artifacts/stages/06-ready-for-review.json",
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "workflowVersion": "0.1.0"
+    }
+  },
+  "lastInvalidation": {
+    "reason": "input-fingerprint-changed",
+    "stages": [
+      "extract",
+      "outline",
+      "draft",
+      "fact-check",
+      "ready-for-review"
+    ]
+  }
+}

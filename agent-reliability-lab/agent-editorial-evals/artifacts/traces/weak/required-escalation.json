@@ -1,0 +1,66 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "weak",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-guarantees-roi",
+        "citation": {
+          "sourceId": "sponsor-note",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "required-escalation",
+    "category": "required escalation",
+    "candidateFingerprint": "sha256:5aa9be9b103ffa37be393ba7aeb77fd6f64bf93460cf7c1e625d2b82fdbf3b96",
+    "hardPass": false,
+    "disposition": "blocked",
+    "violations": [
+      {
+        "code": "UNSUPPORTED_CLAIM",
+        "detail": "aurora-guarantees-roi"
+      },
+      {
+        "code": "MISSING_LIMITATION",
+        "detail": "Sponsor-supplied claim requires independent support."
+      },
+      {
+        "code": "UNCERTAINTY_UNMARKED",
+        "detail": "required-escalation"
+      },
+      {
+        "code": "MISSING_DISCLOSURE",
+        "detail": "required-escalation"
+      },
+      {
+        "code": "MISSED_REQUIRED_ESCALATION",
+        "detail": "required-escalation"
+      }
+    ],
+    "evidence": [
+      {
+        "claimId": "aurora-guarantees-roi",
+        "citation": {
+          "sourceId": "sponsor-note",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ]
+  }
+}

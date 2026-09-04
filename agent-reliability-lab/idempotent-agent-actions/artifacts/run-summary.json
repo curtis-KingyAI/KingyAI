@@ -1,0 +1,39 @@
+{
+  "lab": "idempotent-agent-actions",
+  "labVersion": "0.1.0",
+  "fixtureId": "ambiguous-timeout-ten-retries",
+  "startedAt": "2026-09-03T12:00:00.000Z",
+  "outcome": "protected",
+  "assertions": [
+    {
+      "id": "ten-attempts.one-publication",
+      "result": "pass"
+    },
+    {
+      "id": "ambiguous-timeout.reconciled",
+      "result": "pass"
+    },
+    {
+      "id": "completed-retries.return-stored-result",
+      "result": "pass"
+    },
+    {
+      "id": "same-key-different-payload.conflict",
+      "result": "pass"
+    },
+    {
+      "id": "new-versioned-key.intentional-publication",
+      "result": "pass"
+    }
+  ],
+  "evidence": [
+    "artifacts/idempotency-store.json",
+    "artifacts/outbox.jsonl",
+    "artifacts/publisher-events.jsonl",
+    "artifacts/deduplication-report.md"
+  ],
+  "limitations": [
+    "Local JSON files are not a transactional database or distributed lock.",
+    "Mock publisher only; no live CMS or provider idempotency was tested."
+  ]
+}

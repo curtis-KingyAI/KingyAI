@@ -1,0 +1,11 @@
+{
+  "grants": [
+    {
+      "id": "approval-publish-aurora",
+      "serverId": "research-fixture-v1",
+      "toolName": "cms.publish",
+      "resource": "cms://records/launch-aurora",
+      "nonce": "fixture-nonce-aurora-001"
+    }
+  ]
+}

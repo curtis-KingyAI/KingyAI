@@ -1,0 +1,17 @@
+{
+  "stage": "outline",
+  "inputFingerprint": "sha256:3b98839374e217f9288014d960d8e0846f2d930bf8161990aba8e60487cc5005",
+  "output": {
+    "sections": [
+      {
+        "heading": "Aurora launched with a structured launch-record workflow.",
+        "sourceId": "official-announcement"
+      },
+      {
+        "heading": "Aurora availability changed after the initial source check.",
+        "sourceId": "official-pricing"
+      }
+    ]
+  },
+  "outputFingerprint": "sha256:16ed6f0ebe4ea15ad12255bdf8000b818e95c75580cb623920bac942db6f23d8"
+}

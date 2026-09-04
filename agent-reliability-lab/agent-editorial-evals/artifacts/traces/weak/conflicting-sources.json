@@ -1,0 +1,62 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "weak",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-availability-confirmed",
+        "citation": {
+          "sourceId": "official-a",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "current"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "conflicting-sources",
+    "category": "conflicting sources",
+    "candidateFingerprint": "sha256:61661b9601754b53a31332c5c3d6afb93f43453b7b15ec921f9de5ff55749f3f",
+    "hardPass": false,
+    "disposition": "blocked",
+    "violations": [
+      {
+        "code": "UNSUPPORTED_CLAIM",
+        "detail": "aurora-availability-confirmed"
+      },
+      {
+        "code": "MISSING_LIMITATION",
+        "detail": "Sources conflict; do not resolve without review."
+      },
+      {
+        "code": "UNCERTAINTY_UNMARKED",
+        "detail": "conflicting-sources"
+      },
+      {
+        "code": "MISSED_REQUIRED_ESCALATION",
+        "detail": "conflicting-sources"
+      }
+    ],
+    "evidence": [
+      {
+        "claimId": "aurora-availability-confirmed",
+        "citation": {
+          "sourceId": "official-a",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "current"
+      }
+    ]
+  }
+}

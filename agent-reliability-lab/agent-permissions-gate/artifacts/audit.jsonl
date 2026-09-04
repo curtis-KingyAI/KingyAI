@@ -1,0 +1,8 @@
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-001","actor":"launch-research-agent","action":"source.collect","resource":"source://official/launch-aurora","decision":"allow","reasonCode":"ALLOWED"}
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-002","actor":"launch-research-agent","action":"cms.draft.create","resource":"cms://drafts/launch-aurora","decision":"allow","reasonCode":"ALLOWED"}
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-003","actor":"launch-research-agent","action":"cms.publish","resource":"cms://records/launch-aurora","decision":"deny","reasonCode":"APPROVAL_REQUIRED"}
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-004","actor":"launch-research-agent","action":"file.read","resource":"file://fixtures/private/operations-notes.txt","decision":"deny","reasonCode":"PERMISSION_DENIED"}
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-005","actor":"launch-research-agent","action":"cms.publish","resource":"cms://records/launch-aurora","decision":"allow","reasonCode":"ALLOWED"}
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-006","actor":"launch-research-agent","action":"cms.publish","resource":"cms://records/launch-aurora","decision":"deny","reasonCode":"APPROVAL_REPLAYED"}
+{"timestamp":"2026-09-03T12:00:00.000Z","correlationId":"demo-007","actor":"launch-research-agent","action":"cms.publish","resource":"cms://records/launch-borealis","decision":"deny","reasonCode":"APPROVAL_SCOPE_MISMATCH"}
+{"timestamp":"2026-09-03T13:00:00.000Z","correlationId":"demo-008","actor":"launch-research-agent","action":"cms.publish","resource":"cms://records/launch-aurora","decision":"deny","reasonCode":"APPROVAL_EXPIRED"}

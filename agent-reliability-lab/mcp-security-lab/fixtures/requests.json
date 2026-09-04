@@ -1,0 +1,18 @@
+{
+  "fixtureId": "mcp-host-security-boundaries",
+  "validResearch": {
+    "serverId": "research-fixture-v1",
+    "toolName": "research.lookup",
+    "input": { "query": "Aurora launch", "url": "https://docs.kingy.test/aurora" }
+  },
+  "validRead": {
+    "serverId": "research-fixture-v1",
+    "toolName": "workspace.read",
+    "input": { "path": "/workspace/fixtures/allowed/aurora.md" }
+  },
+  "validPublish": {
+    "serverId": "research-fixture-v1",
+    "toolName": "cms.publish",
+    "input": { "recordId": "launch-aurora", "contentFingerprint": "sha256:aurora-v1" }
+  }
+}

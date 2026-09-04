@@ -1,0 +1,19 @@
+{
+  "stage": "extract",
+  "inputFingerprint": "sha256:465cecc3289683bc28e16a066a24b5d30777b17c698987eb0b59af6a8f7de23e",
+  "output": {
+    "claims": [
+      {
+        "sourceId": "official-announcement",
+        "claim": "Aurora launched with a structured launch-record workflow.",
+        "checkedAt": "2026-09-03"
+      },
+      {
+        "sourceId": "official-pricing",
+        "claim": "Current availability requires source-date verification.",
+        "checkedAt": "2026-09-03"
+      }
+    ]
+  },
+  "outputFingerprint": "sha256:26a5884bae266adbfb445dcda189b9500b5ae7e8ca9b6877be2c429d75bc3d8b"
+}

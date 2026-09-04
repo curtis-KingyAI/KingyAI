@@ -1,0 +1,4 @@
+{"event":"model-called","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"hard-budget-001","workItemId":"source-1","model":"primary","actualCostCredits":30,"tokens":300,"toolCalls":1,"sourceCount":1,"retry":false,"progress":true}
+{"event":"model-called","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"hard-budget-002","workItemId":"source-2","model":"primary","actualCostCredits":35,"tokens":350,"toolCalls":1,"sourceCount":1,"retry":false,"progress":true}
+{"event":"model-called","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"hard-budget-003","workItemId":"source-3","model":"cheap","actualCostCredits":15,"tokens":150,"toolCalls":1,"sourceCount":1,"retry":false,"progress":true}
+{"event":"model-called","timestamp":"2026-09-03T12:00:00.000Z","correlationId":"hard-budget-004","workItemId":"source-4","model":"cheap","actualCostCredits":15,"tokens":150,"toolCalls":1,"sourceCount":1,"retry":false,"progress":true}

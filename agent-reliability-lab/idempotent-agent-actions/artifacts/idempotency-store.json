@@ -1,0 +1,54 @@
+{
+  "entries": {
+    "publish:launch-aurora:v1": {
+      "idempotencyKey": "publish:launch-aurora:v1",
+      "fingerprint": "sha256:aurora-v1-fixture",
+      "status": "completed",
+      "createdAt": "2026-09-03T12:00:00.000Z",
+      "command": {
+        "idempotencyKey": "publish:launch-aurora:v1",
+        "recordId": "launch-aurora",
+        "contentFingerprint": "sha256:aurora-v1-fixture"
+      },
+      "outbox": {
+        "state": "delivered",
+        "createdAt": "2026-09-03T12:00:00.000Z",
+        "deliveredAt": "2026-09-03T12:00:00.000Z"
+      },
+      "result": {
+        "publicationId": "mock-post-001",
+        "idempotencyKey": "publish:launch-aurora:v1",
+        "recordId": "launch-aurora",
+        "contentFingerprint": "sha256:aurora-v1-fixture",
+        "publishedAt": "2026-09-03T12:00:00.000Z"
+      },
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "resolvedBy": "publisher-reconciliation"
+    },
+    "publish:launch-aurora:v2": {
+      "idempotencyKey": "publish:launch-aurora:v2",
+      "fingerprint": "sha256:aurora-v2-fixture",
+      "status": "completed",
+      "createdAt": "2026-09-03T12:00:00.000Z",
+      "command": {
+        "idempotencyKey": "publish:launch-aurora:v2",
+        "recordId": "launch-aurora",
+        "contentFingerprint": "sha256:aurora-v2-fixture"
+      },
+      "outbox": {
+        "state": "delivered",
+        "createdAt": "2026-09-03T12:00:00.000Z",
+        "deliveredAt": "2026-09-03T12:00:00.000Z"
+      },
+      "result": {
+        "publicationId": "mock-post-002",
+        "idempotencyKey": "publish:launch-aurora:v2",
+        "recordId": "launch-aurora",
+        "contentFingerprint": "sha256:aurora-v2-fixture",
+        "publishedAt": "2026-09-03T12:00:00.000Z"
+      },
+      "completedAt": "2026-09-03T12:00:00.000Z",
+      "resolvedBy": "initial-request"
+    }
+  }
+}

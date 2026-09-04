@@ -1,0 +1,23 @@
+{
+  "fixtureId": "launch-aurora-recovery",
+  "sourceManifest": [
+    { "id": "official-announcement" },
+    { "id": "official-pricing" }
+  ],
+  "sourceDocuments": [
+    {
+      "id": "official-announcement",
+      "claim": "Aurora launched with a structured launch-record workflow.",
+      "checkedAt": "2026-09-03"
+    },
+    {
+      "id": "official-pricing",
+      "claim": "Current availability requires source-date verification.",
+      "checkedAt": "2026-09-03"
+    }
+  ],
+  "editorialBrief": {
+    "title": "Aurora launch record",
+    "requiredLimitation": "Current availability requires source-date verification."
+  }
+}

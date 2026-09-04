@@ -1,0 +1,12 @@
+[
+  {
+    "id": "launch-aurora",
+    "status": "published",
+    "publishCount": 1
+  },
+  {
+    "id": "launch-borealis",
+    "status": "draft",
+    "publishCount": 0
+  }
+]

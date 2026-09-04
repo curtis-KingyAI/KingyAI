@@ -1,0 +1,30 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "constrained",
+  "candidate": {
+    "status": "escalate",
+    "claims": [],
+    "limitations": [
+      "Sources conflict; do not resolve without review."
+    ],
+    "uncertaintyMarked": true,
+    "disclosure": null,
+    "escalation": {
+      "required": true,
+      "reason": "conflicting official sources"
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "conflicting-sources",
+    "category": "conflicting sources",
+    "candidateFingerprint": "sha256:bde9df6f328c1677777d28bf2b662d5f1c36191652b5dc38e4230b6fca31cbe7",
+    "hardPass": true,
+    "disposition": "escalate",
+    "violations": [],
+    "evidence": []
+  }
+}

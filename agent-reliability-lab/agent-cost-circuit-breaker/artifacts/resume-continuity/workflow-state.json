@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "0.1.0",
+  "policy": {
+    "maxCredits": 100,
+    "checkpointReserveCredits": 5,
+    "warningRatio": 0.7,
+    "degradationRatio": 0.85,
+    "noProgressLimit": 2
+  },
+  "workItemsFingerprint": "sha256:c898bd03856ccaad19b7028ab26171ad0e69277ee3ab879bb18351eeeefc0a2a",
+  "status": "paused",
+  "nextWorkIndex": 2,
+  "selectedModel": "primary",
+  "scope": "full",
+  "noProgressStreak": 0,
+  "completedItems": [
+    "source-1",
+    "source-2"
+  ],
+  "terminal": null,
+  "signals": {
+    "warned": true,
+    "degraded": false
+  },
+  "ledger": {
+    "spentCredits": 65,
+    "reservedCheckpointCredits": 5,
+    "committedCredits": 70,
+    "estimatedCredits": 65,
+    "tokens": 650,
+    "modelCalls": 2,
+    "toolCalls": 2,
+    "sourceCount": 2,
+    "retries": 0,
+    "elapsedMs": 200
+  },
+  "createdAt": "2026-09-03T12:00:00.000Z"
+}

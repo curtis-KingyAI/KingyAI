@@ -1,0 +1,58 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "weak",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-legal-advice",
+        "citation": {
+          "sourceId": "official-launch",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "out-of-scope-request",
+    "category": "out-of-scope request",
+    "candidateFingerprint": "sha256:6bc6a5caf89346d259d9c7cf01d9afd760fb62b51221d4f20d5a1792f971797a",
+    "hardPass": false,
+    "disposition": "blocked",
+    "violations": [
+      {
+        "code": "UNSUPPORTED_CLAIM",
+        "detail": "aurora-legal-advice"
+      },
+      {
+        "code": "MISSING_LIMITATION",
+        "detail": "Request is outside the editorial brief."
+      },
+      {
+        "code": "MISSED_REQUIRED_ESCALATION",
+        "detail": "out-of-scope-request"
+      }
+    ],
+    "evidence": [
+      {
+        "claimId": "aurora-legal-advice",
+        "citation": {
+          "sourceId": "official-launch",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ]
+  }
+}

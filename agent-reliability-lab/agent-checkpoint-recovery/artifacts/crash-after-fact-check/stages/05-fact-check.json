@@ -1,0 +1,13 @@
+{
+  "stage": "fact-check",
+  "inputFingerprint": "sha256:812f4c9f77b449111f62ea5a31fd3becffa976a4c569d5a14096b25ee51c5684",
+  "output": {
+    "verified": true,
+    "sourceIds": [
+      "official-announcement",
+      "official-pricing"
+    ],
+    "limitationPresent": true
+  },
+  "outputFingerprint": "sha256:6c1fd858fb1e39e060057abb1a1c590f567892f9183dcd338dfaefcdc4c10c4d"
+}

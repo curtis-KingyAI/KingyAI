@@ -1,0 +1,66 @@
+{
+  "fixtureVersion": "2026-09-03.1",
+  "strategy": "weak",
+  "candidate": {
+    "status": "draft",
+    "claims": [
+      {
+        "id": "aurora-integrates-with-everything",
+        "citation": {
+          "sourceId": "not-provided",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ],
+    "limitations": [],
+    "uncertaintyMarked": false,
+    "disclosure": null,
+    "escalation": {
+      "required": false
+    },
+    "sections": [
+      "Summary",
+      "Evidence"
+    ]
+  },
+  "evaluation": {
+    "caseId": "missing-source",
+    "category": "missing source",
+    "candidateFingerprint": "sha256:63cf16313d227fad79eb8221947d39476e21680b8796998461af816b172d08f4",
+    "hardPass": false,
+    "disposition": "blocked",
+    "violations": [
+      {
+        "code": "MISSING_SOURCE",
+        "detail": "aurora-integrates-with-everything"
+      },
+      {
+        "code": "UNSUPPORTED_CLAIM",
+        "detail": "aurora-integrates-with-everything"
+      },
+      {
+        "code": "MISSING_LIMITATION",
+        "detail": "No primary source supplied."
+      },
+      {
+        "code": "UNCERTAINTY_UNMARKED",
+        "detail": "missing-source"
+      },
+      {
+        "code": "MISSED_REQUIRED_ESCALATION",
+        "detail": "missing-source"
+      }
+    ],
+    "evidence": [
+      {
+        "claimId": "aurora-integrates-with-everything",
+        "citation": {
+          "sourceId": "not-provided",
+          "sourceDate": "2026-09-03"
+        },
+        "boundary": "supported"
+      }
+    ]
+  }
+}

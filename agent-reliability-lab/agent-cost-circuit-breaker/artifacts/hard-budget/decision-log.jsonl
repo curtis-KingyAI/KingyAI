@@ -1,0 +1,4 @@
+{"event":"budget-warning","runId":"hard-budget","timestamp":"2026-09-03T12:00:00.000Z","status":"active","committedCredits":70,"remainingCredits":30,"threshold":0.7}
+{"event":"graceful-degradation","runId":"hard-budget","timestamp":"2026-09-03T12:00:00.000Z","status":"active","committedCredits":70,"remainingCredits":30,"workItemId":"source-3","projectedPrimaryCredits":100,"selectedModel":"cheap"}
+{"event":"workflow-terminal","runId":"hard-budget","timestamp":"2026-09-03T12:00:00.000Z","status":"terminal","committedCredits":100,"remainingCredits":0,"code":"BUDGET_EXHAUSTED"}
+{"event":"terminal-run-blocked","runId":"hard-budget-resume","timestamp":"2026-09-03T12:00:00.000Z","status":"terminal","committedCredits":100,"remainingCredits":0,"code":"BUDGET_EXHAUSTED"}

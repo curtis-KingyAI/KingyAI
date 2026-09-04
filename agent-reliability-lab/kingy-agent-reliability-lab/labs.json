@@ -1,0 +1,47 @@
+{
+  "hubVersion": "0.1.0",
+  "labs": [
+    {
+      "id": "agent-permissions-gate",
+      "path": "../agent-permissions-gate",
+      "control": "Authority",
+      "question": "What may an agent read, draft, change, or publish?",
+      "proof": "A scoped, one-use approval permits one mock publication; direct publish, replay, expiry, target substitution, and unrelated actions are denied."
+    },
+    {
+      "id": "idempotent-agent-actions",
+      "path": "../idempotent-agent-actions",
+      "control": "Safe retries",
+      "question": "Can retries repeat an external side effect?",
+      "proof": "Ten attempts surrounding an ambiguous timeout produce one publication for one idempotency key."
+    },
+    {
+      "id": "agent-checkpoint-recovery",
+      "path": "../agent-checkpoint-recovery",
+      "control": "Recovery",
+      "question": "Where can a crashed workflow safely resume?",
+      "proof": "Crashes after each committed stage reuse verified upstream checkpoints and recompute only dependent work."
+    },
+    {
+      "id": "agent-cost-circuit-breaker",
+      "path": "../agent-cost-circuit-breaker",
+      "control": "Bounded cost",
+      "question": "Can a loop stop before it burns its budget?",
+      "proof": "The governor warns, degrades, checkpoints, stops at the cap, blocks resumed calls, and stops no-progress loops."
+    },
+    {
+      "id": "mcp-security-lab",
+      "path": "../mcp-security-lab",
+      "control": "MCP boundary",
+      "question": "Can a host safely consume untrusted tool output?",
+      "proof": "Allowlist, schema, path/domain, revocation, redacted provenance, and independent write approval controls are exercised."
+    },
+    {
+      "id": "agent-editorial-evals",
+      "path": "../agent-editorial-evals",
+      "control": "Measured editorial quality",
+      "question": "Can an unsafe draft be stopped before editorial review?",
+      "proof": "Twelve frozen cases block unsupported claims, citation errors, stale pricing, missing limitations, and missed escalations."
+    }
+  ]
+}
