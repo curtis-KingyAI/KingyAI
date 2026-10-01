@@ -1,0 +1,10 @@
+{
+  "scope": "Local WordPress browser journeys. Catalog/change responses for stack positive UI tests are simulated. No production mutation or remote inference.",
+  "passed": 4,
+  "checks": [
+    "1440px workflow: complete, upload validation/deletion, backtrack, refresh, stale revision, duplicate, export/import, save stack, keyboard, no extension overflow",
+    "1440px stack UI fixtures: save/remove/category, relevance, project persistence, export/import/deletion; no browser errors",
+    "390px workflow: complete, upload validation/deletion, backtrack, refresh, stale revision, duplicate, export/import, save stack, keyboard, no extension overflow",
+    "390px stack UI fixtures: save/remove/category, relevance, project persistence, export/import/deletion; no browser errors"
+  ]
+}

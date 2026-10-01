@@ -1,0 +1,42 @@
+{
+  "status": "completed",
+  "test": true,
+  "results": [
+    {
+      "name": "youtube",
+      "status": "blocked",
+      "code": "verified_channel_identity_missing"
+    },
+    {
+      "name": "launches",
+      "status": "blocked",
+      "code": "canonical_source_adapter_missing"
+    },
+    {
+      "name": "priority_changes",
+      "status": "blocked",
+      "code": "canonical_source_adapter_missing"
+    },
+    {
+      "name": "catalog_freshness",
+      "status": "blocked",
+      "code": "canonical_source_adapter_missing"
+    },
+    {
+      "name": "brief",
+      "status": "completed",
+      "code": "edition_prepared_no_send"
+    },
+    {
+      "name": "stack_digest",
+      "status": "completed",
+      "code": "digest_policy_test_no_send"
+    },
+    {
+      "name": "health",
+      "status": "blocked",
+      "code": "existing_health_adapter_missing"
+    }
+  ],
+  "scope": "Local disposable WordPress test-mode invocation; no provider sends, production mutations or scheduler installation"
+}

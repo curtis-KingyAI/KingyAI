@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "id": "1cbdcbcb-7c12-494b-9fa6-145d5d44054b",
+  "name": "Reusable bottle commercial",
+  "serverRevision": 0,
+  "brief": {
+    "product": "Steel bottle",
+    "audience": "Commuters",
+    "message": "Refill every day",
+    "format": "16:9",
+    "duration": 20,
+    "style": "Clean product demonstration",
+    "budget": 0,
+    "currency": "USD",
+    "productId": "",
+    "referenceNote": ""
+  },
+  "outline": "Show Commuters a specific problem, demonstrate Steel bottle, then close with Refill every day. Style: Clean product demonstration. Verify every product claim before publication.",
+  "shots": [
+    {
+      "id": "2dce39ab-42ef-42cd-9b43-46a2630eae79",
+      "seconds": 5,
+      "purpose": "Establish the problem",
+      "description": "Show the context in which Commuters needs Steel bottle.",
+      "framing": "Medium",
+      "camera": "Slow push-in, 50mm, eye level",
+      "motion": "Subtle subject movement",
+      "route": "generic"
+    },
+    {
+      "id": "ebde832c-874e-4956-a48c-c1d1904c3c50",
+      "seconds": 10,
+      "purpose": "Demonstrate the product",
+      "description": "Show Steel bottle in use. Show a real supported benefit related to: Refill every day.",
+      "framing": "Close-up",
+      "camera": "Slow push-in",
+      "motion": "One controlled action",
+      "route": "generic"
+    },
+    {
+      "id": "fc4ad213-8418-4252-bc19-70d9c9367dbe",
+      "seconds": 5,
+      "purpose": "Close with the message",
+      "description": "Clean product hero composition. Add “Refill every day” as an editable overlay in the editor.",
+      "framing": "Wide",
+      "camera": "Locked",
+      "motion": "Minimal",
+      "route": "generic"
+    }
+  ],
+  "prompts": [
+    {
+      "shotId": "2dce39ab-42ef-42cd-9b43-46a2630eae79",
+      "route": "generic",
+      "text": "Planning template — General image-to-video template. No inference performed.\nProduct: Steel bottle\nAudience: Commuters\nIntended message: Refill every day\nShot: Show the context in which Commuters needs Steel bottle.\nFraming: Medium. Camera: Slow push-in, 50mm, eye level. Subject motion: Subtle subject movement.\nDuration target: 5s. Aspect: 16:9. Style: Clean product demonstration.\nPreserve product shape and identity. Do not add unsupported capabilities, logos or wording. Add final text as editable overlays in post-production.\nReference: No reference direction supplied.\nConfirm this tool/account supports the chosen duration, aspect, reference handling and commercial rights before generation."
+    },
+    {
+      "shotId": "ebde832c-874e-4956-a48c-c1d1904c3c50",
+      "route": "generic",
+      "text": "Planning template — General image-to-video template. No inference performed.\nProduct: Steel bottle\nAudience: Commuters\nIntended message: Refill every day\nShot: Show Steel bottle in use. Show a real supported benefit related to: Refill every day.\nFraming: Close-up. Camera: Slow push-in. Subject motion: One controlled action.\nDuration target: 10s. Aspect: 16:9. Style: Clean product demonstration.\nPreserve product shape and identity. Do not add unsupported capabilities, logos or wording. Add final text as editable overlays in post-production.\nReference: No reference direction supplied.\nConfirm this tool/account supports the chosen duration, aspect, reference handling and commercial rights before generation."
+    },
+    {
+      "shotId": "fc4ad213-8418-4252-bc19-70d9c9367dbe",
+      "route": "generic",
+      "text": "Planning template — General image-to-video template. No inference performed.\nProduct: Steel bottle\nAudience: Commuters\nIntended message: Refill every day\nShot: Clean product hero composition. Add “Refill every day” as an editable overlay in the editor.\nFraming: Wide. Camera: Locked. Subject motion: Minimal.\nDuration target: 5s. Aspect: 16:9. Style: Clean product demonstration.\nPreserve product shape and identity. Do not add unsupported capabilities, logos or wording. Add final text as editable overlays in post-production.\nReference: No reference direction supplied.\nConfirm this tool/account supports the chosen duration, aspect, reference handling and commercial rights before generation."
+    }
+  ],
+  "outlineBrief": "{\"product\":\"Steel bottle\",\"audience\":\"Commuters\",\"message\":\"Refill every day\",\"format\":\"16:9\",\"duration\":20,\"style\":\"Clean product demonstration\",\"budget\":0,\"currency\":\"USD\",\"productId\":\"\",\"referenceNote\":\"\"}",
+  "promptShots": "[{\"id\":\"2dce39ab-42ef-42cd-9b43-46a2630eae79\",\"seconds\":5,\"purpose\":\"Establish the problem\",\"description\":\"Show the context in which Commuters needs Steel bottle.\",\"framing\":\"Medium\",\"camera\":\"Slow push-in, 50mm, eye level\",\"motion\":\"Subtle subject movement\",\"route\":\"generic\"},{\"id\":\"ebde832c-874e-4956-a48c-c1d1904c3c50\",\"seconds\":10,\"purpose\":\"Demonstrate the product\",\"description\":\"Show Steel bottle in use. Show a real supported benefit related to: Refill every day.\",\"framing\":\"Close-up\",\"camera\":\"Slow push-in\",\"motion\":\"One controlled action\",\"route\":\"generic\"},{\"id\":\"fc4ad213-8418-4252-bc19-70d9c9367dbe\",\"seconds\":5,\"purpose\":\"Close with the message\",\"description\":\"Clean product hero composition. Add “Refill every day” as an editable overlay in the editor.\",\"framing\":\"Wide\",\"camera\":\"Locked\",\"motion\":\"Minimal\",\"route\":\"generic\"}]",
+  "promptBrief": "{\"product\":\"Steel bottle\",\"audience\":\"Commuters\",\"message\":\"Refill every day\",\"format\":\"16:9\",\"duration\":20,\"style\":\"Clean product demonstration\",\"budget\":0,\"currency\":\"USD\",\"productId\":\"\",\"referenceNote\":\"\"}",
+  "budget": {
+    "price": 0.2,
+    "unit": "second",
+    "attemptsPerShot": 3,
+    "usableFraction": 0.5,
+    "reviewMinutesPerAttempt": 2,
+    "laborRate": 0,
+    "evidenceDate": "",
+    "sourceUrl": "",
+    "rateEventKey": ""
+  },
+  "referenceMetadata": null
+}

@@ -16,6 +16,7 @@ get_header();
         $snapshot = kingy_ali_companion_snapshot($post_id);
         $snapshot_verified = get_post_meta($post_id, kingy_ali_companion_meta_key('snapshot_verified_date'), true);
         $sponsored = (bool) get_post_meta($post_id, kingy_ali_companion_meta_key('sponsored'), true);
+        $commercial_status = kingy_ali_companion_commercial_status($post_id);
         $publish_date_label = $publish_date ? kingy_ali_public_profile_date_label($publish_date) : '';
         $snapshot_verified_label = $snapshot_verified ? kingy_ali_public_profile_date_label($snapshot_verified) : '';
         ?>
@@ -34,8 +35,14 @@ get_header();
             </section>
 
             <section class="kingy-ali-companion-provenance" aria-label="<?php esc_attr_e('Data provenance', 'kingy-ai-launch-intelligence'); ?>">
-                <?php if ($sponsored) : ?>
+                <?php if ($commercial_status === 'sponsored') : ?>
                     <p class="kingy-ali-companion-disclosure"><?php esc_html_e('Disclosure: this video was sponsored.', 'kingy-ai-launch-intelligence'); ?></p>
+                <?php elseif ($commercial_status === 'mixed') : ?>
+                    <p class="kingy-ali-companion-disclosure"><?php esc_html_e('Disclosure: this video includes a paid segment. See the commercial evidence below for its scope.', 'kingy-ai-launch-intelligence'); ?></p>
+                <?php elseif ($commercial_status === 'independent') : ?>
+                    <p class="kingy-ali-companion-disclosure"><?php esc_html_e('Commercial status: confirmed independent. See the evidence below for other material relationships.', 'kingy-ai-launch-intelligence'); ?></p>
+                <?php else : ?>
+                    <p class="kingy-ali-companion-disclosure"><?php esc_html_e('Commercial status is unconfirmed. This page does not establish an independent review.', 'kingy-ai-launch-intelligence'); ?></p>
                 <?php endif; ?>
                 <?php if ($snapshot) : ?>
                     <p>

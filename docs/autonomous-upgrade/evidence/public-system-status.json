@@ -1,0 +1,271 @@
+{
+  "maintenance": {
+    "generated_at": "2026-10-01T21:37:12+00:00",
+    "scheduler_status": "running_on_schedule",
+    "scheduled_interval_seconds": 300,
+    "missed_run_threshold_seconds": 900,
+    "last_started_at": "2026-10-01T21:35:03+00:00",
+    "last_completed_at": "2026-10-01T21:35:03+00:00",
+    "cycles_observed": 5034,
+    "pending_source_reviews": 9,
+    "failed_sources_observed": 0,
+    "scope": "WordPress canonical product/model source engine. Connected applications have separate maintenance.",
+    "interpretation": "A completed cycle or source fetch is not fact verification. Manual sources require editorial review. This endpoint can reveal a missed run when checked; it is not an independent outage alert.",
+    "sources": [
+      {
+        "fetch_policy": "allowed",
+        "health_status": "healthy",
+        "count": "11"
+      },
+      {
+        "fetch_policy": "manual",
+        "health_status": "healthy",
+        "count": "30"
+      },
+      {
+        "fetch_policy": "manual",
+        "health_status": "unknown",
+        "count": "390"
+      }
+    ],
+    "overdue_current_claims": 1613,
+    "catalog_coverage": [
+      {
+        "post_type": "kingy_ai_model",
+        "published_records": "97",
+        "records_with_canonical_claims": "3",
+        "records_with_source_mappings": "93"
+      },
+      {
+        "post_type": "kingy_ai_tool",
+        "published_records": "205",
+        "records_with_canonical_claims": "34",
+        "records_with_source_mappings": "205"
+      }
+    ]
+  },
+  "release": {
+    "checkerVersion": "1.1.0",
+    "lastAttemptAt": "2026-10-01T21:19:11+00:00",
+    "lastCompletedAt": "2026-10-01T21:19:11+00:00",
+    "status": "healthy",
+    "failures": 0,
+    "runs": 179,
+    "lastSuccessAt": "2026-10-01T21:19:11+00:00",
+    "consecutiveFailures": 0,
+    "rateRefresh": {
+      "checkedAt": "2026-10-01T19:43:02Z",
+      "pass": true,
+      "sourceCount": 6,
+      "written": true,
+      "lastAttempt": {
+        "startedAt": "2026-10-01T19:43:02Z",
+        "completedAt": "2026-10-01T19:43:03+00:00",
+        "pass": true,
+        "written": true,
+        "exitCode": 0,
+        "sourceCount": 6,
+        "failedSourceCount": 0,
+        "changedSourceCount": 0,
+        "reason": "reviewed_sources_matched"
+      },
+      "status": "healthy",
+      "purgeSuccess": true,
+      "lastSuccessAt": "2026-10-01T19:43:02Z",
+      "publicReadback": {
+        "passed": true,
+        "allReached": true,
+        "dateMismatch": [],
+        "profiles": [
+          {
+            "id": "gpt-6-astra",
+            "httpStatus": 200,
+            "rateDateMatch": true,
+            "profileMatch": true
+          },
+          {
+            "id": "gpt-6-sol",
+            "httpStatus": 200,
+            "rateDateMatch": true,
+            "profileMatch": true
+          },
+          {
+            "id": "gpt-6-luna",
+            "httpStatus": 200,
+            "rateDateMatch": true,
+            "profileMatch": true
+          }
+        ],
+        "checkedAt": "2026-10-01T19:43:06+00:00"
+      },
+      "htmlTagPurgeAttempted": false,
+      "htmlTagPurgeSuccess": null,
+      "failedPublicReadbackAttempt": {
+        "lastAttempt": {
+          "startedAt": "2026-09-30T07:43:01Z",
+          "completedAt": "2026-09-30T07:43:02+00:00",
+          "pass": true,
+          "written": true,
+          "exitCode": 0,
+          "sourceCount": 6,
+          "failedSourceCount": 0,
+          "changedSourceCount": 0,
+          "reason": "public_profile_readback_failed"
+        },
+        "publicReadback": {
+          "passed": false,
+          "allReached": true,
+          "dateMismatch": [
+            "gpt-6-astra",
+            "gpt-6-sol",
+            "gpt-6-luna"
+          ],
+          "profiles": [
+            {
+              "id": "gpt-6-astra",
+              "httpStatus": 200,
+              "rateDateMatch": false,
+              "profileMatch": false
+            },
+            {
+              "id": "gpt-6-sol",
+              "httpStatus": 200,
+              "rateDateMatch": false,
+              "profileMatch": false
+            },
+            {
+              "id": "gpt-6-luna",
+              "httpStatus": 200,
+              "rateDateMatch": false,
+              "profileMatch": false
+            }
+          ],
+          "checkedAt": "2026-09-30T07:43:03+00:00"
+        },
+        "status": "attention_required"
+      },
+      "recoveredAt": "2026-09-30T09:19:29+00:00",
+      "failedPublicReadbackHistory": [
+        {
+          "lastAttempt": {
+            "startedAt": "2026-09-27T19:43:01Z",
+            "completedAt": "2026-09-27T19:43:03+00:00",
+            "pass": true,
+            "written": true,
+            "exitCode": 0,
+            "sourceCount": 6,
+            "failedSourceCount": 0,
+            "changedSourceCount": 0,
+            "reason": "public_profile_readback_failed"
+          },
+          "publicReadback": {
+            "passed": false,
+            "allReached": true,
+            "dateMismatch": [
+              "gpt-6-astra",
+              "gpt-6-sol",
+              "gpt-6-luna"
+            ],
+            "profiles": [
+              {
+                "id": "gpt-6-astra",
+                "httpStatus": 200,
+                "rateDateMatch": false,
+                "profileMatch": false
+              },
+              {
+                "id": "gpt-6-sol",
+                "httpStatus": 200,
+                "rateDateMatch": false,
+                "profileMatch": false
+              },
+              {
+                "id": "gpt-6-luna",
+                "httpStatus": 200,
+                "rateDateMatch": false,
+                "profileMatch": false
+              }
+            ],
+            "checkedAt": "2026-09-27T19:43:04+00:00"
+          },
+          "status": "attention_required"
+        }
+      ]
+    }
+  },
+  "distribution-health": {
+    "schema_version": "0.4.1",
+    "methodology_version": "1.0",
+    "generated_at": "2026-10-01 21:37:12",
+    "sources": {
+      "total": 110,
+      "checked": 110,
+      "coverage_percent": 100,
+      "healthy": 66,
+      "failing": 20,
+      "review_required": 24,
+      "due": 0,
+      "sla_compliant": 110,
+      "sla_percent": 100
+    },
+    "editorial_queue": {
+      "pending_changes": 433,
+      "pending_discovery": 49
+    },
+    "products": {
+      "total": 10,
+      "overdue_review": 0
+    },
+    "last_successful_full_cycle": {
+      "id": "5861",
+      "mode": "scheduled",
+      "status": "completed",
+      "total_due": "0",
+      "processed": "0",
+      "baselined": "0",
+      "not_modified": "0",
+      "changed": "0",
+      "failed": "0",
+      "rate_limited": "0",
+      "started_at": "2026-10-01 21:19:11",
+      "ended_at": "2026-10-01 21:19:11"
+    },
+    "last_attempt": {
+      "id": "5861",
+      "mode": "scheduled",
+      "status": "completed",
+      "total_due": "0",
+      "processed": "0",
+      "baselined": "0",
+      "not_modified": "0",
+      "changed": "0",
+      "failed": "0",
+      "rate_limited": "0",
+      "started_at": "2026-10-01 21:19:11",
+      "ended_at": "2026-10-01 21:19:11"
+    },
+    "automated_boundary": "Sources are fetched and changes are staged automatically. Evidence and score inputs change only after an editorial approval.",
+    "source_remediation": {
+      "healthy_original": 66,
+      "validated_replacement_slots": 16,
+      "adopted_replacement_slots": 16,
+      "effective_healthy_slots": 82,
+      "total_source_slots": 110,
+      "effective_coverage_percent": 74.5,
+      "audited_original_failures": 20,
+      "recovered_originals": 0,
+      "pending_replacements": 0,
+      "adopted_replacements": 19,
+      "validated_candidates": 16,
+      "failing_candidates": 1,
+      "unresolved": 1,
+      "editorial_dispositions": {
+        "approved": 19,
+        "rejected": 0,
+        "deferred": 0,
+        "research": 1
+      },
+      "editorial_boundary": "Effective coverage counts only adopted, currently healthy replacements for failing source slots. The original URL and failure history remain preserved. Adoption changes no approved evidence, claim, score, rank, source link, or sponsorship input."
+    }
+  }
+}

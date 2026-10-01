@@ -1,0 +1,13 @@
+✔ complete, backtrack, restore and revise a realistic commercial (6.870931ms)
+✔ budget carries price units, attempts and unknown costs without pretending acceptance (0.268538ms)
+✔ verified price needs compatible currency, unit and a fresh independent date (0.261197ms)
+✔ malformed imports, prototype keys, duplicate shot IDs, unsafe URLs and large files fail (0.637845ms)
+✔ reuse existing camera workspace with matching project and stable shot IDs (1.207239ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.76577

@@ -1,0 +1,63 @@
+{
+  "official_channel_url": "https://www.youtube.com/@kingy-ai",
+  "official_channel_id": null,
+  "restriction": "Proxy denied official YouTube channel, feed and oEmbed requests (HTTP tunnel 403).",
+  "confirmed_newest_five": false,
+  "cms_candidates_only": [
+    {
+      "post_id": 928374,
+      "title": "Boya Notra Review: The Best AI Voice Recorder for 2026?",
+      "canonical_url": "https://kingy.ai/videos/boya-notra-review-the-best-ai-voice-recorder-for-2026/",
+      "possible_video_ids": [
+        "lz1Dr9xQl0Y"
+      ],
+      "cms_created_at": "2026-08-13T01:06:53",
+      "status": "hold",
+      "reason": "CMS bulk-import order is not official YouTube publication order. Confirm the current five newest through the official feed/API and use retained transcript/artifacts. Existing companion URLs are preserved."
+    },
+    {
+      "post_id": 928373,
+      "title": "This AI Agent Builds Videos, Images, Voiceovers and Music | Framia Pro",
+      "canonical_url": "https://kingy.ai/videos/this-ai-agent-builds-videos-images-voiceovers-and-music-framia-pro/",
+      "possible_video_ids": [
+        "y6ul1U29ByA"
+      ],
+      "cms_created_at": "2026-08-13T01:06:52",
+      "status": "hold",
+      "reason": "CMS bulk-import order is not official YouTube publication order. Confirm the current five newest through the official feed/API and use retained transcript/artifacts. Existing companion URLs are preserved."
+    },
+    {
+      "post_id": 928372,
+      "title": "This AI Presentation Tool Feels Like Having a Designer",
+      "canonical_url": "https://kingy.ai/videos/this-ai-presentation-tool-feels-like-having-a-designer/",
+      "possible_video_ids": [
+        "BoIU4K5BUuY"
+      ],
+      "cms_created_at": "2026-08-13T01:06:52",
+      "status": "hold",
+      "reason": "CMS bulk-import order is not official YouTube publication order. Confirm the current five newest through the official feed/API and use retained transcript/artifacts. Existing companion URLs are preserved."
+    },
+    {
+      "post_id": 928371,
+      "title": "I Made an AI Film By Directing, Not Prompting | invideo by Agent One",
+      "canonical_url": "https://kingy.ai/videos/i-made-an-ai-film-by-directing-not-prompting-invideo-by-agent-one/",
+      "possible_video_ids": [
+        "uWR-4JLotCs"
+      ],
+      "cms_created_at": "2026-08-13T01:06:52",
+      "status": "hold",
+      "reason": "CMS bulk-import order is not official YouTube publication order. Confirm the current five newest through the official feed/API and use retained transcript/artifacts. Existing companion URLs are preserved."
+    },
+    {
+      "post_id": 928370,
+      "title": "Pippit Short Drama Agent \u2192 The Future of Faceless Story Channels?",
+      "canonical_url": "https://kingy.ai/videos/pippit-short-drama-agent-the-future-of-faceless-story-channels/",
+      "possible_video_ids": [
+        "kOui5yItC-0"
+      ],
+      "cms_created_at": "2026-08-13T01:06:52",
+      "status": "hold",
+      "reason": "CMS bulk-import order is not official YouTube publication order. Confirm the current five newest through the official feed/API and use retained transcript/artifacts. Existing companion URLs are preserved."
+    }
+  ]
+}

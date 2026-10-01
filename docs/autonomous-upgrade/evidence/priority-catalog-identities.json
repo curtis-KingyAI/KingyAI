@@ -1,0 +1,1661 @@
+{
+  "observations": [
+    {
+      "url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_tool?per_page=100&page=1&_fields=id,slug,title,link",
+      "observed_at": "2026-10-01T23:16:23.142428+00:00",
+      "records": 100
+    },
+    {
+      "url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_tool?per_page=100&page=2&_fields=id,slug,title,link",
+      "observed_at": "2026-10-01T23:16:23.142454+00:00",
+      "records": 100
+    },
+    {
+      "url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_tool?per_page=100&page=3&_fields=id,slug,title,link",
+      "observed_at": "2026-10-01T23:16:23.142461+00:00",
+      "records": 5
+    }
+  ],
+  "records": [
+    {
+      "id": 926011,
+      "slug": "invideo",
+      "link": "https://kingy.ai/ai-tools/invideo/",
+      "title": {
+        "rendered": "InVideo Review: Agent One, Pricing, Credits, and Rights"
+      }
+    },
+    {
+      "id": 929209,
+      "slug": "hailuo-ai",
+      "link": "https://kingy.ai/ai-tools/hailuo-ai/",
+      "title": {
+        "rendered": "Hailuo AI Review: Pricing, Credits, H3 Access, and Limits"
+      }
+    },
+    {
+      "id": 926001,
+      "slug": "supabase",
+      "link": "https://kingy.ai/ai-tools/supabase/",
+      "title": {
+        "rendered": "Supabase Review: Pricing, Self-Hosting, API, and MCP"
+      }
+    },
+    {
+      "id": 929147,
+      "slug": "capcut",
+      "link": "https://kingy.ai/ai-tools/capcut/",
+      "title": {
+        "rendered": "CapCut AI Review: Tools, Pricing Rules, and Regional Limits"
+      }
+    },
+    {
+      "id": 929130,
+      "slug": "pippit",
+      "link": "https://kingy.ai/ai-tools/pippit/",
+      "title": {
+        "rendered": "Pippit AI Review: Pricing, Credits, and Agent Workflows"
+      }
+    },
+    {
+      "id": 929101,
+      "slug": "artlist",
+      "link": "https://kingy.ai/ai-tools/artlist/",
+      "title": {
+        "rendered": "Artlist AI Review: Toolkit vs Studio, Pricing, and Updates"
+      }
+    },
+    {
+      "id": 925678,
+      "slug": "truthspine",
+      "link": "https://kingy.ai/ai-tools/truthspine/",
+      "title": {
+        "rendered": "TruthSpine: Local Project Context, Pricing, Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 926015,
+      "slug": "dreamina",
+      "link": "https://kingy.ai/ai-tools/dreamina/",
+      "title": {
+        "rendered": "Dreamina: Octo workflow, closed-beta access and evaluation guide"
+      }
+    },
+    {
+      "id": 926005,
+      "slug": "openclaw",
+      "link": "https://kingy.ai/ai-tools/openclaw/",
+      "title": {
+        "rendered": "OpenClaw"
+      }
+    },
+    {
+      "id": 922936,
+      "slug": "molmomotion",
+      "link": "https://kingy.ai/ai-tools/molmomotion/",
+      "title": {
+        "rendered": "MolmoMotion"
+      }
+    },
+    {
+      "id": 922935,
+      "slug": "microsoft-365-copilot-cowork",
+      "link": "https://kingy.ai/ai-tools/microsoft-365-copilot-cowork/",
+      "title": {
+        "rendered": "Microsoft 365 Copilot Cowork"
+      }
+    },
+    {
+      "id": 922934,
+      "slug": "google-home-speaker",
+      "link": "https://kingy.ai/ai-tools/google-home-speaker/",
+      "title": {
+        "rendered": "Google Home Speaker"
+      }
+    },
+    {
+      "id": 922857,
+      "slug": "mai-code-1-flash",
+      "link": "https://kingy.ai/ai-tools/mai-code-1-flash/",
+      "title": {
+        "rendered": "MAI-Code-1-Flash"
+      }
+    },
+    {
+      "id": 922854,
+      "slug": "github-copilot-code-review",
+      "link": "https://kingy.ai/ai-tools/github-copilot-code-review/",
+      "title": {
+        "rendered": "GitHub Copilot Code Review"
+      }
+    },
+    {
+      "id": 922851,
+      "slug": "hugging-face-kernels",
+      "link": "https://kingy.ai/ai-tools/hugging-face-kernels/",
+      "title": {
+        "rendered": "Hugging Face Kernels"
+      }
+    },
+    {
+      "id": 922848,
+      "slug": "maxtext-elastic-training",
+      "link": "https://kingy.ai/ai-tools/maxtext-elastic-training/",
+      "title": {
+        "rendered": "MaxText Elastic Training"
+      }
+    },
+    {
+      "id": 922842,
+      "slug": "github-copilot-ai-credit-session-limits",
+      "link": "https://kingy.ai/ai-tools/github-copilot-ai-credit-session-limits/",
+      "title": {
+        "rendered": "GitHub Copilot AI Credit Session Limits"
+      }
+    },
+    {
+      "id": 922839,
+      "slug": "gpt-live",
+      "link": "https://kingy.ai/ai-tools/gpt-live/",
+      "title": {
+        "rendered": "GPT-Live: ChatGPT Voice capabilities, limits and API status"
+      }
+    },
+    {
+      "id": 913165,
+      "slug": "chatgpt-sites",
+      "link": "https://kingy.ai/ai-tools/chatgpt-sites/",
+      "title": {
+        "rendered": "ChatGPT Sites"
+      }
+    },
+    {
+      "id": 913166,
+      "slug": "minimax-m3",
+      "link": "https://kingy.ai/ai-tools/minimax-m3/",
+      "title": {
+        "rendered": "MiniMax M3"
+      }
+    },
+    {
+      "id": 915768,
+      "slug": "latitude-v2-agent-monitoring",
+      "link": "https://kingy.ai/ai-tools/latitude-v2-agent-monitoring/",
+      "title": {
+        "rendered": "Latitude V2 Agent Monitoring: Pricing, Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 915767,
+      "slug": "bluerails-discovery",
+      "link": "https://kingy.ai/ai-tools/bluerails-discovery/",
+      "title": {
+        "rendered": "Bluerails Discovery: Methodology, Pricing, and Evaluation"
+      }
+    },
+    {
+      "id": 915769,
+      "slug": "openart-director",
+      "link": "https://kingy.ai/ai-tools/openart-director/",
+      "title": {
+        "rendered": "OpenArt Director: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 915257,
+      "slug": "datadog-pup-cli-and-agent-skills",
+      "link": "https://kingy.ai/ai-tools/datadog-pup-cli-and-agent-skills/",
+      "title": {
+        "rendered": "Datadog Pup CLI and Agent Skills: Security and Evaluation"
+      }
+    },
+    {
+      "id": 914148,
+      "slug": "pkg-go-dev-api",
+      "link": "https://kingy.ai/ai-tools/pkg-go-dev-api/",
+      "title": {
+        "rendered": "pkg.go.dev API: Endpoints, Limits, Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 914147,
+      "slug": "diffusiongemma",
+      "link": "https://kingy.ai/ai-tools/diffusiongemma/",
+      "title": {
+        "rendered": "DiffusionGemma: Architecture, Benchmarks, Pricing, and Evaluation"
+      }
+    },
+    {
+      "id": 913912,
+      "slug": "circleci-mcp-server",
+      "link": "https://kingy.ai/ai-tools/circleci-mcp-server/",
+      "title": {
+        "rendered": "CircleCI MCP Server: Hosted vs CLI, Pricing, Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 915256,
+      "slug": "agentx-agent-evaluation-framework",
+      "link": "https://kingy.ai/ai-tools/agentx-agent-evaluation-framework/",
+      "title": {
+        "rendered": "AgentX Agent Evaluation Framework: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 915115,
+      "slug": "appviewx-agent-identity-security",
+      "link": "https://kingy.ai/ai-tools/appviewx-agent-identity-security/",
+      "title": {
+        "rendered": "AppViewX Agent Identity Security: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914516,
+      "slug": "g-d-ai-hub-montr-al",
+      "link": "https://kingy.ai/ai-tools/g-d-ai-hub-montr-al/",
+      "title": {
+        "rendered": "G+D AI Hub Montréal: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914035,
+      "slug": "evaluation-cards",
+      "link": "https://kingy.ai/ai-tools/evaluation-cards/",
+      "title": {
+        "rendered": "Evaluation Cards: Evidence Signals, Coverage, Limits, and Evaluation"
+      }
+    },
+    {
+      "id": 915121,
+      "slug": "crowdstrike-continuous-identity-for-ai-agents",
+      "link": "https://kingy.ai/ai-tools/crowdstrike-continuous-identity-for-ai-agents/",
+      "title": {
+        "rendered": "CrowdStrike Continuous Identity for AI Agents: Availability, Controls, and Risks"
+      }
+    },
+    {
+      "id": 914033,
+      "slug": "github-agentic-workflows",
+      "link": "https://kingy.ai/ai-tools/github-agentic-workflows/",
+      "title": {
+        "rendered": "GitHub Agentic Workflows: Guardrails, Pricing, Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 913913,
+      "slug": "descope-mcp-server",
+      "link": "https://kingy.ai/ai-tools/descope-mcp-server/",
+      "title": {
+        "rendered": "Descope MCP Server: Security Model, Pricing, and Evaluation"
+      }
+    },
+    {
+      "id": 914992,
+      "slug": "gemini-enterprise-workflow-agents",
+      "link": "https://kingy.ai/ai-tools/gemini-enterprise-workflow-agents/",
+      "title": {
+        "rendered": "Gemini Enterprise Workflow Agents: Access, Pricing, and Evaluation"
+      }
+    },
+    {
+      "id": 915255,
+      "slug": "cloudflare-temporary-accounts-for-ai-agents",
+      "link": "https://kingy.ai/ai-tools/cloudflare-temporary-accounts-for-ai-agents/",
+      "title": {
+        "rendered": "Cloudflare Temporary Accounts: Security, Limits, and Pricing"
+      }
+    },
+    {
+      "id": 914990,
+      "slug": "amazon-bedrock-agentcore-web-search",
+      "link": "https://kingy.ai/ai-tools/amazon-bedrock-agentcore-web-search/",
+      "title": {
+        "rendered": "Amazon Bedrock AgentCore Web Search: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914487,
+      "slug": "claude-corps",
+      "link": "https://kingy.ai/ai-tools/claude-corps/",
+      "title": {
+        "rendered": "Claude Corps: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914149,
+      "slug": "google-eclipse-foundation-strategic-membership",
+      "link": "https://kingy.ai/ai-tools/google-eclipse-foundation-strategic-membership/",
+      "title": {
+        "rendered": "Google Eclipse Foundation Strategic Membership: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 913911,
+      "slug": "hugging-face-serge",
+      "link": "https://kingy.ai/ai-tools/hugging-face-serge/",
+      "title": {
+        "rendered": "Hugging Face Serge: Deployment Modes, Security, and Evaluation"
+      }
+    },
+    {
+      "id": 917678,
+      "slug": "note-md-local-llm-memory",
+      "link": "https://kingy.ai/ai-tools/note-md-local-llm-memory/",
+      "title": {
+        "rendered": "note.md Local LLM Memory: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 917896,
+      "slug": "deckwise",
+      "link": "https://kingy.ai/ai-tools/deckwise/",
+      "title": {
+        "rendered": "Deckwise: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 917894,
+      "slug": "cubeone-ai-slide-editor",
+      "link": "https://kingy.ai/ai-tools/cubeone-ai-slide-editor/",
+      "title": {
+        "rendered": "CubeOne AI Slide Editor: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 917895,
+      "slug": "qapilot-cowork",
+      "link": "https://kingy.ai/ai-tools/qapilot-cowork/",
+      "title": {
+        "rendered": "QApilot CoWork: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 917676,
+      "slug": "jotform-ai-app-builder",
+      "link": "https://kingy.ai/ai-tools/jotform-ai-app-builder/",
+      "title": {
+        "rendered": "Jotform AI App Builder: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914815,
+      "slug": "github-copilot-auto-mode",
+      "link": "https://kingy.ai/ai-tools/github-copilot-auto-mode/",
+      "title": {
+        "rendered": "GitHub Copilot Auto Mode: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914590,
+      "slug": "microsoft-work-iq-apis",
+      "link": "https://kingy.ai/ai-tools/microsoft-work-iq-apis/",
+      "title": {
+        "rendered": "Microsoft Work IQ APIs: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914584,
+      "slug": "github-code-quality-ga",
+      "link": "https://kingy.ai/ai-tools/github-code-quality-ga/",
+      "title": {
+        "rendered": "GitHub Code Quality GA: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914515,
+      "slug": "gemini-in-chrome-market-expansion",
+      "link": "https://kingy.ai/ai-tools/gemini-in-chrome-market-expansion/",
+      "title": {
+        "rendered": "Gemini in Chrome Market Expansion: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 914514,
+      "slug": "copilot-usage-metrics-server-side-telemetry",
+      "link": "https://kingy.ai/ai-tools/copilot-usage-metrics-server-side-telemetry/",
+      "title": {
+        "rendered": "Copilot Usage Metrics Server-Side Telemetry: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 917099,
+      "slug": "github-copilot-for-jira",
+      "link": "https://kingy.ai/ai-tools/github-copilot-for-jira/",
+      "title": {
+        "rendered": "GitHub Copilot for Jira: Workflow, Permissions, Costs, and QA"
+      }
+    },
+    {
+      "id": 917098,
+      "slug": "github-desktop-3-6-copilot-integration",
+      "link": "https://kingy.ai/ai-tools/github-desktop-3-6-copilot-integration/",
+      "title": {
+        "rendered": "GitHub Desktop 3.6 Copilot Integration: Worktrees, Conflicts, and QA"
+      }
+    },
+    {
+      "id": 917100,
+      "slug": "strictknownmarketplaces-for-copilot-cli-and-vs-code",
+      "link": "https://kingy.ai/ai-tools/strictknownmarketplaces-for-copilot-cli-and-vs-code/",
+      "title": {
+        "rendered": "strictKnownMarketplaces: Copilot Plugin Governance, Limits, and QA"
+      }
+    },
+    {
+      "id": 920861,
+      "slug": "genkit-agents-api",
+      "link": "https://kingy.ai/ai-tools/genkit-agents-api/",
+      "title": {
+        "rendered": "Genkit Agents API: State, Pricing, Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 920862,
+      "slug": "lerobot-v0-6-0",
+      "link": "https://kingy.ai/ai-tools/lerobot-v0-6-0/",
+      "title": {
+        "rendered": "LeRobot v0.6.0: Robotics Loop, Benchmarks, and Deployment Risks"
+      }
+    },
+    {
+      "id": 920863,
+      "slug": "github-copilot-agent-session-streaming",
+      "link": "https://kingy.ai/ai-tools/github-copilot-agent-session-streaming/",
+      "title": {
+        "rendered": "GitHub Copilot Agent Session Streaming: Coverage, Retention, and QA"
+      }
+    },
+    {
+      "id": 917677,
+      "slug": "browseract",
+      "link": "https://kingy.ai/ai-tools/browseract/",
+      "title": {
+        "rendered": "BrowserAct: Browser Modes, Pricing, Privacy Risks, and Evaluation"
+      }
+    },
+    {
+      "id": 920982,
+      "slug": "next3d-ai-3d-model-generator",
+      "link": "https://kingy.ai/ai-tools/next3d-ai-3d-model-generator/",
+      "title": {
+        "rendered": "Next3D AI 3D Model Generator"
+      }
+    },
+    {
+      "id": 914571,
+      "slug": "seedance-2-0-ai-video",
+      "link": "https://kingy.ai/ai-tools/seedance-2-0-ai-video/",
+      "title": {
+        "rendered": "Seedance 2.0: Features, access, limits and evaluation guide"
+      }
+    },
+    {
+      "id": 922118,
+      "slug": "muse-image-launched-publicly-muse-video-was-previewed-rather-than-fully-launched",
+      "link": "https://kingy.ai/ai-tools/muse-image-launched-publicly-muse-video-was-previewed-rather-than-fully-launched/",
+      "title": {
+        "rendered": "Muse Image launched publicly; Muse Video was previewed rather than fully launched"
+      }
+    },
+    {
+      "id": 922107,
+      "slug": "badge-peer-review-agent",
+      "link": "https://kingy.ai/ai-tools/badge-peer-review-agent/",
+      "title": {
+        "rendered": "Badge peer review agent"
+      }
+    },
+    {
+      "id": 922029,
+      "slug": "katalyst-ai",
+      "link": "https://kingy.ai/ai-tools/katalyst-ai/",
+      "title": {
+        "rendered": "Katalyst AI: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 922028,
+      "slug": "hugging-face-models-on-foundry-managed-compute",
+      "link": "https://kingy.ai/ai-tools/hugging-face-models-on-foundry-managed-compute/",
+      "title": {
+        "rendered": "Hugging Face Models on Foundry Managed Compute: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 922093,
+      "slug": "copilot-usage-metrics-review-cycle-fields",
+      "link": "https://kingy.ai/ai-tools/copilot-usage-metrics-review-cycle-fields/",
+      "title": {
+        "rendered": "Copilot usage metrics review-cycle fields"
+      }
+    },
+    {
+      "id": 922027,
+      "slug": "github-copilot-app-for-all-copilot-plans",
+      "link": "https://kingy.ai/ai-tools/github-copilot-app-for-all-copilot-plans/",
+      "title": {
+        "rendered": "GitHub Copilot app for all Copilot plans: What It Does, Pricing, Use Cases, and Alternatives"
+      }
+    },
+    {
+      "id": 922085,
+      "slug": "kimi-k2-7-code-in-github-copilot-business-and-enterprise",
+      "link": "https://kingy.ai/ai-tools/kimi-k2-7-code-in-github-copilot-business-and-enterprise/",
+      "title": {
+        "rendered": "Kimi K2.7 Code in GitHub Copilot Business and Enterprise"
+      }
+    },
+    {
+      "id": 916987,
+      "slug": "builder-io-visual-plan-and-visual-recap-skills",
+      "link": "https://kingy.ai/ai-tools/builder-io-visual-plan-and-visual-recap-skills/",
+      "title": {
+        "rendered": "Builder.io Visual Plan and Visual Recap: Structured Reviews for Coding Agents"
+      }
+    },
+    {
+      "id": 916986,
+      "slug": "mem0-plugin-for-pi-code",
+      "link": "https://kingy.ai/ai-tools/mem0-plugin-for-pi-code/",
+      "title": {
+        "rendered": "Mem0’s Pi Code Plugin Adds Persistent Project Memory"
+      }
+    },
+    {
+      "id": 916999,
+      "slug": "microsoft-365-education-ai-teaching-capabilities",
+      "link": "https://kingy.ai/ai-tools/microsoft-365-education-ai-teaching-capabilities/",
+      "title": {
+        "rendered": "Microsoft 365 Education AI Teaching Capabilities: Access, Controls, and QA"
+      }
+    },
+    {
+      "id": 916985,
+      "slug": "gemini-3-5-flash-computer-use",
+      "link": "https://kingy.ai/ai-tools/gemini-3-5-flash-computer-use/",
+      "title": {
+        "rendered": "Gemini 3.5 Flash Computer Use: How the Agent Loop and Safety Controls Work"
+      }
+    },
+    {
+      "id": 916401,
+      "slug": "leonardo-ai",
+      "link": "https://kingy.ai/ai-tools/leonardo-ai/",
+      "title": {
+        "rendered": "Leonardo AI"
+      }
+    },
+    {
+      "id": 916214,
+      "slug": "hugging-face-spaces",
+      "link": "https://kingy.ai/ai-tools/hugging-face-spaces/",
+      "title": {
+        "rendered": "Hugging Face Spaces"
+      }
+    },
+    {
+      "id": 916212,
+      "slug": "comfyui",
+      "link": "https://kingy.ai/ai-tools/comfyui/",
+      "title": {
+        "rendered": "ComfyUI"
+      }
+    },
+    {
+      "id": 916210,
+      "slug": "open-webui",
+      "link": "https://kingy.ai/ai-tools/open-webui/",
+      "title": {
+        "rendered": "Open WebUI"
+      }
+    },
+    {
+      "id": 916208,
+      "slug": "jan",
+      "link": "https://kingy.ai/ai-tools/jan/",
+      "title": {
+        "rendered": "Jan"
+      }
+    },
+    {
+      "id": 916206,
+      "slug": "lm-studio",
+      "link": "https://kingy.ai/ai-tools/lm-studio/",
+      "title": {
+        "rendered": "LM Studio"
+      }
+    },
+    {
+      "id": 916204,
+      "slug": "ollama",
+      "link": "https://kingy.ai/ai-tools/ollama/",
+      "title": {
+        "rendered": "Ollama"
+      }
+    },
+    {
+      "id": 916202,
+      "slug": "semrush-ai",
+      "link": "https://kingy.ai/ai-tools/semrush-ai/",
+      "title": {
+        "rendered": "Semrush AI"
+      }
+    },
+    {
+      "id": 916200,
+      "slug": "surfer-ai",
+      "link": "https://kingy.ai/ai-tools/surfer-ai/",
+      "title": {
+        "rendered": "Surfer AI"
+      }
+    },
+    {
+      "id": 916198,
+      "slug": "hubspot-ai",
+      "link": "https://kingy.ai/ai-tools/hubspot-ai/",
+      "title": {
+        "rendered": "HubSpot AI"
+      }
+    },
+    {
+      "id": 916196,
+      "slug": "apollo-ai",
+      "link": "https://kingy.ai/ai-tools/apollo-ai/",
+      "title": {
+        "rendered": "Apollo AI"
+      }
+    },
+    {
+      "id": 916194,
+      "slug": "clay",
+      "link": "https://kingy.ai/ai-tools/clay/",
+      "title": {
+        "rendered": "Clay"
+      }
+    },
+    {
+      "id": 916192,
+      "slug": "copy-ai",
+      "link": "https://kingy.ai/ai-tools/copy-ai/",
+      "title": {
+        "rendered": "Copy.ai"
+      }
+    },
+    {
+      "id": 916190,
+      "slug": "jasper",
+      "link": "https://kingy.ai/ai-tools/jasper/",
+      "title": {
+        "rendered": "Jasper"
+      }
+    },
+    {
+      "id": 916188,
+      "slug": "manus",
+      "link": "https://kingy.ai/ai-tools/manus/",
+      "title": {
+        "rendered": "Manus"
+      }
+    },
+    {
+      "id": 916186,
+      "slug": "relay-app",
+      "link": "https://kingy.ai/ai-tools/relay-app/",
+      "title": {
+        "rendered": "Relay.app"
+      }
+    },
+    {
+      "id": 916184,
+      "slug": "gumloop",
+      "link": "https://kingy.ai/ai-tools/gumloop/",
+      "title": {
+        "rendered": "Gumloop"
+      }
+    },
+    {
+      "id": 916182,
+      "slug": "n8n",
+      "link": "https://kingy.ai/ai-tools/n8n/",
+      "title": {
+        "rendered": "n8n"
+      }
+    },
+    {
+      "id": 916180,
+      "slug": "make",
+      "link": "https://kingy.ai/ai-tools/make/",
+      "title": {
+        "rendered": "Make"
+      }
+    },
+    {
+      "id": 916178,
+      "slug": "zapier-ai",
+      "link": "https://kingy.ai/ai-tools/zapier-ai/",
+      "title": {
+        "rendered": "Zapier AI"
+      }
+    },
+    {
+      "id": 916176,
+      "slug": "lindy",
+      "link": "https://kingy.ai/ai-tools/lindy/",
+      "title": {
+        "rendered": "Lindy"
+      }
+    },
+    {
+      "id": 916174,
+      "slug": "superhuman-ai",
+      "link": "https://kingy.ai/ai-tools/superhuman-ai/",
+      "title": {
+        "rendered": "Superhuman AI"
+      }
+    },
+    {
+      "id": 916172,
+      "slug": "fathom",
+      "link": "https://kingy.ai/ai-tools/fathom/",
+      "title": {
+        "rendered": "Fathom"
+      }
+    },
+    {
+      "id": 916170,
+      "slug": "fireflies-ai",
+      "link": "https://kingy.ai/ai-tools/fireflies-ai/",
+      "title": {
+        "rendered": "Fireflies.ai"
+      }
+    },
+    {
+      "id": 916168,
+      "slug": "otter-ai",
+      "link": "https://kingy.ai/ai-tools/otter-ai/",
+      "title": {
+        "rendered": "Otter.ai"
+      }
+    },
+    {
+      "id": 916166,
+      "slug": "granola",
+      "link": "https://kingy.ai/ai-tools/granola/",
+      "title": {
+        "rendered": "Granola"
+      }
+    },
+    {
+      "id": 916164,
+      "slug": "notion-ai",
+      "link": "https://kingy.ai/ai-tools/notion-ai/",
+      "title": {
+        "rendered": "Notion AI"
+      }
+    },
+    {
+      "id": 916162,
+      "slug": "hume-ai",
+      "link": "https://kingy.ai/ai-tools/hume-ai/",
+      "title": {
+        "rendered": "Hume AI"
+      }
+    },
+    {
+      "id": 916158,
+      "slug": "murf",
+      "link": "https://kingy.ai/ai-tools/murf/",
+      "title": {
+        "rendered": "Murf"
+      }
+    },
+    {
+      "id": 916156,
+      "slug": "udio",
+      "link": "https://kingy.ai/ai-tools/udio/",
+      "title": {
+        "rendered": "Udio"
+      }
+    },
+    {
+      "id": 916154,
+      "slug": "suno",
+      "link": "https://kingy.ai/ai-tools/suno/",
+      "title": {
+        "rendered": "Suno"
+      }
+    },
+    {
+      "id": 916152,
+      "slug": "sourcegraph-cody",
+      "link": "https://kingy.ai/ai-tools/sourcegraph-cody/",
+      "title": {
+        "rendered": "Sourcegraph Cody"
+      }
+    },
+    {
+      "id": 916150,
+      "slug": "claude-code",
+      "link": "https://kingy.ai/ai-tools/claude-code/",
+      "title": {
+        "rendered": "Claude Code"
+      }
+    },
+    {
+      "id": 916148,
+      "slug": "v0-by-vercel",
+      "link": "https://kingy.ai/ai-tools/v0-by-vercel/",
+      "title": {
+        "rendered": "v0 by Vercel"
+      }
+    },
+    {
+      "id": 916146,
+      "slug": "freepik-ai",
+      "link": "https://kingy.ai/ai-tools/freepik-ai/",
+      "title": {
+        "rendered": "Freepik AI"
+      }
+    },
+    {
+      "id": 916144,
+      "slug": "canva-ai",
+      "link": "https://kingy.ai/ai-tools/canva-ai/",
+      "title": {
+        "rendered": "Canva AI"
+      }
+    },
+    {
+      "id": 916142,
+      "slug": "adobe-firefly",
+      "link": "https://kingy.ai/ai-tools/adobe-firefly/",
+      "title": {
+        "rendered": "Adobe Firefly"
+      }
+    },
+    {
+      "id": 916140,
+      "slug": "recraft",
+      "link": "https://kingy.ai/ai-tools/recraft/",
+      "title": {
+        "rendered": "Recraft"
+      }
+    },
+    {
+      "id": 916138,
+      "slug": "midjourney",
+      "link": "https://kingy.ai/ai-tools/midjourney/",
+      "title": {
+        "rendered": "Midjourney"
+      }
+    },
+    {
+      "id": 916136,
+      "slug": "descript",
+      "link": "https://kingy.ai/ai-tools/descript/",
+      "title": {
+        "rendered": "Descript"
+      }
+    },
+    {
+      "id": 916134,
+      "slug": "synthesia",
+      "link": "https://kingy.ai/ai-tools/synthesia/",
+      "title": {
+        "rendered": "Synthesia"
+      }
+    },
+    {
+      "id": 916132,
+      "slug": "heygen",
+      "link": "https://kingy.ai/ai-tools/heygen/",
+      "title": {
+        "rendered": "HeyGen"
+      }
+    },
+    {
+      "id": 916128,
+      "slug": "pika",
+      "link": "https://kingy.ai/ai-tools/pika/",
+      "title": {
+        "rendered": "Pika"
+      }
+    },
+    {
+      "id": 916126,
+      "slug": "kling",
+      "link": "https://kingy.ai/ai-tools/kling/",
+      "title": {
+        "rendered": "Kling"
+      }
+    },
+    {
+      "id": 916124,
+      "slug": "phind",
+      "link": "https://kingy.ai/ai-tools/phind/",
+      "title": {
+        "rendered": "Phind"
+      }
+    },
+    {
+      "id": 916122,
+      "slug": "elicit",
+      "link": "https://kingy.ai/ai-tools/elicit/",
+      "title": {
+        "rendered": "Elicit"
+      }
+    },
+    {
+      "id": 916120,
+      "slug": "you-com",
+      "link": "https://kingy.ai/ai-tools/you-com/",
+      "title": {
+        "rendered": "You.com"
+      }
+    },
+    {
+      "id": 916118,
+      "slug": "consensus",
+      "link": "https://kingy.ai/ai-tools/consensus/",
+      "title": {
+        "rendered": "Consensus"
+      }
+    },
+    {
+      "id": 913733,
+      "slug": "next-generation-apple-intelligence-and-siri-ai",
+      "link": "https://kingy.ai/ai-tools/next-generation-apple-intelligence-and-siri-ai/",
+      "title": {
+        "rendered": "Next-generation Apple Intelligence and Siri AI: What It Does, Pricing, Use Cases, Alternatives, and Kingy AI Verdict"
+      }
+    },
+    {
+      "id": 913731,
+      "slug": "krisp-voice-translation-api",
+      "link": "https://kingy.ai/ai-tools/krisp-voice-translation-api/",
+      "title": {
+        "rendered": "Krisp Voice Translation API: Real-Time AI Voice Translation for Developers"
+      }
+    },
+    {
+      "id": 913711,
+      "slug": "claude-fable-5",
+      "link": "https://kingy.ai/ai-tools/claude-fable-5/",
+      "title": {
+        "rendered": "Claude Fable 5: Pricing, Safeguards, Coding Fit, and Limits"
+      }
+    },
+    {
+      "id": 913710,
+      "slug": "north-mini-code",
+      "link": "https://kingy.ai/ai-tools/north-mini-code/",
+      "title": {
+        "rendered": "North Mini Code: Open-Weight Coding Model, Specs, and Evaluation"
+      }
+    },
+    {
+      "id": 913484,
+      "slug": "replit-seo-agent",
+      "link": "https://kingy.ai/ai-tools/replit-seo-agent/",
+      "title": {
+        "rendered": "Replit SEO Agent"
+      }
+    },
+    {
+      "id": 913480,
+      "slug": "microsoft-scout",
+      "link": "https://kingy.ai/ai-tools/microsoft-scout/",
+      "title": {
+        "rendered": "Microsoft Scout"
+      }
+    },
+    {
+      "id": 913474,
+      "slug": "codex-on-aws",
+      "link": "https://kingy.ai/ai-tools/codex-on-aws/",
+      "title": {
+        "rendered": "Codex on AWS"
+      }
+    },
+    {
+      "id": 913470,
+      "slug": "command-a",
+      "link": "https://kingy.ai/ai-tools/command-a/",
+      "title": {
+        "rendered": "Command A+"
+      }
+    },
+    {
+      "id": 913466,
+      "slug": "gemini-spark",
+      "link": "https://kingy.ai/ai-tools/gemini-spark/",
+      "title": {
+        "rendered": "Gemini Spark"
+      }
+    },
+    {
+      "id": 913462,
+      "slug": "gemini-api-managed-agents",
+      "link": "https://kingy.ai/ai-tools/gemini-api-managed-agents/",
+      "title": {
+        "rendered": "Gemini API Managed Agents"
+      }
+    },
+    {
+      "id": 913456,
+      "slug": "microsoft-365-copilot",
+      "link": "https://kingy.ai/ai-tools/microsoft-365-copilot/",
+      "title": {
+        "rendered": "Microsoft 365 Copilot Passport: Price &#038; Privacy"
+      }
+    },
+    {
+      "id": 913452,
+      "slug": "workspace-agents",
+      "link": "https://kingy.ai/ai-tools/workspace-agents/",
+      "title": {
+        "rendered": "Workspace Agents: Research-Preview Capabilities, Governance, and Evaluation"
+      }
+    },
+    {
+      "id": 913444,
+      "slug": "cursor-composer",
+      "link": "https://kingy.ai/ai-tools/cursor-composer/",
+      "title": {
+        "rendered": "Cursor Composer"
+      }
+    },
+    {
+      "id": 913438,
+      "slug": "microsoft-agent-365",
+      "link": "https://kingy.ai/ai-tools/microsoft-agent-365/",
+      "title": {
+        "rendered": "Microsoft Agent 365"
+      }
+    },
+    {
+      "id": 913434,
+      "slug": "cursor-cloud-agents",
+      "link": "https://kingy.ai/ai-tools/cursor-cloud-agents/",
+      "title": {
+        "rendered": "Cursor Cloud Agents"
+      }
+    },
+    {
+      "id": 913428,
+      "slug": "devin",
+      "link": "https://kingy.ai/ai-tools/devin/",
+      "title": {
+        "rendered": "Devin"
+      }
+    },
+    {
+      "id": 913424,
+      "slug": "gpt-5-3-codex-spark",
+      "link": "https://kingy.ai/ai-tools/gpt-5-3-codex-spark/",
+      "title": {
+        "rendered": "GPT-5.3-Codex-Spark"
+      }
+    },
+    {
+      "id": 913420,
+      "slug": "gpt-5-3-codex",
+      "link": "https://kingy.ai/ai-tools/gpt-5-3-codex/",
+      "title": {
+        "rendered": "GPT-5.3-Codex"
+      }
+    },
+    {
+      "id": 913414,
+      "slug": "amazon-bedrock-agentcore",
+      "link": "https://kingy.ai/ai-tools/amazon-bedrock-agentcore/",
+      "title": {
+        "rendered": "Amazon Bedrock AgentCore"
+      }
+    },
+    {
+      "id": 913408,
+      "slug": "bigquery-agent-analytics",
+      "link": "https://kingy.ai/ai-tools/bigquery-agent-analytics/",
+      "title": {
+        "rendered": "BigQuery Agent Analytics"
+      }
+    },
+    {
+      "id": 913404,
+      "slug": "vertex-ai-agent-builder",
+      "link": "https://kingy.ai/ai-tools/vertex-ai-agent-builder/",
+      "title": {
+        "rendered": "Gemini Enterprise Agent Platform"
+      }
+    },
+    {
+      "id": 913398,
+      "slug": "agentforce-360",
+      "link": "https://kingy.ai/ai-tools/agentforce-360/",
+      "title": {
+        "rendered": "Agentforce 360"
+      }
+    },
+    {
+      "id": 913394,
+      "slug": "agentkit",
+      "link": "https://kingy.ai/ai-tools/agentkit/",
+      "title": {
+        "rendered": "AgentKit"
+      }
+    },
+    {
+      "id": 913390,
+      "slug": "claude-agent-sdk",
+      "link": "https://kingy.ai/ai-tools/claude-agent-sdk/",
+      "title": {
+        "rendered": "Claude Agent SDK"
+      }
+    },
+    {
+      "id": 913382,
+      "slug": "github-copilot-coding-agent",
+      "link": "https://kingy.ai/ai-tools/github-copilot-coding-agent/",
+      "title": {
+        "rendered": "GitHub Copilot coding agent"
+      }
+    },
+    {
+      "id": 913377,
+      "slug": "mistral-vibe",
+      "link": "https://kingy.ai/ai-tools/mistral-vibe/",
+      "title": {
+        "rendered": "Mistral Vibe"
+      }
+    },
+    {
+      "id": 913373,
+      "slug": "mistral-search-toolkit",
+      "link": "https://kingy.ai/ai-tools/mistral-search-toolkit/",
+      "title": {
+        "rendered": "Mistral Search Toolkit: Retrieval, Evaluation, and Public-Preview Guide"
+      }
+    },
+    {
+      "id": 913369,
+      "slug": "mistral-forge",
+      "link": "https://kingy.ai/ai-tools/mistral-forge/",
+      "title": {
+        "rendered": "Mistral Forge"
+      }
+    },
+    {
+      "id": 913363,
+      "slug": "gpt-rosalind",
+      "link": "https://kingy.ai/ai-tools/gpt-rosalind/",
+      "title": {
+        "rendered": "GPT-Rosalind"
+      }
+    },
+    {
+      "id": 913357,
+      "slug": "gpt-5-5",
+      "link": "https://kingy.ai/ai-tools/gpt-5-5/",
+      "title": {
+        "rendered": "GPT-5.5"
+      }
+    },
+    {
+      "id": 913283,
+      "slug": "phi",
+      "link": "https://kingy.ai/ai-tools/phi/",
+      "title": {
+        "rendered": "Phi"
+      }
+    },
+    {
+      "id": 913279,
+      "slug": "azure-ai-foundry",
+      "link": "https://kingy.ai/ai-tools/azure-ai-foundry/",
+      "title": {
+        "rendered": "Azure AI Foundry"
+      }
+    },
+    {
+      "id": 913273,
+      "slug": "microsoft-copilot-studio",
+      "link": "https://kingy.ai/ai-tools/microsoft-copilot-studio/",
+      "title": {
+        "rendered": "Microsoft Copilot Studio"
+      }
+    },
+    {
+      "id": 913269,
+      "slug": "command-r7b",
+      "link": "https://kingy.ai/ai-tools/command-r7b/",
+      "title": {
+        "rendered": "Command R7B"
+      }
+    },
+    {
+      "id": 913263,
+      "slug": "command-r",
+      "link": "https://kingy.ai/ai-tools/command-r/",
+      "title": {
+        "rendered": "Command R+"
+      }
+    },
+    {
+      "id": 913259,
+      "slug": "qwen-coder",
+      "link": "https://kingy.ai/ai-tools/qwen-coder/",
+      "title": {
+        "rendered": "Qwen Coder"
+      }
+    },
+    {
+      "id": 913253,
+      "slug": "qwen",
+      "link": "https://kingy.ai/ai-tools/qwen/",
+      "title": {
+        "rendered": "Qwen"
+      }
+    },
+    {
+      "id": 913247,
+      "slug": "bolt-new",
+      "link": "https://kingy.ai/ai-tools/bolt-new/",
+      "title": {
+        "rendered": "Bolt.new"
+      }
+    },
+    {
+      "id": 913241,
+      "slug": "windsurf",
+      "link": "https://kingy.ai/ai-tools/windsurf/",
+      "title": {
+        "rendered": "Windsurf"
+      }
+    },
+    {
+      "id": 913237,
+      "slug": "github-copilot-workspace",
+      "link": "https://kingy.ai/ai-tools/github-copilot-workspace/",
+      "title": {
+        "rendered": "GitHub Copilot Workspace"
+      }
+    },
+    {
+      "id": 913231,
+      "slug": "github-spark",
+      "link": "https://kingy.ai/ai-tools/github-spark/",
+      "title": {
+        "rendered": "GitHub Spark"
+      }
+    },
+    {
+      "id": 913227,
+      "slug": "github-models",
+      "link": "https://kingy.ai/ai-tools/github-models/",
+      "title": {
+        "rendered": "GitHub Models"
+      }
+    },
+    {
+      "id": 913223,
+      "slug": "kiro",
+      "link": "https://kingy.ai/ai-tools/kiro/",
+      "title": {
+        "rendered": "Kiro"
+      }
+    },
+    {
+      "id": 913217,
+      "slug": "lovable",
+      "link": "https://kingy.ai/ai-tools/lovable/",
+      "title": {
+        "rendered": "Lovable"
+      }
+    },
+    {
+      "id": 913209,
+      "slug": "luma-dream-machine",
+      "link": "https://kingy.ai/ai-tools/luma-dream-machine/",
+      "title": {
+        "rendered": "Luma Dream Machine"
+      }
+    },
+    {
+      "id": 913203,
+      "slug": "ideogram",
+      "link": "https://kingy.ai/ai-tools/ideogram/",
+      "title": {
+        "rendered": "Ideogram"
+      }
+    },
+    {
+      "id": 913195,
+      "slug": "stable-diffusion",
+      "link": "https://kingy.ai/ai-tools/stable-diffusion/",
+      "title": {
+        "rendered": "Stable Diffusion"
+      }
+    },
+    {
+      "id": 913191,
+      "slug": "amazon-bedrock",
+      "link": "https://kingy.ai/ai-tools/amazon-bedrock/",
+      "title": {
+        "rendered": "Amazon Bedrock"
+      }
+    },
+    {
+      "id": 913185,
+      "slug": "amazon-nova",
+      "link": "https://kingy.ai/ai-tools/amazon-nova/",
+      "title": {
+        "rendered": "Amazon Nova"
+      }
+    },
+    {
+      "id": 913179,
+      "slug": "grok",
+      "link": "https://kingy.ai/ai-tools/grok/",
+      "title": {
+        "rendered": "Grok"
+      }
+    },
+    {
+      "id": 913175,
+      "slug": "perplexity-sonar",
+      "link": "https://kingy.ai/ai-tools/perplexity-sonar/",
+      "title": {
+        "rendered": "Perplexity Sonar"
+      }
+    },
+    {
+      "id": 913155,
+      "slug": "flux-1",
+      "link": "https://kingy.ai/ai-tools/flux-1/",
+      "title": {
+        "rendered": "FLUX.1"
+      }
+    },
+    {
+      "id": 913149,
+      "slug": "elevenlabs",
+      "link": "https://kingy.ai/ai-tools/elevenlabs/",
+      "title": {
+        "rendered": "ElevenLabs"
+      }
+    },
+    {
+      "id": 913143,
+      "slug": "runway",
+      "link": "https://kingy.ai/ai-tools/runway/",
+      "title": {
+        "rendered": "Runway"
+      }
+    },
+    {
+      "id": 913137,
+      "slug": "perplexity",
+      "link": "https://kingy.ai/ai-tools/perplexity/",
+      "title": {
+        "rendered": "Perplexity Passport: Plans &#038; Data Boundaries"
+      }
+    },
+    {
+      "id": 913131,
+      "slug": "replit-agent",
+      "link": "https://kingy.ai/ai-tools/replit-agent/",
+      "title": {
+        "rendered": "Replit Agent"
+      }
+    },
+    {
+      "id": 913125,
+      "slug": "cursor",
+      "link": "https://kingy.ai/ai-tools/cursor/",
+      "title": {
+        "rendered": "Cursor"
+      }
+    },
+    {
+      "id": 913119,
+      "slug": "github-copilot",
+      "link": "https://kingy.ai/ai-tools/github-copilot/",
+      "title": {
+        "rendered": "GitHub Copilot"
+      }
+    },
+    {
+      "id": 913115,
+      "slug": "deepseek-r1",
+      "link": "https://kingy.ai/ai-tools/deepseek-r1/",
+      "title": {
+        "rendered": "DeepSeek-R1"
+      }
+    },
+    {
+      "id": 913109,
+      "slug": "deepseek-v3",
+      "link": "https://kingy.ai/ai-tools/deepseek-v3/",
+      "title": {
+        "rendered": "DeepSeek-V3"
+      }
+    },
+    {
+      "id": 913105,
+      "slug": "magistral",
+      "link": "https://kingy.ai/ai-tools/magistral/",
+      "title": {
+        "rendered": "Magistral"
+      }
+    },
+    {
+      "id": 913101,
+      "slug": "mistral-agents-api",
+      "link": "https://kingy.ai/ai-tools/mistral-agents-api/",
+      "title": {
+        "rendered": "Mistral Agents API"
+      }
+    },
+    {
+      "id": 913097,
+      "slug": "mistral-small",
+      "link": "https://kingy.ai/ai-tools/mistral-small/",
+      "title": {
+        "rendered": "Mistral Small"
+      }
+    },
+    {
+      "id": 913093,
+      "slug": "le-chat",
+      "link": "https://kingy.ai/ai-tools/le-chat/",
+      "title": {
+        "rendered": "Le Chat"
+      }
+    },
+    {
+      "id": 913087,
+      "slug": "pixtral",
+      "link": "https://kingy.ai/ai-tools/pixtral/",
+      "title": {
+        "rendered": "Pixtral"
+      }
+    },
+    {
+      "id": 913083,
+      "slug": "mistral-nemo",
+      "link": "https://kingy.ai/ai-tools/mistral-nemo/",
+      "title": {
+        "rendered": "Mistral NeMo"
+      }
+    },
+    {
+      "id": 913077,
+      "slug": "codestral",
+      "link": "https://kingy.ai/ai-tools/codestral/",
+      "title": {
+        "rendered": "Codestral"
+      }
+    },
+    {
+      "id": 913065,
+      "slug": "llama",
+      "link": "https://kingy.ai/ai-tools/llama/",
+      "title": {
+        "rendered": "Llama"
+      }
+    },
+    {
+      "id": 913061,
+      "slug": "gemini-deep-research",
+      "link": "https://kingy.ai/ai-tools/gemini-deep-research/",
+      "title": {
+        "rendered": "Gemini Deep Research"
+      }
+    },
+    {
+      "id": 913057,
+      "slug": "jules",
+      "link": "https://kingy.ai/ai-tools/jules/",
+      "title": {
+        "rendered": "Jules"
+      }
+    },
+    {
+      "id": 913053,
+      "slug": "google-generative-media-models",
+      "link": "https://kingy.ai/ai-tools/google-generative-media-models/",
+      "title": {
+        "rendered": "Google generative media models"
+      }
+    },
+    {
+      "id": 913049,
+      "slug": "flow",
+      "link": "https://kingy.ai/ai-tools/flow/",
+      "title": {
+        "rendered": "Flow"
+      }
+    },
+    {
+      "id": 913045,
+      "slug": "gemini-api",
+      "link": "https://kingy.ai/ai-tools/gemini-api/",
+      "title": {
+        "rendered": "Gemini API"
+      }
+    },
+    {
+      "id": 913035,
+      "slug": "gemini",
+      "link": "https://kingy.ai/ai-tools/gemini/",
+      "title": {
+        "rendered": "Gemini Passport: Access, Limits &#038; Privacy Boundaries"
+      }
+    },
+    {
+      "id": 913029,
+      "slug": "notebooklm",
+      "link": "https://kingy.ai/ai-tools/notebooklm/",
+      "title": {
+        "rendered": "NotebookLM"
+      }
+    },
+    {
+      "id": 913015,
+      "slug": "model-context-protocol",
+      "link": "https://kingy.ai/ai-tools/model-context-protocol/",
+      "title": {
+        "rendered": "Model Context Protocol"
+      }
+    },
+    {
+      "id": 913011,
+      "slug": "claude-api",
+      "link": "https://kingy.ai/ai-tools/claude-api/",
+      "title": {
+        "rendered": "Claude API"
+      }
+    },
+    {
+      "id": 913003,
+      "slug": "claude",
+      "link": "https://kingy.ai/ai-tools/claude/",
+      "title": {
+        "rendered": "Claude"
+      }
+    },
+    {
+      "id": 912999,
+      "slug": "chatgpt-agent",
+      "link": "https://kingy.ai/ai-tools/chatgpt-agent/",
+      "title": {
+        "rendered": "ChatGPT agent"
+      }
+    },
+    {
+      "id": 912995,
+      "slug": "codex",
+      "link": "https://kingy.ai/ai-tools/codex/",
+      "title": {
+        "rendered": "Codex"
+      }
+    },
+    {
+      "id": 912991,
+      "slug": "openai-reasoning-models",
+      "link": "https://kingy.ai/ai-tools/openai-reasoning-models/",
+      "title": {
+        "rendered": "OpenAI reasoning models"
+      }
+    },
+    {
+      "id": 912985,
+      "slug": "chatgpt-image-generation",
+      "link": "https://kingy.ai/ai-tools/chatgpt-image-generation/",
+      "title": {
+        "rendered": "ChatGPT image generation"
+      }
+    },
+    {
+      "id": 912981,
+      "slug": "openai-api",
+      "link": "https://kingy.ai/ai-tools/openai-api/",
+      "title": {
+        "rendered": "OpenAI API"
+      }
+    },
+    {
+      "id": 912977,
+      "slug": "chatgpt-deep-research",
+      "link": "https://kingy.ai/ai-tools/chatgpt-deep-research/",
+      "title": {
+        "rendered": "ChatGPT deep research"
+      }
+    },
+    {
+      "id": 912969,
+      "slug": "sora",
+      "link": "https://kingy.ai/ai-tools/sora/",
+      "title": {
+        "rendered": "Sora"
+      }
+    },
+    {
+      "id": 912963,
+      "slug": "openai-o1",
+      "link": "https://kingy.ai/ai-tools/openai-o1/",
+      "title": {
+        "rendered": "OpenAI o1"
+      }
+    },
+    {
+      "id": 912957,
+      "slug": "chatgpt",
+      "link": "https://kingy.ai/ai-tools/chatgpt/",
+      "title": {
+        "rendered": "ChatGPT Passport: Plans, Privacy &#038; Data Boundaries"
+      }
+    }
+  ]
+}

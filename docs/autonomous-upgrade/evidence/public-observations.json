@@ -1,0 +1,215 @@
+[
+  {
+    "name": "videos",
+    "requested_url": "https://kingy.ai/videos/",
+    "observed_at": "2026-10-01T21:37:10.146007+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/videos/",
+    "bytes": 161520,
+    "sha256": "a9a0e8cf4ea5e87abdc04b61768639be57255749b13174c54b47b09966992be4"
+  },
+  {
+    "name": "tools",
+    "requested_url": "https://kingy.ai/ai-tools/",
+    "observed_at": "2026-10-01T21:37:10.146761+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/ai-tools/",
+    "bytes": 224238,
+    "sha256": "8ac1f9f0fcfe7a7c83de711c0c36cf6d9d6178286e0f825c1f55f0a9424414fc"
+  },
+  {
+    "name": "apps",
+    "requested_url": "https://kingy.ai/apps-labs/",
+    "observed_at": "2026-10-01T21:37:10.147377+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/apps-labs/",
+    "bytes": 127376,
+    "sha256": "506230eb292b3c26ced48ce937228bf8db76a9227099fdeb5ef85383dcb28136"
+  },
+  {
+    "name": "launches",
+    "requested_url": "https://kingy.ai/ai-launches/",
+    "observed_at": "2026-10-01T21:37:10.147803+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/ai-launches/",
+    "bytes": 268160,
+    "sha256": "73721cbc858b1316ed899f2577bf5427dda48a6fb440bf2b55897abb1f02d8de"
+  },
+  {
+    "name": "coverage",
+    "requested_url": "https://kingy.ai/ai-launches/coverage/",
+    "observed_at": "2026-10-01T21:37:10.148552+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/ai-launches/coverage/",
+    "bytes": 110423,
+    "sha256": "3f99a96e4e068137aa3fa2e81073badca5292bc035ddc8425441a6ac3d6258d3"
+  },
+  {
+    "name": "brief",
+    "requested_url": "https://kingy.ai/brief/",
+    "observed_at": "2026-10-01T21:37:10.149171+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/brief/",
+    "bytes": 102620,
+    "sha256": "b38d4c8c27b04d2bd26ef0ae7bbd36c7c61518a2cae61cb5d9085f7b94e5431d"
+  },
+  {
+    "name": "stack",
+    "requested_url": "https://kingy.ai/ai-stack-builder/",
+    "observed_at": "2026-10-01T21:37:10.861470+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/ai-stack-builder/",
+    "bytes": 127954,
+    "sha256": "03754f063124532ce29d241d60ac69a8f1043be4161044d1ad5389b92d673caf"
+  },
+  {
+    "name": "radar",
+    "requested_url": "https://kingy.ai/ai-stack-change-radar/",
+    "observed_at": "2026-10-01T21:37:11.049700+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/ai-stack-change-radar/",
+    "bytes": 53766,
+    "sha256": "f7a0b10cf0721cf4bf4f10c8f861744e5c15b7bf97c4045aab1c86d94e91d9dc"
+  },
+  {
+    "name": "sponsor",
+    "requested_url": "https://kingy.ai/for-ai-companies/",
+    "observed_at": "2026-10-01T21:37:11.118149+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/for-ai-companies/",
+    "bytes": 125733,
+    "sha256": "8bc46ef14c040e54eadce146c20e26c0e4b09d525a46381717df1cfdf571857f"
+  },
+  {
+    "name": "inquiry",
+    "requested_url": "https://kingy.ai/sponsor-fit-review/",
+    "observed_at": "2026-10-01T21:37:11.122358+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/sponsor-fit-review/",
+    "bytes": 131672,
+    "sha256": "019fab78c0a7ede6319ad509048d13610b6619dd5a881ddeb3ece0569a0164d9"
+  },
+  {
+    "name": "clients",
+    "requested_url": "https://kingy.ai/clients/",
+    "observed_at": "2026-10-01T21:37:11.139128+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/clients/",
+    "bytes": 429454,
+    "sha256": "aeab9957dfaa81e0f9b316fa50dc5815ca91d83cd40693858118e12051039e0d"
+  },
+  {
+    "name": "standards",
+    "requested_url": "https://kingy.ai/editorial-sponsorship-standards/",
+    "observed_at": "2026-10-01T21:37:11.504068+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/editorial-sponsorship-standards/",
+    "bytes": 128266,
+    "sha256": "f286c2702f15d8acfd945ec762bad40df410976be48e7b22115f98bc13a89cc0"
+  },
+  {
+    "name": "make-this",
+    "requested_url": "https://kingy.ai/make-this/",
+    "observed_at": "2026-10-01T21:37:11.661538+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/make-this/",
+    "bytes": 326630,
+    "sha256": "f26f5814c1738f23eda9d3b667ad974bd0a5239adc3b9553e6f50305ea1c5165"
+  },
+  {
+    "name": "channel",
+    "requested_url": "https://www.youtube.com/@kingy-ai",
+    "observed_at": "2026-10-01T21:37:11.709064+00:00",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+  },
+  {
+    "name": "video-records",
+    "requested_url": "https://kingy.ai/wp-json/wp/v2/kingy_video?per_page=10&orderby=date&order=desc",
+    "observed_at": "2026-10-01T21:37:11.709823+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/wp-json/wp/v2/kingy_video?per_page=10&orderby=date&order=desc",
+    "bytes": 165861,
+    "sha256": "1bb7759c655daabc67f2a6a82d649517e4e4def646010e5b39e05c35b02b87a1"
+  },
+  {
+    "name": "tool-records",
+    "requested_url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_tool?per_page=25",
+    "observed_at": "2026-10-01T21:37:11.712053+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_tool?per_page=25",
+    "bytes": 465352,
+    "sha256": "1b7ab451b06dc1a0b63aed074a018864ba30d053ef8e26b8939ab6dd35df23b1"
+  },
+  {
+    "name": "launch-records",
+    "requested_url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_launch?per_page=25&orderby=date&order=desc",
+    "observed_at": "2026-10-01T21:37:11.764760+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_launch?per_page=25&orderby=date&order=desc",
+    "bytes": 407920,
+    "sha256": "40f807b8a53e22ac1c42c317ea5d3b19b8d614bf55ce29399ca9fafd932a2be2"
+  },
+  {
+    "name": "release",
+    "requested_url": "https://kingy.ai/wp-json/kingy-release/v1/status",
+    "observed_at": "2026-10-01T21:37:11.972305+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/wp-json/kingy-release/v1/status",
+    "bytes": 8632,
+    "sha256": "c695154818ef4cba8b14acab805530536df313a34eaa7fbe48e402ea0cc15258"
+  },
+  {
+    "name": "maintenance",
+    "requested_url": "https://kingy.ai/wp-json/kingy-maintenance/v1/status",
+    "observed_at": "2026-10-01T21:37:12.231043+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/wp-json/kingy-maintenance/v1/status",
+    "bytes": 1164,
+    "sha256": "5a974adf0bdbe774779c829783fca5922f5e3c149cdea9ece0419dd6b81e8e73"
+  },
+  {
+    "name": "distribution-health",
+    "requested_url": "https://kingy.ai/wp-json/kingy/v1/distribution-monitoring-health",
+    "observed_at": "2026-10-01T21:37:12.507210+00:00",
+    "status": 200,
+    "url": "https://kingy.ai/wp-json/kingy/v1/distribution-monitoring-health",
+    "bytes": 1731,
+    "sha256": "83d1b2c0f8f87b939de1280527eab132188f4b0f6237421cf3b348139f60ca9b"
+  },
+  {
+    "name": "wp-cron-docs",
+    "requested_url": "https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/",
+    "observed_at": "2026-10-01T21:37:12.518273+00:00",
+    "status": 200,
+    "url": "https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/",
+    "bytes": 175902,
+    "sha256": "a5be3fd66966e841f0d8eee64f15a9bfe79196e94a6a20b496c0ccf3b09ba9b4"
+  },
+  {
+    "name": "wp-db-docs",
+    "requested_url": "https://developer.wordpress.org/plugins/creating-tables-with-plugins/",
+    "observed_at": "2026-10-01T21:37:12.687060+00:00",
+    "status": 200,
+    "url": "https://developer.wordpress.org/plugins/creating-tables-with-plugins/",
+    "bytes": 184104,
+    "sha256": "a3f1175498b556d9e9774444346cdb3773cfaf6eab6a3cbe7945b43ea2815f04"
+  },
+  {
+    "name": "wp-rest-docs",
+    "requested_url": "https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/",
+    "observed_at": "2026-10-01T21:37:12.722249+00:00",
+    "status": 200,
+    "url": "https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/",
+    "bytes": 193796,
+    "sha256": "4547ca63ae52bca55c42815e2f35d4e4ef5452e0187d20b575b677816338f7a4"
+  },
+  {
+    "name": "youtube-feed-docs",
+    "requested_url": "https://developers.google.com/youtube/v3/guides/push_notifications",
+    "observed_at": "2026-10-01T21:37:12.820673+00:00",
+    "status": 200,
+    "url": "https://developers.google.com/youtube/v3/guides/push_notifications",
+    "bytes": 74020,
+    "sha256": "d6df7bcdb5786706a03a0816fc775157b679252e38fdcd1d1fa69a42fae876d2"
+  }
+]

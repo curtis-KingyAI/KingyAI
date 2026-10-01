@@ -1,0 +1,187 @@
+{
+  "status": "PREPARED; not configured or continuously monitored",
+  "uses_existing_catalog": true,
+  "no_new_product_records": true,
+  "products": [
+    {
+      "id": "wp:kingy_ai_tool:926011",
+      "post_id": 926011,
+      "slug": "invideo",
+      "title": "InVideo Review: Agent One, Pricing, Credits, and Rights",
+      "url": "https://kingy.ai/ai-tools/invideo/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:929209",
+      "post_id": 929209,
+      "slug": "hailuo-ai",
+      "title": "Hailuo AI Review: Pricing, Credits, H3 Access, and Limits",
+      "url": "https://kingy.ai/ai-tools/hailuo-ai/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:929147",
+      "post_id": 929147,
+      "slug": "capcut",
+      "title": "CapCut AI Review: Tools, Pricing Rules, and Regional Limits",
+      "url": "https://kingy.ai/ai-tools/capcut/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:929130",
+      "post_id": 929130,
+      "slug": "pippit",
+      "title": "Pippit AI Review: Pricing, Credits, and Agent Workflows",
+      "url": "https://kingy.ai/ai-tools/pippit/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:929101",
+      "post_id": 929101,
+      "slug": "artlist",
+      "title": "Artlist AI Review: Toolkit vs Studio, Pricing, and Updates",
+      "url": "https://kingy.ai/ai-tools/artlist/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:926015",
+      "post_id": 926015,
+      "slug": "dreamina",
+      "title": "Dreamina: Octo workflow, closed-beta access and evaluation guide",
+      "url": "https://kingy.ai/ai-tools/dreamina/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:915769",
+      "post_id": 915769,
+      "slug": "openart-director",
+      "title": "OpenArt Director: What It Does, Pricing, Use Cases, and Alternatives",
+      "url": "https://kingy.ai/ai-tools/openart-director/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:913166",
+      "post_id": 913166,
+      "slug": "minimax-m3",
+      "title": "MiniMax M3",
+      "url": "https://kingy.ai/ai-tools/minimax-m3/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916126",
+      "post_id": 916126,
+      "slug": "kling",
+      "title": "Kling",
+      "url": "https://kingy.ai/ai-tools/kling/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:913143",
+      "post_id": 913143,
+      "slug": "runway",
+      "title": "Runway",
+      "url": "https://kingy.ai/ai-tools/runway/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:913209",
+      "post_id": 913209,
+      "slug": "luma-dream-machine",
+      "title": "Luma Dream Machine",
+      "url": "https://kingy.ai/ai-tools/luma-dream-machine/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916138",
+      "post_id": 916138,
+      "slug": "midjourney",
+      "title": "Midjourney",
+      "url": "https://kingy.ai/ai-tools/midjourney/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:913149",
+      "post_id": 913149,
+      "slug": "elevenlabs",
+      "title": "ElevenLabs",
+      "url": "https://kingy.ai/ai-tools/elevenlabs/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916154",
+      "post_id": 916154,
+      "slug": "suno",
+      "title": "Suno",
+      "url": "https://kingy.ai/ai-tools/suno/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:913155",
+      "post_id": 913155,
+      "slug": "flux-1",
+      "title": "FLUX.1",
+      "url": "https://kingy.ai/ai-tools/flux-1/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916401",
+      "post_id": 916401,
+      "slug": "leonardo-ai",
+      "title": "Leonardo AI",
+      "url": "https://kingy.ai/ai-tools/leonardo-ai/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916132",
+      "post_id": 916132,
+      "slug": "heygen",
+      "title": "HeyGen",
+      "url": "https://kingy.ai/ai-tools/heygen/",
+      "purpose": "Recent retained video example or commercial production route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916144",
+      "post_id": 916144,
+      "slug": "canva-ai",
+      "title": "Canva AI",
+      "url": "https://kingy.ai/ai-tools/canva-ai/",
+      "purpose": "Commercial creation/editing route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916142",
+      "post_id": 916142,
+      "slug": "adobe-firefly",
+      "title": "Adobe Firefly",
+      "url": "https://kingy.ai/ai-tools/adobe-firefly/",
+      "purpose": "Commercial creation/editing route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    },
+    {
+      "id": "wp:kingy_ai_tool:916136",
+      "post_id": 916136,
+      "slug": "descript",
+      "title": "Descript",
+      "url": "https://kingy.ai/ai-tools/descript/",
+      "purpose": "Commercial creation/editing route; verify official monitoring mapping before assigning",
+      "monitoring_status": "unconfirmed; proposed priority only"
+    }
+  ]
+}
