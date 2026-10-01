@@ -1,6 +1,6 @@
 {
     "scope": "disposable local WordPress; synthetic fixtures and fake email transports; zero real sends",
-    "passed": 64,
+    "passed": 68,
     "checks": [
         "idempotent additive migration",
         "existing public quality gates hold incomplete synthetic launch",
@@ -53,6 +53,10 @@
         "ambiguous provider result held",
         "uncertain send held without reconciliation",
         "ambiguous send reconciles without retry",
+        "expiration cannot erase an ambiguous earlier send",
+        "unproven reconcile status cannot authorize a resend",
+        "revoked consent cannot erase earlier send uncertainty",
+        "expired ambiguous result reconciles without another send",
         "uncertain digest event is held across daily policies",
         "accepted digest event cannot repeat on a later day",
         "unsent suppressed digest does not falsely mark an event delivered",
@@ -67,6 +71,6 @@
         "sponsor details preserve required planning fields",
         "sponsor enrichment cannot create alternate inquiries"
     ],
-    "observed_at": "2026-10-01T23:06:41Z",
+    "observed_at": "2026-10-01T23:24:54Z",
     "production_touched": false
 }

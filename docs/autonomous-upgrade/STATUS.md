@@ -4,7 +4,7 @@ Owner: Curtis Pyke. Status: PARTIALLY COMPLETE; production acceptance is not com
 
 ## Confirmed access and baseline
 
-- Authorized GitHub repository: `curtis-KingyAI/KingyAI`, base commit recorded in `evidence/base-commit.txt`. Isolated branch: `codex/autonomous-upgrade-20261001`.
+- Authorized GitHub repository: `curtis-KingyAI/KingyAI`, base commit recorded in `evidence/base-commit.txt`. Isolated branch: `codex/autonomous-upgrade-20261001`. Draft review: https://github.com/curtis-KingyAI/KingyAI/pull/23. Prepared implementation commit: `adc0c8e30e75e4aaa45f49bbf31741cdac3afb45`.
 - Repository recovery bundle: `/workspace/kingy-upgrade/discovery/repository-before.bundle`. This is a code backup, not a production database backup.
 - Live WordPress REST API and public pages are readable. Site timezone is already America/Vancouver.
 - Runtime reports no configured secrets, outbound identities, or provider credentials. No authenticated WordPress, server, database, Beehiiv, or channel session was supplied.

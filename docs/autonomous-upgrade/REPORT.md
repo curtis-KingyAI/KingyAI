@@ -4,6 +4,8 @@
 
 Owner: Curtis Pyke. Source repository: `curtis-KingyAI/KingyAI`. Work branch: `codex/autonomous-upgrade-20261001`. Base commit: `e1ce218` (full identifier in `evidence/base-commit.txt`). The implementation is a disabled-by-default extension and three additive changes to the existing KALI plugin. This report describes prepared source, not a released version.
 
+Prepared implementation commit: [adc0c8e30e75e4aaa45f49bbf31741cdac3afb45](https://github.com/curtis-KingyAI/KingyAI/commit/adc0c8e30e75e4aaa45f49bbf31741cdac3afb45). Review: [draft pull request #23](https://github.com/curtis-KingyAI/KingyAI/pull/23). No production release identifier exists.
+
 ## What is live
 
 The existing [Kingy property](https://kingy.ai/), [video companions](https://kingy.ai/videos/), [Make This](https://kingy.ai/make-this/), [Brief](https://kingy.ai/brief/), [Stack Change Radar](https://kingy.ai/ai-stack-change-radar/), [sponsor offer](https://kingy.ai/sponsor-kingy-ai/) and [inquiry route](https://kingy.ai/sponsor-fit-review/) were inspected publicly. No production pages, records, subscribers, settings or hosting deployments were mutated by this run. No new jobs were registered and no real emails or inquiry submissions were sent.
@@ -26,7 +28,7 @@ Structured creative output is explicitly a template. Remote generation was not s
 
 ## Acceptance evidence
 
-- **64 local WordPress checks passed**: additive migration rerun, one verified price event on workflow/legacy companion pricing/coverage/followed feed, independent fact dates, unsupported/conflicting observations, idempotence, lock expiry and ownership, DST and missed slots, three bounded retries, wrong-channel/XXE rejection, companion publication gates and exact record rollback, simulated email suppression/expiration/acceptance/ambiguity reconciliation, cross-day digest deduplication, large-list hold, server isolation and missing-adapter behavior. See `evidence/wordpress-test-results.json`.
+- **68 local WordPress checks passed**: additive migration rerun, one verified price event on workflow/legacy companion pricing/coverage/followed feed, independent fact dates, unsupported/conflicting observations, idempotence, lock expiry and ownership, DST and missed slots, three bounded retries, wrong-channel/XXE rejection, companion publication gates and exact record rollback, simulated email suppression/expiration/acceptance/ambiguity reconciliation, cross-day digest deduplication, large-list hold, server isolation and missing-adapter behavior. See `evidence/wordpress-test-results.json`.
 - **5 Node tests passed**: connected commercial lifecycle, budget semantics, verified price assumptions, malformed imports/uploads, and native Kingy camera-workspace handoff. See `evidence/node-test-results.txt`.
 - **4 browser journey groups passed**, at 1440px and 390px: real local WordPress workflow, upload rejection/deletion, backtracking, refresh, staleness/regeneration, duplication, production pack and JSON, device stack persistence/relevance/export/import/deletion and keyboard focus. Positive stack catalog/change responses are explicitly simulated UI fixtures, not production product verification. See `evidence/browser-results.json` and screenshots.
 - Axe WCAG 2 A/AA and 2.1 AA checks on the workflow, stack and rendered email reported zero scoped violations. This automated check does not replace assistive-technology review or production-theme testing. See `evidence/accessibility-results.json`.

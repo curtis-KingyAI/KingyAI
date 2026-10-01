@@ -109,6 +109,11 @@ $unknown=function()use(&$unknownCalls){$unknownCalls++;throw new RuntimeExceptio
 kau_test('ambiguous provider result held',kau_send_outbox($uncertain)['status']==='uncertain');kau_send_outbox($uncertain);kau_test('uncertain send held without reconciliation',$unknownCalls===1);remove_filter('kau_email_transport',$unknown);
 $reconcile=function(){return array('status'=>'accepted','provider_id'=>'staging-reconciled');};add_filter('kau_email_reconcile',$reconcile);
 kau_test('ambiguous send reconciles without retry',kau_send_outbox($uncertain)['status']==='accepted');remove_filter('kau_email_reconcile',$reconcile);
+$expiredAmbiguous=kau_queue_email('brief','staging-recipient:5','expired-ambiguous-'.$tool,$edition,gmdate('Y-m-d\TH:i:s\Z',time()-60));$wpdb->update(kau_table('outbox'),array('status'=>'uncertain'),array('id'=>$expiredAmbiguous));
+kau_test('expiration cannot erase an ambiguous earlier send',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');
+$malformedReconcile=function(){return array('status'=>'queued');};add_filter('kau_email_reconcile',$malformedReconcile);kau_test('unproven reconcile status cannot authorize a resend',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');remove_filter('kau_email_reconcile',$malformedReconcile);
+remove_filter('kau_recipient_policy',$policy);kau_test('revoked consent cannot erase earlier send uncertainty',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');add_filter('kau_recipient_policy',$policy,10,2);
+add_filter('kau_email_reconcile',$reconcile);kau_test('expired ambiguous result reconciles without another send',kau_send_outbox($expiredAmbiguous)['status']==='accepted');remove_filter('kau_email_reconcile',$reconcile);
 $digestRef='staging-digest:'.$tool;$digestId=kau_queue_email('stack_digest',$digestRef,'day-one',$edition,$expire);$wpdb->update(kau_table('outbox'),array('status'=>'uncertain'),array('id'=>$digestId));
 kau_test('uncertain digest event is held across daily policies',kau_unseen_recipient_changes($digestRef,array($change))===array());
 $wpdb->update(kau_table('outbox'),array('status'=>'accepted'),array('id'=>$digestId));kau_test('accepted digest event cannot repeat on a later day',kau_unseen_recipient_changes($digestRef,array($change))===array());

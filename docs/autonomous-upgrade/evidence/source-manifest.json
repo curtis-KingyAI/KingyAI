@@ -54,8 +54,8 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/jobs.php",
-      "sha256": "9282afc25edbfd1f8b7ab991495bfdacf6a370287cf5bc39ef33bed939d57962",
-      "bytes": 10473
+      "sha256": "670e5abd692127a8272ac7eae4121a24335bc1b130b526d196a82f27156dbe36",
+      "bytes": 10858
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/pipelines.php",
@@ -104,8 +104,8 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/staging.php",
-      "sha256": "b5b89a82458b7a58a2dd4009425f65caebac59c04d07bdabebfef613ef1f9507",
-      "bytes": 20766
+      "sha256": "e8e81ab2a97337c7acc1ae1922bf92fb31df78c8cd94f05c3df6041caaf918cb",
+      "bytes": 21862
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/workflow.test.mjs",

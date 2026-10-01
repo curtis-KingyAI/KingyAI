@@ -121,24 +121,29 @@ function kau_send_outbox($id, $test = false) {
         if (!$row) { throw new InvalidArgumentException('Delivery record missing.'); }
         if (in_array($row['status'], array('accepted','delivered','suppressed','expired','failed'), true)) { return array('status' => $row['status']); }
         if ($test) { return array('status' => 'test_no_send'); }
-        if ($row['expires_at'] < kau_now()) { $status = 'expired'; }
+        if (in_array($row['status'], array('sending','uncertain'), true)) {
+            // Expiration or revoked consent cannot establish whether an earlier send was accepted.
+            // Preserve ambiguity across editions; reconciliation is read-only and never sends here.
+            try { $result = apply_filters('kau_email_reconcile', null, $row); }
+            catch (Throwable $e) { $result = null; }
+            $status = is_array($result) ? ($result['status'] ?? 'uncertain') : 'uncertain';
+            if ($status === 'definitely_not_sent') { $status = $row['expires_at'] < kau_now() ? 'expired' : 'queued'; }
+            elseif (!in_array($status,array('accepted','delivered'),true)) { $status = 'uncertain'; }
+        }
+        elseif ($row['expires_at'] < kau_now()) { $status = 'expired'; }
         elseif (!kau_delivery_ready($row['stream'])) { return array('status' => 'blocked_provider_checks'); }
         else {
             $policy = apply_filters('kau_recipient_policy', null, $row);
             if (!is_array($policy) || ($policy['verified_opt_in'] ?? false) !== true || ($policy['suppressed'] ?? true) !== false
                 || ($policy['stream'] ?? '') !== $row['stream'] || ($policy['frequency_eligible'] ?? false) !== true
                 || ($policy['events_eligible'] ?? false) !== true) { $status = 'suppressed'; }
-            elseif (in_array($row['status'], array('sending','uncertain'), true)) {
-                // A crash after provider acceptance must be reconciled before any retry.
-                $result = apply_filters('kau_email_reconcile', null, $row);
-                $status = is_array($result) ? ($result['status'] ?? 'uncertain') : 'uncertain';
-                if ($status === 'definitely_not_sent') { $status = 'queued'; } // Retry only on a later invocation.
-            } else {
+            else {
                 $wpdb->update($table, array('status' => 'sending', 'updated_at' => kau_now()), array('id' => $id));
                 try { $result = apply_filters('kau_email_transport', null, $row, $policy); }
                 catch (Throwable $e) { $result = null; }
                 $status = is_array($result) ? ($result['status'] ?? 'uncertain') : 'uncertain';
                 // Transport errors alone cannot establish that an email was not accepted.
+                if (!in_array($status,array('accepted','delivered','failed'),true)) { $status = 'uncertain'; }
             }
         }
         if (!in_array($status, array('queued','accepted','delivered','uncertain','suppressed','expired','failed'), true)) { $status = 'uncertain'; }
