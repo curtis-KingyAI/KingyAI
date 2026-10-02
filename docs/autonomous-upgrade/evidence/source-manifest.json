@@ -1,6 +1,8 @@
 {
   "base_commit": "e1ce218ef171c1bcb92e965bdbb70713dc6ddea3",
   "release": "prepared source only; no production deployment",
+  "plugin_version": "0.2.0",
+  "schema_version": 2,
   "files": [
     {
       "path": "wp-content/plugins/kingy-ai-launch-intelligence/includes/companion-videos.php",
@@ -19,8 +21,8 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/README.md",
-      "sha256": "1a55924c0764f60d5a34df7dee44e0c7edc1880bc52f7409988dc361b76e02e3",
-      "bytes": 1351
+      "sha256": "7c703d2268eec429ea11ef199ae7bcb80866ba113001453a870c45234e0bfaab",
+      "bytes": 1499
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/app.css",
@@ -29,8 +31,8 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/app.mjs",
-      "sha256": "c5568d61f207f3c3b728e5f8a61d1744d3ed264e4d1c81cdf608396bbaabdb54",
-      "bytes": 31033
+      "sha256": "044515157510505d42a807d495f46454e715529b4053b10a860a55a356f8517a",
+      "bytes": 31518
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-video-project.js",
@@ -54,13 +56,13 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/jobs.php",
-      "sha256": "670e5abd692127a8272ac7eae4121a24335bc1b130b526d196a82f27156dbe36",
-      "bytes": 10858
+      "sha256": "92a21f9203752b53c504bbadd2dddbefa1ab6bfddc3b7b7398a3885f1662efed",
+      "bytes": 17584
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/pipelines.php",
-      "sha256": "70684cbb522322f318435ee7e42b034b7135bb62f3dbc87e21c289eb339bb36f",
-      "bytes": 10283
+      "sha256": "cebf044733e6c5c96eaf119c5143c938e5a360990500ca142283af513a86b3dd",
+      "bytes": 14009
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/publishing.php",
@@ -69,8 +71,8 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/rest.php",
-      "sha256": "fcd6aef9ef18782f9c49e2d5fc2b630d1d4d7d63e94d4b042e89d99614946cb3",
-      "bytes": 10684
+      "sha256": "2afef3a152636473b9bdd28aef1e3329818728fb68a3e9aef506321c395a85dd",
+      "bytes": 13701
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/sponsor.php",
@@ -79,8 +81,8 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/store.php",
-      "sha256": "3d1c713709ad8027ccb2a1ef354d246c06236da1068446859de46609329ddb2b",
-      "bytes": 9962
+      "sha256": "40e35d1d5cda8d5390ac7120756a02631796086a5b4c6152072444b1054eb40f",
+      "bytes": 10577
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/validation.php",
@@ -94,8 +96,18 @@
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/kingy-autonomous-upgrade.php",
-      "sha256": "c83e08edcefd9c7b4bc34c1fe1d64d9db27d31959840d2c6f68fc7864adedc24",
-      "bytes": 2077
+      "sha256": "6a83bf684766fbbdd7f75446da797e20efc633c0924db85ffa5ca7b27cabdf4d",
+      "bytes": 2127
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/accounts-browser.py",
+      "sha256": "99fbcaa50d606575d6283f59c24c7c7421b71a7d61e4b4e955810d460a1f7dfc",
+      "bytes": 7155
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/browser-accounts.php",
+      "sha256": "1fbbe2ea2efa74d2aba648619e2d85a742e599edd27952435de1a801c90c35c0",
+      "bytes": 1101
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/browser.py",
@@ -103,9 +115,14 @@
       "bytes": 7378
     },
     {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/recovery.php",
+      "sha256": "9b04e27f5e1c55b4873d92aa97aab38f02e5e1935a2bf5e0e090a67300733325",
+      "bytes": 19305
+    },
+    {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/staging.php",
-      "sha256": "e8e81ab2a97337c7acc1ae1922bf92fb31df78c8cd94f05c3df6041caaf918cb",
-      "bytes": 21862
+      "sha256": "97504534cb1e714fae15ae9fac48d79f6893fef31f615637d04b4f4b60a95a3a",
+      "bytes": 22218
     },
     {
       "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/workflow.test.mjs",

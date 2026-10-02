@@ -4,6 +4,11 @@ if (!defined('ABSPATH')) { exit; }
 function kau_api_permission() { return kau_enabled('workflow') && is_user_logged_in(); }
 function kau_stack_permission() { return kau_enabled('stack') && is_user_logged_in(); }
 function kau_private_permission() { return current_user_can('manage_options'); }
+function kau_with_account_lock($callback){
+    $name='account-'.get_current_user_id();$token=kau_lock($name);
+    if(!$token){return new WP_Error('locked','Account data is being updated. Retry shortly.',array('status'=>409));}
+    try{return $callback();}finally{kau_unlock($name,$token);}
+}
 function kau_register_routes() {
     register_rest_route('kingy-upgrade/v1', '/catalog', array('methods' => 'GET', 'permission_callback' => function () { return kau_enabled('workflow') || kau_enabled('stack'); }, 'callback' => function ($r) {
         $search = $r->get_param('search');
@@ -18,13 +23,14 @@ function kau_register_routes() {
     }));
     register_rest_route('kingy-upgrade/v1', '/projects', array('methods'=>'GET', 'permission_callback'=>'kau_api_permission', 'callback'=>function () {
         global $wpdb; $rows=$wpdb->get_results($wpdb->prepare('SELECT id,payload,revision,updated_at FROM '.kau_table('projects')." WHERE owner_id=%d AND id NOT LIKE 'stack-user-%%' ORDER BY updated_at DESC LIMIT 100",get_current_user_id()), ARRAY_A);
-        return array_map(function($row){$row['payload']=json_decode($row['payload'],true);return $row;},$rows);
+        return array_map(function($row){$row['payload']=json_decode($row['payload'],true);$row['revision']=(int)$row['revision'];return $row;},$rows);
     }));
     register_rest_route('kingy-upgrade/v1', '/projects/(?P<id>[a-zA-Z0-9-]{16,64})', array(
         array('methods'=>'PUT','permission_callback'=>'kau_api_permission','callback'=>'kau_save_project'),
         array('methods'=>'DELETE','permission_callback'=>'kau_api_permission','callback'=>function($r){
-            global $wpdb; $n=$wpdb->delete(kau_table('projects'),array('id'=>$r['id'],'owner_id'=>get_current_user_id()));
-            return $n ? array('deleted'=>true) : new WP_Error('not_found','Project not found.',array('status'=>404));
+            return kau_with_account_lock(function()use($r){global $wpdb;$n=$wpdb->delete(kau_table('projects'),array('id'=>$r->get_url_params()['id'],'owner_id'=>get_current_user_id()));
+                if($n===false){return new WP_Error('delete_failed','Project could not be deleted.',array('status'=>503));}
+                return $n ? array('deleted'=>true) : new WP_Error('not_found','Project not found.',array('status'=>404));});
         })
     ));
     register_rest_route('kingy-upgrade/v1', '/operations', array('methods'=>'GET','permission_callback'=>'kau_private_permission','callback'=>'kau_operations_status'));
@@ -34,7 +40,7 @@ function kau_register_routes() {
             return $body?json_decode($body,true):array('schemaVersion'=>1,'products'=>array(),'projects'=>array(),'preferences'=>array('plan'=>'','budget'=>''));
         }),
         array('methods'=>'PUT','permission_callback'=>'kau_stack_permission','callback'=>'kau_save_stack'),
-        array('methods'=>'DELETE','permission_callback'=>'kau_stack_permission','callback'=>function(){global $wpdb;$wpdb->delete(kau_table('projects'),array('id'=>'stack-user-'.get_current_user_id(),'owner_id'=>get_current_user_id()));return array('deleted'=>true);})
+        array('methods'=>'DELETE','permission_callback'=>'kau_stack_permission','callback'=>function(){return kau_with_account_lock(function(){global $wpdb;$n=$wpdb->delete(kau_table('projects'),array('owner_id'=>get_current_user_id()));return $n===false?new WP_Error('delete_failed','Saved data could not be deleted.',array('status'=>503)):array('deleted'=>true,'projects_deleted'=>$n);});})
     ));
     register_rest_route('kingy-upgrade/v1','/stack/email',array('methods'=>'PUT','permission_callback'=>'kau_stack_permission','callback'=>function($r){
         $body=$r->get_json_params();if(!is_array($body)||!is_bool($body['dailyDigest']??null)||!is_array($body['productIds']??null)||count($body['productIds'])>100){return new WP_Error('invalid_preferences','Invalid preferences.',array('status'=>400));}
@@ -58,8 +64,8 @@ function kau_save_stack($r){
         foreach($body['projects'] as $p){kau_validate_private_project($p);}
         $body=array('schemaVersion'=>1,'products'=>$products,'projects'=>$body['projects'],'preferences'=>array('plan'=>kau_text($body['preferences']['plan']??'',500),'budget'=>kau_text($body['preferences']['budget']??'',100)));
     }catch(Throwable $e){return new WP_Error('invalid_stack','Stack fields are invalid.',array('status'=>400));}
-    $owner=get_current_user_id();$ok=$wpdb->replace(kau_table('projects'),array('id'=>'stack-user-'.$owner,'owner_id'=>$owner,'payload'=>wp_json_encode($body),'updated_at'=>kau_now()));
-    return $ok===false?new WP_Error('save_failed','Stack could not be saved.',array('status'=>503)):array('saved'=>true);
+    return kau_with_account_lock(function()use($body){global $wpdb;$owner=get_current_user_id();$ok=$wpdb->replace(kau_table('projects'),array('id'=>'stack-user-'.$owner,'owner_id'=>$owner,'payload'=>wp_json_encode($body),'updated_at'=>kau_now()));
+        return $ok===false?new WP_Error('save_failed','Stack could not be saved.',array('status'=>503)):array('saved'=>true);});
 }
 
 function kau_save_project($request) {
@@ -71,8 +77,12 @@ function kau_save_project($request) {
     // Payload is private, never public HTML. Media is device-only at every nesting level.
     try { kau_validate_private_project($body); }
     catch(Throwable $e) { return new WP_Error('invalid_project','Project fields or media policy are invalid.',array('status'=>400)); }
-    $id=$request['id']; $owner=get_current_user_id(); $token=kau_lock('project-'.$id);
-    if (!$token) { return new WP_Error('locked','Project is being saved. Retry shortly.',array('status'=>409)); }
+    $id=$request->get_url_params()['id'];
+    if($body['id']!==$id || !is_int($body['serverRevision']??0) || ($body['serverRevision']??0)<0){return new WP_Error('invalid_project','Project identity or revision is invalid.',array('status'=>400));}
+    $owner=get_current_user_id();$account_token=kau_lock('account-'.$owner);
+    if(!$account_token){return new WP_Error('locked','Account data is being updated. Retry shortly.',array('status'=>409));}
+    $token=kau_lock('project-'.$id);
+    if (!$token) { kau_unlock('account-'.$owner,$account_token);return new WP_Error('locked','Project is being saved. Retry shortly.',array('status'=>409)); }
     try {
         $old=$wpdb->get_row($wpdb->prepare('SELECT owner_id,revision FROM '.kau_table('projects').' WHERE id=%s',$id),ARRAY_A);
         if ($old && (int)$old['owner_id']!==$owner) { return new WP_Error('not_found','Project not found.',array('status'=>404)); }
@@ -83,7 +93,7 @@ function kau_save_project($request) {
         $ok=$old?$wpdb->update(kau_table('projects'),$data,array('id'=>$id,'owner_id'=>$owner)):$wpdb->insert(kau_table('projects'),$data);
         if ($ok===false) { return new WP_Error('save_failed','Project could not be saved.',array('status'=>503)); }
         return array('id'=>$id,'revision'=>$next,'updated_at'=>$data['updated_at']);
-    } finally { kau_unlock('project-'.$id,$token); }
+    } finally { kau_unlock('project-'.$id,$token);kau_unlock('account-'.$owner,$account_token); }
 }
 
 function kau_reject_embedded_media($value,$depth=0){
@@ -94,14 +104,23 @@ function kau_reject_embedded_media($value,$depth=0){
 function kau_validate_private_project($body){
     kau_reject_embedded_media($body);
     if(!is_array($body)||($body['schemaVersion']??null)!==1){throw new InvalidArgumentException();}
-    kau_text($body['name']??'',120);$brief=$body['brief']??null;if(!is_array($brief)){throw new InvalidArgumentException();}
+    if(!preg_match('/^[a-zA-Z0-9-]{16,64}$/',kau_text($body['id']??'',64))){throw new InvalidArgumentException();}
+    kau_text($body['name']??'',120);kau_text($body['outline']??null,10000);$brief=$body['brief']??null;if(!is_array($brief)){throw new InvalidArgumentException();}
     foreach(array('product','audience','message','style','referenceNote') as $key){kau_text($brief[$key]??null,3000);}
     if(!in_array($brief['format']??'',array('16:9','9:16','1:1'),true)||!in_array($brief['currency']??'',array('USD','CAD','EUR','GBP'),true)){throw new InvalidArgumentException();}
     foreach(array('duration'=>array(6,180),'budget'=>array(0,1000000)) as $key=>$range){$n=$brief[$key]??null;if(!is_numeric($n)||$n<$range[0]||$n>$range[1]){throw new InvalidArgumentException();}}
     if(!empty($brief['productId'])){kau_product_id($brief['productId']);}
     if(!is_array($body['shots']??null)||count($body['shots'])>40){throw new InvalidArgumentException();}
-    $ids=array();foreach($body['shots'] as $shot){if(!is_array($shot)||isset($ids[$shot['id']??''])||!is_numeric($shot['seconds']??null)||$shot['seconds']<1||$shot['seconds']>180){throw new InvalidArgumentException();}$ids[kau_text($shot['id']??'',64)]=true;foreach(array('purpose','description','framing','camera','motion','route') as $key){kau_text($shot[$key]??null,3000);}}
+    $routes=array('generic','artlist','invideo');
+    $ids=array();foreach($body['shots'] as $shot){if(!is_array($shot)||!preg_match('/^[a-zA-Z0-9-]{16,64}$/',$shot['id']??'')||isset($ids[$shot['id']??''])||!is_numeric($shot['seconds']??null)||$shot['seconds']<1||$shot['seconds']>180||!in_array($shot['route']??'',$routes,true)){throw new InvalidArgumentException();}$ids[kau_text($shot['id'],64)]=true;foreach(array('purpose','description','framing','camera','motion','route') as $key){kau_text($shot[$key]??null,3000);}}
     if(!is_array($body['prompts']??null)||count($body['prompts'])>40){throw new InvalidArgumentException();}
-    foreach($body['prompts'] as $prompt){if(!is_array($prompt)||!isset($ids[$prompt['shotId']??''])){throw new InvalidArgumentException();}kau_text($prompt['text']??null,12000);}
+    $seen=array();foreach($body['prompts'] as $prompt){if(!is_array($prompt)||!isset($ids[$prompt['shotId']??''])||isset($seen[$prompt['shotId']])||!in_array($prompt['route']??'',$routes,true)){throw new InvalidArgumentException();}$seen[$prompt['shotId']]=true;kau_text($prompt['text']??null,12000);}
+    $budget=$body['budget']??null;if(!is_array($budget)||!in_array($budget['unit']??'',array('second','generation'),true)){throw new InvalidArgumentException();}
+    foreach(array('price'=>array(0,1000000),'attemptsPerShot'=>array(1,20),'usableFraction'=>array(.01,1),'reviewMinutesPerAttempt'=>array(0,1440),'laborRate'=>array(0,10000)) as $key=>$range){$n=$budget[$key]??null;if($key==='price'&&$n===null){continue;}if(!is_int($n)&&!is_float($n)||!is_finite((float)$n)||$n<$range[0]||$n>$range[1]){throw new InvalidArgumentException();}}
+    if(!is_int($budget['attemptsPerShot'])){throw new InvalidArgumentException();}
+    kau_text($budget['evidenceDate']??null,30);kau_text($budget['rateEventKey']??null,191);$source=kau_text($budget['sourceUrl']??null,2048);if($source){kau_url($source);}
+    if($budget['evidenceDate']&&!date_create_immutable($budget['evidenceDate'])){throw new InvalidArgumentException();}
+    foreach(array('outlineBrief','promptShots','promptBrief') as $key){if(($body[$key]??null)!==null){kau_text($body[$key],60000);}}
+    if(($body['referenceMetadata']??null)!==null){$r=$body['referenceMetadata'];if(!is_array($r)||!is_numeric($r['width']??null)||!is_numeric($r['height']??null)||$r['width']<1||$r['height']<1||$r['width']>12000||$r['height']>12000||$r['width']*$r['height']>32000000){throw new InvalidArgumentException();}kau_text($r['name']??null,150);}
     return true;
 }

@@ -32,10 +32,14 @@ Public readbacks taken October 1, 2026 (UTC timestamps retained in evidence):
 | Shared records and operations | Implemented and locally tested | Bind canonical source, release and provider contracts against deployed systems |
 | Video companions | Prepared pipeline; evidence dependency pending | Obtain permitted official feed/channel identity/transcripts; reconcile newest five and retained artifacts |
 | Product-commercial journey | Complete local journey verified | Place on existing Make This after compatible staging and release checks |
-| Source coverage and Brief | Gates/outbox tested; first edition drafted | Resolve deployed source failures and paused provider cause; test established opt-in/suppression/provider paths |
-| My AI Stack | Device journey and native ownership implemented | Validate deployed authentication/follow flow, account journeys and digest integration |
+| Source coverage and Brief | Frozen editions, independent outbox recovery and gates tested; first edition drafted | Resolve deployed source failures and paused provider cause; test established opt-in/suppression/provider paths |
+| My AI Stack | Device and six native-account journey groups verified locally | Validate deployed authentication/follow flow, account journeys and digest integration |
 | Sponsor journey | Additive fields/copy prepared | Integrate existing handler; verify durable owner test inquiry and inbox/CRM delivery |
 | Release and schedules | Templates prepared; none installed | Existing hosting/scheduler administration and production rollback checkpoint required |
+
+## Continuation checkpoint
+
+Version 0.2.0 requires schema 2. A local database export/import checkpoint preceded the additive outbox recovery migration. The 68 foundation checks, 43 recovery checks, 5 Node tests, four existing browser journey groups and six native-auth account groups passed. Production access remains unconfigured. Adapter code defects pause only the affected email stream; uncertain sends remain held. See REPORT.md and the new recovery/native-account evidence.
 
 ## Decisions
 

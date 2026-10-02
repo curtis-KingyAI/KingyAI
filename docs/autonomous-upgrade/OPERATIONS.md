@@ -19,20 +19,23 @@ node --test wp-content/plugins/kingy-autonomous-upgrade/tests/workflow.test.mjs
 python wp-content/plugins/kingy-autonomous-upgrade/tests/browser.py
 ```
 
-Run `tests/staging.php` only inside WordPress with `WP_ENVIRONMENT_TYPE=local`. It deliberately creates synthetic fixtures and fake provider adapters; it throws outside disposable local environments. Do not run it on staging cloned from production subscriber data or on production.
+Run `tests/staging.php`, `tests/recovery.php` and `tests/browser-accounts.php` only inside WordPress with `WP_ENVIRONMENT_TYPE=local`. It deliberately creates synthetic fixtures and fake provider adapters; it throws outside disposable local environments. Do not run it on staging cloned from production subscriber data or on production.
 
 ```sh
 wp eval-file wp-content/plugins/kingy-autonomous-upgrade/tests/staging.php
+wp eval-file wp-content/plugins/kingy-autonomous-upgrade/tests/recovery.php
 wp kingy-upgrade tick --test
 wp kingy-upgrade status
 ```
+
+`python wp-content/plugins/kingy-autonomous-upgrade/tests/accounts-browser.py` exercises native local WordPress cookies/nonces and cross-device account storage. Its private permission-600 cookie fixture is outside Git and is deleted on completion. The script is configured for the disposable local containers; do not use production sessions.
 
 The test tick does not publish or send, but writes test job and exception records. Existing production adapters must honor `context.test` and the deadline without remote paid generation. A completed local edition-preparation result is not provider validation.
 
 ## Guarded rollout
 
 1. Checkpoint and disable new features. Deploy only the reconciled extension and affected patches through the verified existing hosting release mechanism. Activation is inert; preserve current WordPress and scheduler operation.
-2. After the production backup has actually been restored in staging and verified, run `wp kingy-upgrade migrate --backup-restored`. This creates six additive tables. Record database evidence; the flag is an operator assertion, not an automated verification of a backup.
+2. After the production backup has actually been restored in staging and verified, run `wp kingy-upgrade migrate --backup-restored`. Version 0.2.0 requires schema 2. This creates six additive tables, or adds outbox `attempts` and `next_attempt` to schema 1 while retaining all queued and historical delivery records. Record database evidence; the flag is an operator assertion, not an automated verification of a backup.
 3. Keep jobs/email off. Enable workflow/stack/changes/sponsor one at a time with `kau_feature_flags`, and compare before/after public journeys. Place `[kingy_product_commercial]` on the existing Make This page, `[kingy_my_stack]` on the existing stack entry page, and `[kingy_verified_changes]` in the maintained coverage surface. Preserve all existing content and canonical URLs. Set `kau_stack_url`, `kau_workflow_url` and `kau_follow_url` to the actual established routes.
 4. Insert `[kingy_sponsor_upgrade]` into the existing commercial entry page, preserving approved terms and the existing inquiry CTA. The copy draft is additive. Insert `kau_sponsor_detail_fields()` **inside** the maintained inquiry form. After its existing consent/validation/spam gates and successful storage, call `kau_validate_sponsor_details()` then `kau_store_sponsor_details()`; bind validity to the existing durable inquiry type. Do not add another mail-only handler. Send only an explicitly designated owner test inquiry, verify real private storage/confirmation/inbox receipt, invalid/spam rejection and editorial route separation.
 5. Check mobile/desktop keyboard journeys, real product price propagation, anonymous and account persistence, ownership, deletion, sitemap/canonical consistency and credential leakage. Verify companion assets/disclosures/chapter links before publication. Existing KALI gates remain in place.
@@ -55,7 +58,11 @@ The test tick does not publish or send, but writes test job and exception record
 
 The extension is assigned a job only when `kau_job_bindings[name]` is `extension`. Keep existing equivalent owners untouched. Default unassigned state performs no production jobs. No terminal process from this workspace is a scheduler.
 
-Retries are three attempts with bounded exponential backoff; novel code defects fail the affected job for operator review. The overall tick deadline is 240 seconds and individual adapters must use bounded timeouts. Lock ownership prevents stale workers from unlocking a replacement. Missing adapters remain blocked. After repairing a blocked job, use a new safe test slot or explicitly inspect/reset only that held state; do not reset accepted/uncertain outbox rows.
+Retries are three attempts with bounded exponential backoff; novel code defects fail the affected job for operator review. The overall tick deadline is 240 seconds and individual adapters must use bounded timeouts. Provider transport and reconciliation receive a deadline at most 20 seconds away. The independent outbox drain is limited to 50 rows and 60 seconds. Lock ownership prevents stale workers from unlocking a replacement. Missing adapters remain blocked. After repairing a blocked job, use a new safe test slot or explicitly inspect/reset only that held state; do not reset accepted/uncertain outbox rows.
+
+The worker preserves a last-tick checkpoint and reconstructs at most three local dates of missed slots. A larger gap produces an exception; inspect prior scheduled work manually. Never reset missed Brief slots to send a stale edition. Published editions are frozen in page metadata: inspect their content hash, canonical URL and retained payload before retrying. Do not overwrite an owned edition to resolve a conflict.
+
+For an email code defect, inspect the affected stream's private exception and `kau_email_paused`. Repair the code, rerun the relevant local/provider checks, inspect the original outbox checkpoint and reconcile any uncertain outcome. Clear **only** that repaired stream from `kau_email_paused` through authenticated administration. Keep the other stream's state and all accepted/delivered records. Do not convert uncertain to queued without documented provider confirmation that it was never sent.
 
 ## Rollback
 

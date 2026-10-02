@@ -56,6 +56,8 @@ function kau_migrate() {
             payload longtext NOT NULL,
             status varchar(32) NOT NULL DEFAULT 'queued',
             provider_id varchar(191) NOT NULL DEFAULT '',
+            attempts int NOT NULL DEFAULT 0,
+            next_attempt bigint NOT NULL DEFAULT 0,
             updated_at varchar(20) NOT NULL,
             PRIMARY KEY  (id),
             UNIQUE KEY delivery_key (delivery_key)"
@@ -66,7 +68,10 @@ function kau_migrate() {
             throw new RuntimeException('Additive table creation failed: ' . $name);
         }
     }
-    update_option('kau_schema_version', '1', false);
+    foreach (array('attempts','next_attempt') as $column) {
+        if (!$wpdb->get_var($wpdb->prepare('SHOW COLUMNS FROM '.kau_table('outbox').' LIKE %s',$column))) { throw new RuntimeException('Outbox recovery column missing.'); }
+    }
+    update_option('kau_schema_version', KAU_SCHEMA_VERSION, false);
 }
 
 function kau_exception($stream, $key, $reason) {
@@ -160,9 +165,12 @@ function kau_catalog($search = '', $identities = array()) {
 
 function kau_operations_status() {
     global $wpdb;
-    $ready = get_option('kau_schema_version') === '1';
+    $ready = get_option('kau_schema_version') === KAU_SCHEMA_VERSION;
     return array('version' => KAU_VERSION, 'enabled' => get_option('kau_feature_flags', array()), 'schema_ready' => $ready,
         'timezone' => 'America/Vancouver', 'observed_at' => kau_now(),
+        'last_worker_tick'=>get_option('kau_last_tick',null),
+        'email_readiness'=>array('brief'=>kau_delivery_ready('brief'),'stack_digest'=>kau_delivery_ready('stack_digest')),
+        'email_paused'=>get_option('kau_email_paused',array()),
         'jobs' => $ready ? $wpdb->get_results('SELECT name,status,attempts,started_at,completed_at,detail FROM ' . kau_table('jobs') . ' ORDER BY id DESC LIMIT 50', ARRAY_A) : array(),
         'exceptions' => $ready ? $wpdb->get_results('SELECT stream,reason,last_seen,occurrences FROM ' . kau_table('exceptions') . ' WHERE resolved=0 ORDER BY id DESC LIMIT 50', ARRAY_A) : array(),
         'email_counts' => $ready ? $wpdb->get_results('SELECT stream,status,COUNT(*) AS count FROM ' . kau_table('outbox') . ' GROUP BY stream,status', ARRAY_A) : array(),

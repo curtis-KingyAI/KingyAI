@@ -5,9 +5,10 @@ global $wpdb;
 $GLOBALS['kau_test_passed']=array();
 function kau_test($name,$condition){if(!$condition){throw new RuntimeException('FAILED: '.$name);}$GLOBALS['kau_test_passed'][]=$name;}
 function kau_throws($call){try{$call();return false;}catch(Throwable $e){return true;}}
+function kau_test_due_email($id){global $wpdb;$wpdb->update(kau_table('outbox'),array('next_attempt'=>0),array('id'=>$id));} // Simulate elapsed backoff without sleeping.
 update_option('kau_feature_flags',array('workflow'=>true,'stack'=>true,'changes'=>true,'jobs'=>true,'email'=>false,'sponsor'=>true),false);
 kau_migrate();kau_migrate();
-kau_test('idempotent additive migration',get_option('kau_schema_version')==='1');
+kau_test('idempotent additive migration',get_option('kau_schema_version')===KAU_SCHEMA_VERSION);
 $tool=wp_insert_post(array('post_type'=>'kingy_ai_tool','post_status'=>'publish','post_title'=>'STAGING FIXTURE — bottle-video tool'));
 update_post_meta($tool,'_kingy_ali_last_verified','2026-09-01');
 update_post_meta($tool,'_kingy_ali_pricing','Legacy fixture price');
@@ -100,6 +101,7 @@ kau_test('email provider gate closed',kau_send_outbox($id)['status']==='blocked_
 kau_test('test invocation never sends',kau_send_outbox($id,true)['status']==='test_no_send');
 $flags=get_option('kau_feature_flags');$flags['email']=true;update_option('kau_feature_flags',$flags);
 $checks=array_fill_keys(array('provider_sandbox','rendering','archive_links','preferences','suppression','unsubscribe','reconciliation','account_restrictions'),true);update_option('kau_email_checks',array('brief'=>$checks,'stack_digest'=>$checks));
+kau_test_due_email($id);
 $policy=function($v,$row){return array('verified_opt_in'=>true,'suppressed'=>false,'frequency_eligible'=>true,'events_eligible'=>true,'stream'=>$row['stream']);};add_filter('kau_recipient_policy',$policy,10,2);
 $calls=0;$transport=function()use(&$calls){$calls++;return array('status'=>'accepted','provider_id'=>'staging-provider-1');};add_filter('kau_email_transport',$transport);
 kau_test('provider acceptance stored separately',kau_send_outbox($id)['status']==='accepted');kau_send_outbox($id);kau_test('duplicate invocation never resends',$calls===1);
@@ -108,12 +110,12 @@ $uncertain=kau_queue_email('brief','staging-recipient:2','uncertain-fixture-'.$t
 $unknown=function()use(&$unknownCalls){$unknownCalls++;throw new RuntimeException('Simulated ambiguous provider timeout');};add_filter('kau_email_transport',$unknown);
 kau_test('ambiguous provider result held',kau_send_outbox($uncertain)['status']==='uncertain');kau_send_outbox($uncertain);kau_test('uncertain send held without reconciliation',$unknownCalls===1);remove_filter('kau_email_transport',$unknown);
 $reconcile=function(){return array('status'=>'accepted','provider_id'=>'staging-reconciled');};add_filter('kau_email_reconcile',$reconcile);
-kau_test('ambiguous send reconciles without retry',kau_send_outbox($uncertain)['status']==='accepted');remove_filter('kau_email_reconcile',$reconcile);
+kau_test_due_email($uncertain);kau_test('ambiguous send reconciles without retry',kau_send_outbox($uncertain)['status']==='accepted');remove_filter('kau_email_reconcile',$reconcile);
 $expiredAmbiguous=kau_queue_email('brief','staging-recipient:5','expired-ambiguous-'.$tool,$edition,gmdate('Y-m-d\TH:i:s\Z',time()-60));$wpdb->update(kau_table('outbox'),array('status'=>'uncertain'),array('id'=>$expiredAmbiguous));
 kau_test('expiration cannot erase an ambiguous earlier send',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');
-$malformedReconcile=function(){return array('status'=>'queued');};add_filter('kau_email_reconcile',$malformedReconcile);kau_test('unproven reconcile status cannot authorize a resend',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');remove_filter('kau_email_reconcile',$malformedReconcile);
-remove_filter('kau_recipient_policy',$policy);kau_test('revoked consent cannot erase earlier send uncertainty',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');add_filter('kau_recipient_policy',$policy,10,2);
-add_filter('kau_email_reconcile',$reconcile);kau_test('expired ambiguous result reconciles without another send',kau_send_outbox($expiredAmbiguous)['status']==='accepted');remove_filter('kau_email_reconcile',$reconcile);
+$malformedReconcile=function(){return array('status'=>'queued');};add_filter('kau_email_reconcile',$malformedReconcile);kau_test_due_email($expiredAmbiguous);kau_test('unproven reconcile status cannot authorize a resend',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');remove_filter('kau_email_reconcile',$malformedReconcile);
+remove_filter('kau_recipient_policy',$policy);kau_test_due_email($expiredAmbiguous);kau_test('revoked consent cannot erase earlier send uncertainty',kau_send_outbox($expiredAmbiguous)['status']==='uncertain');add_filter('kau_recipient_policy',$policy,10,2);
+add_filter('kau_email_reconcile',$reconcile);kau_test_due_email($expiredAmbiguous);kau_test('expired ambiguous result reconciles without another send',kau_send_outbox($expiredAmbiguous)['status']==='accepted');remove_filter('kau_email_reconcile',$reconcile);
 $digestRef='staging-digest:'.$tool;$digestId=kau_queue_email('stack_digest',$digestRef,'day-one',$edition,$expire);$wpdb->update(kau_table('outbox'),array('status'=>'uncertain'),array('id'=>$digestId));
 kau_test('uncertain digest event is held across daily policies',kau_unseen_recipient_changes($digestRef,array($change))===array());
 $wpdb->update(kau_table('outbox'),array('status'=>'accepted'),array('id'=>$digestId));kau_test('accepted digest event cannot repeat on a later day',kau_unseen_recipient_changes($digestRef,array($change))===array());

@@ -2,12 +2,13 @@
 /**
  * Plugin Name: Kingy Autonomous Upgrade
  * Description: Guarded commercial workflow, device stack and operations extensions for the existing Kingy property.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Author: Kingy AI
  */
 if (!defined('ABSPATH')) { exit; }
 define('KAU_DIR', __DIR__ . '/');
-define('KAU_VERSION', '0.1.0');
+define('KAU_VERSION', '0.2.0');
+define('KAU_SCHEMA_VERSION', '2');
 require_once KAU_DIR . 'includes/validation.php';
 require_once KAU_DIR . 'includes/store.php';
 require_once KAU_DIR . 'includes/jobs.php';
@@ -19,7 +20,7 @@ require_once KAU_DIR . 'includes/sponsor.php';
 
 function kau_enabled($feature) {
     $flags = get_option('kau_feature_flags', array());
-    return is_array($flags) && !empty($flags[$feature]) && get_option('kau_schema_version') === '1';
+    return is_array($flags) && !empty($flags[$feature]) && get_option('kau_schema_version') === KAU_SCHEMA_VERSION;
 }
 
 // No activation-time migrations, page creation, cron registration or email sends.

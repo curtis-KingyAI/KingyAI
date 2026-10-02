@@ -1,0 +1,12 @@
+{
+  "scope": "Real disposable local WordPress native cookies, REST nonces and account persistence. No mocked authentication, production changes or real sends.",
+  "passed": 6,
+  "checks": [
+    "Actual native cookie/REST nonce saves project; missing nonce cannot read private projects",
+    "Second authenticated user cannot read, overwrite or delete first-user project",
+    "Cross-device restore/update works on mobile; stale editor recovers from real 409 conflict",
+    "Saved stack/projects restore in another native session without exposing them to another user",
+    "Unchecked digest consent is rejected; unconfigured follow adapter never claims opt-in",
+    "Account deletion removes stack and standalone projects, clears device/other-tab copies, preserves other user"
+  ]
+}
