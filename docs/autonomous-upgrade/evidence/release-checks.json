@@ -134,6 +134,11 @@
     {
       "check": "private native-cookie fixture cleanup",
       "passed": true
+    },
+    {
+      "check": "complete staged continuation diff",
+      "exit_code": 0,
+      "source_tree": "148a3a582adb3377cc6b2dde597f2d9073a0f6e9"
     }
   ]
 }

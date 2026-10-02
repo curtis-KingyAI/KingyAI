@@ -4,7 +4,7 @@
 
 Owner: Curtis Pyke. Source repository: `curtis-KingyAI/KingyAI`. Work branch: `codex/autonomous-upgrade-20261001`. Base commit: `e1ce218` (full identifier in `evidence/base-commit.txt`). Version 0.2.0 (schema 2) is a disabled-by-default extension and three additive changes to the existing KALI plugin. This report describes prepared source, not a released version.
 
-Prepared implementation commit: [dc6774821fec6d9b51c441aee23ae33b6b97d80e](https://github.com/curtis-KingyAI/KingyAI/commit/dc6774821fec6d9b51c441aee23ae33b6b97d80e). Review: [draft pull request #23](https://github.com/curtis-KingyAI/KingyAI/pull/23). No production release identifier exists.
+Prepared implementation commit: [9d2cf42ef143163119a964bb79435dc7516c98c6](https://github.com/curtis-KingyAI/KingyAI/commit/9d2cf42ef143163119a964bb79435dc7516c98c6). Review: [draft pull request #23](https://github.com/curtis-KingyAI/KingyAI/pull/23). No production release identifier exists.
 
 ## What is live
 
