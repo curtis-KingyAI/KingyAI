@@ -1,0 +1,42 @@
+[
+  {
+    "name": "new-sol-specs",
+    "url": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "observed_at": "2026-10-01T22:58:16.939137+00:00",
+    "status": 200,
+    "sha256": "d60b26a68bdf0a827699f28031bb7a62552001edcd14955c10a4cb8cbff251f2",
+    "bytes": 442072
+  },
+  {
+    "name": "model-record",
+    "url": "https://kingy.ai/wp-json/wp/v2/kingy_ai_model?slug=gpt-6-1-sol",
+    "observed_at": "2026-10-01T22:58:17.316015+00:00",
+    "status": 200,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "bytes": 2
+  },
+  {
+    "name": "proof-receipt",
+    "url": "https://kingy.ai/make-this/recipe-video-exact-text/",
+    "observed_at": "2026-10-01T22:58:17.995161+00:00",
+    "status": 200,
+    "sha256": "7e7152a64707df90fa40e365bc2661454f11292bfcd0eeb68d5c2704f4df4e80",
+    "bytes": 283467
+  },
+  {
+    "name": "production-benchmarks",
+    "url": "https://kingy.ai/production-benchmarks/",
+    "observed_at": "2026-10-01T22:58:18.660628+00:00",
+    "status": 200,
+    "sha256": "c082d426817e8f1c28dee5b2e05c9ea1498478c8e2b619ba63830f2e1dc441ed",
+    "bytes": 72193
+  },
+  {
+    "name": "preflight",
+    "url": "https://kingy.ai/output-preflight/",
+    "observed_at": "2026-10-01T22:58:18.792993+00:00",
+    "status": 200,
+    "sha256": "d75aecaac715873a49d8fdde005d36bd232093841e0e42277365b3aa004dd0cd",
+    "bytes": 84956
+  }
+]

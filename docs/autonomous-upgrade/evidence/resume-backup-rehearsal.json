@@ -1,0 +1,8 @@
+{
+  "scope": "disposable local WordPress only; not a production backup",
+  "database_export_and_restore": "passed",
+  "backup_path": "/workspace/kingy-upgrade/staging/wordpress/pre-resume-20261001.sql",
+  "sha256": "2cef61e8b1dfe2f8895e34c06b84bb729b4a8018caee3d50016d8d996a8d565c",
+  "observed_at": "2026-10-01T23:40:43.123500+00:00",
+  "production_touched": false
+}

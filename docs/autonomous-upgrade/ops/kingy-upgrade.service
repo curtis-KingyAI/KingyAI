@@ -1,0 +1,14 @@
+[Unit]
+Description=Kingy assigned upgrade jobs (template: requires existing host reconciliation)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=REPLACE_WITH_EXISTING_WORDPRESS_USER
+WorkingDirectory=/REPLACE_WITH_EXISTING_WORDPRESS_ROOT
+ExecStart=/usr/local/bin/wp --path=/REPLACE_WITH_EXISTING_WORDPRESS_ROOT kingy-upgrade tick
+TimeoutStartSec=300
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077

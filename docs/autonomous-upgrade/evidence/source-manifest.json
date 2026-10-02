@@ -1,0 +1,133 @@
+{
+  "base_commit": "e1ce218ef171c1bcb92e965bdbb70713dc6ddea3",
+  "release": "prepared source only; no production deployment",
+  "plugin_version": "0.2.0",
+  "schema_version": 2,
+  "files": [
+    {
+      "path": "wp-content/plugins/kingy-ai-launch-intelligence/includes/companion-videos.php",
+      "sha256": "3179d7b2dfa72261e839728b91e663a3b965797c6f6c226e8adfc952e500b0e1",
+      "bytes": 55583
+    },
+    {
+      "path": "wp-content/plugins/kingy-ai-launch-intelligence/includes/tool-modules.php",
+      "sha256": "ee7541092ec0edd51694b7e534a935eee9b7d09300928d2ce3f6db54057e169e",
+      "bytes": 20675
+    },
+    {
+      "path": "wp-content/plugins/kingy-ai-launch-intelligence/templates/single-kingy-video.php",
+      "sha256": "f8ea6c8f9537f17b54b4c91c4da012a4cda2c6617641bb4b841b8160e739ccc6",
+      "bytes": 9700
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/README.md",
+      "sha256": "7c703d2268eec429ea11ef199ae7bcb80866ba113001453a870c45234e0bfaab",
+      "bytes": 1499
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/app.css",
+      "sha256": "58c1686e28ba1e63b94f9f035afe54098a76a3ab0f97fe8b8ff17dfc1c73ae6d",
+      "bytes": 2775
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/app.mjs",
+      "sha256": "044515157510505d42a807d495f46454e715529b4053b10a860a55a356f8517a",
+      "bytes": 31518
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-video-project.js",
+      "sha256": "ae27dff7903dd4b8aa09533b2b4c83ab0979c32d0cbb308080efececf67c2fe0",
+      "bytes": 13052
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-workbench-cost.mjs",
+      "sha256": "7495fd5a2b79b11b3f336c836122b64c73cd22bf324e96a43e0ae65d2aaa5a12",
+      "bytes": 1783
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/video-bridge.mjs",
+      "sha256": "92bb325681ce08ee00aa589072a9e298259db0585424ee365280124038e346ac",
+      "bytes": 1759
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/assets/workflow.mjs",
+      "sha256": "694ea8e6c23785d0051b5817ca923119bafaaaa18f2ca681ba0f5b784d1c41fd",
+      "bytes": 11954
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/jobs.php",
+      "sha256": "92a21f9203752b53c504bbadd2dddbefa1ab6bfddc3b7b7398a3885f1662efed",
+      "bytes": 17584
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/pipelines.php",
+      "sha256": "cebf044733e6c5c96eaf119c5143c938e5a360990500ca142283af513a86b3dd",
+      "bytes": 14009
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/publishing.php",
+      "sha256": "2426d23cf7911583822f822771f0e2bebebdba54592b7d1d7faa2086abeb1fed",
+      "bytes": 11152
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/rest.php",
+      "sha256": "2afef3a152636473b9bdd28aef1e3329818728fb68a3e9aef506321c395a85dd",
+      "bytes": 13701
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/sponsor.php",
+      "sha256": "bca2cbbed683e9a758deecb6d894cb50c23af3d2ea4687610b4d520a821c0692",
+      "bytes": 2694
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/store.php",
+      "sha256": "40e35d1d5cda8d5390ac7120756a02631796086a5b4c6152072444b1054eb40f",
+      "bytes": 10577
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/validation.php",
+      "sha256": "1aefa3f1527c52a40159d1188c6fce903122fc405583b8b47318f22c2e672b20",
+      "bytes": 7328
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/includes/views.php",
+      "sha256": "d0389b95a620bdf7ed50f472d4dd470393e2e4e57f43b0905456f5d1f4a05c66",
+      "bytes": 6313
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/kingy-autonomous-upgrade.php",
+      "sha256": "6a83bf684766fbbdd7f75446da797e20efc633c0924db85ffa5ca7b27cabdf4d",
+      "bytes": 2127
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/accounts-browser.py",
+      "sha256": "99fbcaa50d606575d6283f59c24c7c7421b71a7d61e4b4e955810d460a1f7dfc",
+      "bytes": 7155
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/browser-accounts.php",
+      "sha256": "1fbbe2ea2efa74d2aba648619e2d85a742e599edd27952435de1a801c90c35c0",
+      "bytes": 1101
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/browser.py",
+      "sha256": "e55b6bd8891a9f036328f361bc68df1cc35758cbf38ce3674cd5a28fbd9d982e",
+      "bytes": 7378
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/recovery.php",
+      "sha256": "9b04e27f5e1c55b4873d92aa97aab38f02e5e1935a2bf5e0e090a67300733325",
+      "bytes": 19305
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/staging.php",
+      "sha256": "97504534cb1e714fae15ae9fac48d79f6893fef31f615637d04b4f4b60a95a3a",
+      "bytes": 22218
+    },
+    {
+      "path": "wp-content/plugins/kingy-autonomous-upgrade/tests/workflow.test.mjs",
+      "sha256": "6e6aed23527921950169fe2ff645e16870f9feb5221f95f44479163acf7f9f5f",
+      "bytes": 4330
+    }
+  ]
+}

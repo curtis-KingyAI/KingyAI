@@ -1,0 +1,24 @@
+Notice: Function _load_textdomain_just_in_time was called <strong>incorrectly</strong>. Translation loading for the <code>kingy-ai-launch-intelligence</code> domain was triggered too early. This is usually an indicator for some code in the plugin or theme running too early. Translations should be loaded at the <code>init</code> action or later. Please see <a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/">Debugging in WordPress</a> for more information. (This message was added in version 6.7.0.) in /var/www/html/wp-includes/functions.php on line 6260
+Fatal error: Uncaught InvalidArgumentException: Use an existing stable WordPress product identity. in /var/www/html/wp-content/plugins/kingy-autonomous-upgrade/includes/validation.php:29
+Stack trace:
+#0 /var/www/html/wp-content/plugins/kingy-autonomous-upgrade/includes/validation.php(39): kau_product_id('wp:kingy_ai_too...')
+#1 /var/www/html/wp-content/plugins/kingy-autonomous-upgrade/includes/pipelines.php(147): kau_validate_change(Array)
+#2 phar:///usr/local/bin/wp/vendor/wp-cli/eval-command/src/EvalFile_Command.php(85) : eval()'d code(66): kau_build_digest(Array, '2026-10-01')
+#3 phar:///usr/local/bin/wp/vendor/wp-cli/eval-command/src/EvalFile_Command.php(85): eval()
+#4 phar:///usr/local/bin/wp/vendor/wp-cli/eval-command/src/EvalFile_Command.php(59): EvalFile_Command::execute_eval('/var/www/html/w...', Array, false)
+#5 [internal function]: EvalFile_Command->__invoke(Array, Array)
+#6 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Dispatcher/CommandFactory.php(100): call_user_func(Array, Array, Array)
+#7 [internal function]: WP_CLI\Dispatcher\CommandFactory::WP_CLI\Dispatcher\{closure}(Array, Array)
+#8 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Dispatcher/Subcommand.php(497): call_user_func(Object(Closure), Array, Array)
+#9 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Runner.php(470): WP_CLI\Dispatcher\Subcommand->invoke(Array, Array, Array)
+#10 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Runner.php(493): WP_CLI\Runner->run_command(Array, Array)
+#11 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Runner.php(136): WP_CLI\Runner->run_command_and_exit()
+#12 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Runner.php(1228): WP_CLI\Runner->do_early_invoke('before_wp_load')
+#13 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/WP_CLI/Bootstrap/LaunchRunner.php(28): WP_CLI\Runner->start()
+#14 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/bootstrap.php(84): WP_CLI\Bootstrap\LaunchRunner->process(Object(WP_CLI\Bootstrap\BootstrapState))
+#15 phar:///usr/local/bin/wp/vendor/wp-cli/wp-cli/php/wp-cli.php(35): WP_CLI\bootstrap()
+#16 phar:///usr/local/bin/wp/php/boot-phar.php(20): include('phar:///usr/loc...')
+#17 /usr/local/bin/wp(4): include('phar:///usr/loc...')
+#18 {main}
+  thrown in /var/www/html/wp-content/plugins/kingy-autonomous-upgrade/includes/validation.php on line 29
+Error: There has been a critical error on this website.Learn more about troubleshooting WordPress. There has been a critical error on this website.

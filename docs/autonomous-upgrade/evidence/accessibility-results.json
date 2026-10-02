@@ -1,0 +1,17 @@
+[
+  {
+    "url": "http://127.0.0.1:8081/?pagename=commercial-staging",
+    "scope": "[data-kau=\"workflow\"]",
+    "violations": []
+  },
+  {
+    "url": "http://127.0.0.1:8081/?pagename=my-ai-stack-staging",
+    "scope": "[data-kau=\"stack\"]",
+    "violations": []
+  },
+  {
+    "url": "http://127.0.0.1:8081/staging-email.html",
+    "scope": "main",
+    "violations": []
+  }
+]

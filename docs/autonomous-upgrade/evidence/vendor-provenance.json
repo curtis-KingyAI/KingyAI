@@ -1,0 +1,18 @@
+[
+  {
+    "local": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-workbench-cost.mjs",
+    "sha256": "7495fd5a2b79b11b3f336c836122b64c73cd22bf324e96a43e0ae65d2aaa5a12",
+    "matches_captured_source": true,
+    "public_source_url": "https://kingy.ai/wp-content/plugins/kingy-workbench/assets/cost.mjs?v=1.1.0",
+    "retrieved_from": "Kingy public production application assets; see source URLs in the manifest",
+    "observed_date_utc": "2026-10-01"
+  },
+  {
+    "local": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-video-project.js",
+    "sha256": "ae27dff7903dd4b8aa09533b2b4c83ab0979c32d0cbb308080efececf67c2fe0",
+    "matches_captured_source": true,
+    "public_source_url": "https://kingy.ai/wp-content/mu-plugins/kingy-video-journey/project-model.js?ver=1790711727",
+    "retrieved_from": "Kingy public production application assets; see source URLs in the manifest",
+    "observed_date_utc": "2026-10-01"
+  }
+]

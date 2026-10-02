@@ -44,6 +44,7 @@ function kingy_ali_companion_meta_key($key) {
         'snapshot_json_revision' => '_kingy_snapshot_json_revision',
         'snapshot_verified_date' => '_kingy_snapshot_verified_date',
         'sponsored' => '_kingy_sponsored',
+        'commercial_status' => '_kingy_commercial_status',
         'image_qa_approved' => '_kingy_image_qa_approved',
         'editorial_qa_approved' => '_kingy_editorial_qa_approved',
         'index_approved' => '_kingy_companion_index_approved',
@@ -64,6 +65,7 @@ function kingy_ali_register_companion_video_meta() {
         'snapshot_json' => 'string',
         'snapshot_verified_date' => 'string',
         'sponsored' => 'boolean',
+        'commercial_status' => 'string',
         'image_qa_approved' => 'boolean',
         'editorial_qa_approved' => 'boolean',
         'index_approved' => 'boolean',
@@ -126,6 +128,15 @@ function kingy_ali_companion_youtube_id($value) {
     }
 
     return preg_match('/^[A-Za-z0-9_-]{11}$/', $candidate) ? $candidate : '';
+}
+
+function kingy_ali_companion_commercial_status($post_id) {
+    $status = get_post_meta($post_id, kingy_ali_companion_meta_key('commercial_status'), true);
+    if (is_string($status) && in_array($status, array('sponsored', 'independent', 'mixed', 'unconfirmed'), true)) {
+        return $status;
+    }
+    // A legacy unchecked sponsor box does not establish independence.
+    return get_post_meta($post_id, kingy_ali_companion_meta_key('sponsored'), true) ? 'sponsored' : 'unconfirmed';
 }
 
 function kingy_ali_companion_valid_date($value) {
@@ -251,6 +262,13 @@ function kingy_ali_render_companion_video_meta_box($post) {
         <span class="description" id="kingy-featured-tools-help"><?php esc_html_e('Comma-separated published tool IDs or slugs. Relationship changes are preserved as an append-only event history.', 'kingy-ai-launch-intelligence'); ?></span>
     </p>
     <p><label><input name="kingy_sponsored" type="checkbox" value="1" <?php checked($sponsored); ?>> <?php esc_html_e('Sponsored video — show disclosure', 'kingy-ai-launch-intelligence'); ?></label></p>
+    <p><label for="kingy-commercial-status"><?php esc_html_e('Evidence-supported commercial status', 'kingy-ai-launch-intelligence'); ?></label>
+        <select id="kingy-commercial-status" name="kingy_commercial_status">
+            <?php foreach (array('unconfirmed' => 'Unconfirmed', 'sponsored' => 'Sponsored', 'independent' => 'Confirmed independent', 'mixed' => 'Editorial with a paid segment') as $value => $label) : ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected(kingy_ali_companion_commercial_status($post->ID), $value); ?>><?php echo esc_html($label); ?></option>
+            <?php endforeach; ?>
+        </select>
+    </p>
     <hr>
     <p><strong><?php esc_html_e('Snapshot', 'kingy-ai-launch-intelligence'); ?></strong><br>
         <?php if ($snapshot) : ?>
@@ -342,6 +360,12 @@ function kingy_ali_save_companion_video($post_id, $post, $update) {
         return;
     }
 
+    $commercial_status = kingy_ali_companion_request_scalar('kingy_commercial_status');
+    if ($commercial_status !== '' && !in_array($commercial_status, array('unconfirmed', 'sponsored', 'independent', 'mixed'), true)) {
+        kingy_ali_companion_set_notice(__('Invalid commercial status. Existing metadata was preserved.', 'kingy-ai-launch-intelligence'));
+        return;
+    }
+
     $resolved = null;
     if (isset($_POST['kingy_featured_tools']) && is_scalar($_POST['kingy_featured_tools'])) {
         $resolved = kingy_ali_companion_resolve_tool_references(wp_unslash($_POST['kingy_featured_tools']));
@@ -373,6 +397,9 @@ function kingy_ali_save_companion_video($post_id, $post, $update) {
     }
 
     update_post_meta($post_id, kingy_ali_companion_meta_key('sponsored'), isset($_POST['kingy_sponsored']) ? 1 : 0);
+    if ($commercial_status !== '') {
+        update_post_meta($post_id, kingy_ali_companion_meta_key('commercial_status'), $commercial_status);
+    }
     update_post_meta($post_id, kingy_ali_companion_meta_key('image_qa_approved'), isset($_POST['kingy_image_qa_approved']) ? 1 : 0);
     update_post_meta($post_id, kingy_ali_companion_meta_key('editorial_qa_approved'), isset($_POST['kingy_editorial_qa_approved']) ? 1 : 0);
     update_post_meta($post_id, kingy_ali_companion_meta_key('index_approved'), isset($_POST['kingy_index_approved']) ? 1 : 0);

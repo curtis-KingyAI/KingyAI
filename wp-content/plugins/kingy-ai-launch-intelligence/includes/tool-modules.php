@@ -207,7 +207,12 @@ function kingy_ali_render_kali_tool_facts($tool_id) {
 }
 
 function kingy_ali_render_kali_tool_pricing($tool_id, $heading_level = 2, $humanize_values = false) {
+    $verified_price = apply_filters('kingy_ali_current_price_record', null, $tool_id);
+    $verified_price = is_array($verified_price) && isset($verified_price['price'], $verified_price['source_url'], $verified_price['verified_at']) ? $verified_price : null;
     $pricing_url = kingy_ali_sanitize_public_profile_link_url(kingy_ali_get_meta($tool_id, 'pricing_url'));
+    if ($verified_price) {
+        $pricing_url = kingy_ali_sanitize_public_profile_link_url($verified_price['source_url']);
+    }
     $heading_tag = kingy_ali_kali_heading_tag($heading_level);
     $free_plan = kingy_ali_public_profile_meta_text($tool_id, 'free_plan', __('Unknown', 'kingy-ai-launch-intelligence'));
     if ($humanize_values) {
@@ -219,10 +224,10 @@ function kingy_ali_render_kali_tool_pricing($tool_id, $heading_level = 2, $human
     <section class="kingy-ali-content-band kingy-ali-tool-module" data-kingy-kali-module="pricing" data-kingy-kali-mode="live" data-kingy-tool-id="<?php echo esc_attr($tool_id); ?>">
         <<?php echo tag_escape($heading_tag); ?>><?php esc_html_e('Current pricing', 'kingy-ai-launch-intelligence'); ?></<?php echo tag_escape($heading_tag); ?>>
         <dl class="kingy-ali-score-list">
-            <?php kingy_ali_tool_fact(__('Pricing', 'kingy-ai-launch-intelligence'), kingy_ali_public_profile_meta_text($tool_id, 'pricing')); ?>
+            <?php kingy_ali_tool_fact(__('Pricing', 'kingy-ai-launch-intelligence'), $verified_price ? $verified_price['price']['amount'] . ' ' . $verified_price['price']['currency'] . ' per ' . $verified_price['price']['unit'] : kingy_ali_public_profile_meta_text($tool_id, 'pricing')); ?>
             <?php kingy_ali_tool_fact(__('Free plan', 'kingy-ai-launch-intelligence'), $free_plan); ?>
         </dl>
-        <p class="kingy-ali-small-note"><?php echo esc_html(kingy_ali_kali_current_verification_text($tool_id)); ?></p>
+        <p class="kingy-ali-small-note"><?php echo esc_html($verified_price ? 'Price evidence verified ' . $verified_price['verified_at'] . '. Other product facts have separate verification dates.' : kingy_ali_kali_current_verification_text($tool_id)); ?></p>
         <?php if ($pricing_url) : ?>
             <p><a data-kingy-ali-track="clicked_source_link" data-event-label="<?php esc_attr_e('Official pricing', 'kingy-ai-launch-intelligence'); ?>" data-event-surface="kali_tool_pricing" href="<?php echo esc_url($pricing_url); ?>"<?php echo kingy_ali_source_link_target_attrs($pricing_url); ?>><?php esc_html_e('Check official pricing', 'kingy-ai-launch-intelligence'); ?></a></p>
         <?php endif; ?>

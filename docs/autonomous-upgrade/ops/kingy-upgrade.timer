@@ -1,0 +1,11 @@
+[Unit]
+Description=Kingy assigned job trigger (template, not installed)
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Persistent=true
+Unit=kingy-upgrade.service
+
+[Install]
+WantedBy=timers.target

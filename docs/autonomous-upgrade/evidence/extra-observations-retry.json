@@ -1,0 +1,42 @@
+[
+  {
+    "name": "workbench-js",
+    "status": 200,
+    "bytes": 13441,
+    "url": "https://kingy.ai/wp-content/plugins/kingy-workbench/assets/workbench.js"
+  },
+  {
+    "name": "impact-engine",
+    "status": 200,
+    "bytes": 7922,
+    "url": "https://kingy.ai/wp-content/mu-plugins/kingy-workflow-impacts/engine.mjs"
+  },
+  {
+    "name": "impact-watch",
+    "status": 200,
+    "bytes": 7191,
+    "url": "https://kingy.ai/wp-content/mu-plugins/kingy-workflow-impacts/watch.mjs"
+  },
+  {
+    "name": "prices",
+    "status": 200,
+    "bytes": 4594,
+    "url": "https://kingy.ai/wp-json/kingy-audit/v1/prices"
+  },
+  {
+    "name": "sponsorship",
+    "status": 200,
+    "bytes": 143418,
+    "url": "https://kingy.ai/sponsor-kingy-ai/"
+  },
+  {
+    "name": "camera",
+    "status": 200,
+    "bytes": 33467,
+    "url": "https://kingy.ai/ai-camera-simulator/"
+  },
+  {
+    "name": "video-budget",
+    "error": "HTTP Error 404: Not Found"
+  }
+]

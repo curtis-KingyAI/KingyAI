@@ -1,0 +1,144 @@
+{
+  "scope": "local source validation; no production release",
+  "observed_at": "2026-10-02T00:51:58.081700+00:00",
+  "checks": [
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/jobs.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/pipelines.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/publishing.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/rest.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/sponsor.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/store.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/validation.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/includes/views.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/kingy-autonomous-upgrade.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/tests/browser-accounts.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/tests/recovery.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/tests/staging.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-ai-launch-intelligence/includes/companion-videos.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-ai-launch-intelligence/includes/tool-modules.php",
+      "exit_code": 0
+    },
+    {
+      "check": "php syntax",
+      "file": "wp-content/plugins/kingy-ai-launch-intelligence/templates/single-kingy-video.php",
+      "exit_code": 0
+    },
+    {
+      "check": "module syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/assets/app.mjs",
+      "exit_code": 0
+    },
+    {
+      "check": "module syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-workbench-cost.mjs",
+      "exit_code": 0
+    },
+    {
+      "check": "module syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/assets/video-bridge.mjs",
+      "exit_code": 0
+    },
+    {
+      "check": "module syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/assets/workflow.mjs",
+      "exit_code": 0
+    },
+    {
+      "check": "module syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/tests/workflow.test.mjs",
+      "exit_code": 0
+    },
+    {
+      "check": "module syntax",
+      "file": "wp-content/plugins/kingy-autonomous-upgrade/assets/vendor/kingy-video-project.js",
+      "exit_code": 0
+    },
+    {
+      "check": "existing regression",
+      "file": "wp-content/plugins/kingy-ai-launch-intelligence/tests/out-of-range-pagination-smoke.php",
+      "exit_code": 0,
+      "output": "Out-of-range archive pagination smoke tests passed.\n"
+    },
+    {
+      "check": "existing regression",
+      "file": "wp-content/plugins/kingy-ai-launch-intelligence/tests/launch-archive-pagination-smoke.php",
+      "exit_code": 0,
+      "output": "Launch archive pagination smoke tests passed.\n"
+    },
+    {
+      "check": "diff whitespace",
+      "exit_code": 0
+    },
+    {
+      "check": "credential scan",
+      "scoped_files": 69,
+      "known_staging_secret_matches": 0,
+      "high_confidence_credential_matches": 0,
+      "passed": true,
+      "scope": "extension, three KALI patches and durable project records; known local staging values and high-confidence credential patterns; not proof against every possible secret"
+    },
+    {
+      "check": "private native-cookie fixture cleanup",
+      "passed": true
+    },
+    {
+      "check": "complete staged continuation diff",
+      "exit_code": 0,
+      "source_tree": "148a3a582adb3377cc6b2dde597f2d9073a0f6e9"
+    }
+  ]
+}

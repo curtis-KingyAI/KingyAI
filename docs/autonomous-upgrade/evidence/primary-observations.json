@@ -1,0 +1,34 @@
+[
+  {
+    "name": "official-sol-luna",
+    "url": "https://openai.com/index/introducing-gpt-6-sol-and-luna/",
+    "observed_at": "2026-10-01T22:52:31.037086+00:00",
+    "status": 200,
+    "sha256": "bffa212b7b4d4f51f493227edb4fc5488981e775d7af979e57a12f5f5036a923",
+    "bytes": 872009
+  },
+  {
+    "name": "official-sol-specs",
+    "url": "https://developers.openai.com/api/docs/models/gpt-6-sol",
+    "observed_at": "2026-10-01T22:52:31.848996+00:00",
+    "status": 200,
+    "sha256": "40e8a67962ea7520b4f36917d761607a3104bf2d7208a2e6c24f158af1580a47",
+    "bytes": 442112
+  },
+  {
+    "name": "official-pricing",
+    "url": "https://developers.openai.com/api/docs/pricing",
+    "observed_at": "2026-10-01T22:52:32.145295+00:00",
+    "status": 200,
+    "sha256": "1a9ed13381679b1d74dba87c0603a00d48015e9682447d403dfb26e28ce15263",
+    "bytes": 580361
+  },
+  {
+    "name": "media-kit",
+    "url": "https://kingy.ai/media-kit/",
+    "observed_at": "2026-10-01T22:52:32.366410+00:00",
+    "status": 200,
+    "sha256": "0a5f2e85d7486d45eb7682082b12fdbdae7c1d189d36e3f5055e8ffae7fc5577",
+    "bytes": 136856
+  }
+]
